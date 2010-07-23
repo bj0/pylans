@@ -1,14 +1,17 @@
 #!/usr/bin/python
 # prompt.py
 # todo: quit message?
-# more commands: peer list, dump peer, ??s
+# more commands: dump peer, ??s
 
+import uuid
 from cmd import Cmd
 
 from twisted.internet import reactor
 from twisted.internet.threads import deferToThread
 
-import router
+#import settings
+#import router
+from networks import NetworkManager
 from router import PeerInfo # for pickle
 from chatter import ChatterBox
 
@@ -28,6 +31,17 @@ class Prompt(Cmd):
             
         except ValueError:
             print 'Invalid arguments.'
+            
+            
+    def do_status(self, line):
+        print '========= Network Status ========='
+        print 'name:        {0}'.format(self.router.network.name)
+        print 'id:          {0}'.format(self.router.network.id)
+        print 'address:     {0}'.format(self.router.network.virtual_address)
+        print 'port:        {0}'.format(self.router.network.port)
+        print 'my name:     {0}'.format(self.router.network.user_name)
+        print '# of peers:  {0}'.format(len(self.router.pm))
+            
             
     def do_list(self, line):
         pl = self.router.pm.peer_list
@@ -52,6 +66,10 @@ class Prompt(Cmd):
         if peer is not None:
             reactor.callFromThread(cbox.send_message,peer.id, msg)
             
+            
+    def emptyline(self, *args):
+        self.do_status('')
+            
     def do_EOF(self, line):
         print
         reactor.callFromThread(reactor.stop)
@@ -61,15 +79,19 @@ class Prompt(Cmd):
 
 
 if __name__ == '__main__':
-    rt = router.Router()
-    cbox = ChatterBox(rt)
-    p = Prompt(rt)
+
+    net_mgr = NetworkManager()
+    if len(net_mgr) < 1:
+        net = net_mgr.create('newnetwork')
+    else:
+        net = net_mgr.network_list.values()[0]
+
+    net.start()
+    cbox = ChatterBox(net.router)
+    p = Prompt(net.router)
     deferToThread(p.cmdloop)
 
-    rt._tuntap.configure_iface(router.config.address)
-    reactor.callLater(5, reactor.listenTCP,15034, cbox, interface=router.config.address.split('/')[0])
-    reactor.listenUDP(router.config.port, rt._proto)        
-#            rt.try_register(('10.10.10.216',8015))
+    reactor.callLater(5, reactor.listenTCP, cbox.port, cbox, interface=net.ip)
 
     
     print 'run'

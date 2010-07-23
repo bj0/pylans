@@ -15,13 +15,14 @@ from event import Event
 from tuntap import TunTap
 from crypto import Crypter
 from pinger import Pinger
-import config
+#import settings
 
 class PeerInfo(object):
     
     def __init__(self):
         self.id = 0                     # unique peer id
         self.name = 'wop'
+        self.alias = None
         self.address = ('ip','port')
         self.vip = 0                    # virtual ip
         self.real_ips = []              # list of known real ips
@@ -30,13 +31,28 @@ class PeerInfo(object):
         self.ping_time = 0              #
         self.timeouts = 0               # tracking ping timeouts
         
+    def update(self, peer):
+        self.name = peer.name
+        self.vip = peer.vip
         
 class PeerManager(object):
     
+    MAX_REG_TRIES = 5
+    MAX_PX_TRIES = 5
+    REG_TRY_DELAY = 1
+    PX_TRY_DELAY = 1
+    
     def __init__(self, router):
         self.peer_list = {}
+        self.peer_map = {}
         self.ip_map = {}
         
+        self._self = PeerInfo()
+        self._self.id = router.network.id
+        self._self.name = router.network.user_name
+        self._self.vip = Router.encode_ip(router.network.ip)
+        self._my_pickle = pickle.dumps(self._self,-1)
+
         self.router = router
         router.register_handler(Router.PEER_XCHANGE, self.handle_px)
         router.register_handler(Router.PEER_XCHANGE_ACK, self.handle_px_ack)
@@ -89,20 +105,42 @@ class PeerManager(object):
         
     ###### Peer XChange Functions
     
+    def try_px(self, pid):
+        print 'px'
+        def send_px(i):
+            print 'sendpx',i
+            if i > self.MAX_PX_TRIES or pid in self.peer_map:
+                return
+            else:
+                self.router.send(Router.PEER_XCHANGE, pickle.dumps(self.peer_list,-1), self.peer_list[pid].address)
+                reactor.callLater(PX_TRY_DELAY, send_px, i+1)
+                
+        reactor.callLater(PX_TRY_DELAY, send_px, 0)
+
     def handle_px(self, type, packet, address):
         peer_list = pickle.loads(packet)
             
         # reply
-        self.router.send(Router.PEER_XCHANGE_ACK, pickle.dumps(self.peer_list), address)
-        self.parse_peer_list(peer_list)
+        self.router.send(Router.PEER_XCHANGE_ACK, pickle.dumps(self.peer_list,-1), address)
+        self.parse_peer_list(self.get_by_address(address), peer_list)
             
 
     def handle_px_ack(self, type, packet, address):
         peer_list = pickle.loads(packet)
-        self.parse_peer_list(peer_list)
+        self.parse_peer_list(self.get_by_address(address), peer_list)
     
-    def parse_peer_list(self, peer_list):
-        pass
+    def parse_peer_list(self, from_peer, peer_list):
+        if from_peer.id not in self.peer_map:
+            self.peer_map[from_peer.id] = peer_list
+
+        for peer in peer_list:
+            if peer.id != self._self.id:
+                if peer.id in self.peer_list:
+                    pass # known peer
+                else:
+                    self.try_register(peer.address)
+                
+            # generate map?
     
     
     
@@ -114,13 +152,13 @@ class PeerManager(object):
             
             def send_register(i):
                 print 'sendreg',i
-                if i > 10 or address in self.router.pm:
+                if i > self.MAX_REG_TRIES or address in self.router.pm:
                     return
                 else:
-                    self.router.send(Router.REGISTER, self.router._my_pickle, address)
-                    reactor.callLater(1, send_register, i+1)
+                    self.router.send(Router.REGISTER, self._my_pickle, address)
+                    reactor.callLater(self.REG_TRY_DELAY, send_register, i+1)
                     
-            reactor.callLater(1, send_register, 0)
+            reactor.callLater(self.REG_TRY_DELAY, send_register, 0)
         else:
             print 'wtf'
                     
@@ -130,8 +168,10 @@ class PeerManager(object):
             print 'register from new peer',pi.id
             pi.address = address
             self.add_peer(pi)
+        else:
+            self.peer_list[pi.id].update(pi)
 
-        self.router.send(Router.REGISTER_ACK, self.router._my_pickle, address)
+        self.router.send(Router.REGISTER_ACK, self._my_pickle, address)
         print 'sent ack to ',address
                 
         
@@ -186,10 +226,6 @@ class PeerManager(object):
     
 
 class UDPPeerProtocol(DatagramProtocol):
-#    def __init__(self):
-#    def __init__(self, router):
-#        self.router = router
-#        self.receive = Event()
 
     def send(self, data, address):
         try:
@@ -220,32 +256,46 @@ class Router(object):
     
     USER = 0x80
 
-    def __init__(self, proto=None, tuntap=None):
+    def __init__(self, network, proto=None, tuntap=None):
         if tuntap is None:
             tuntap = TunTap(self)
         if proto is None:
             proto = UDPPeerProtocol()
                         
-        self._self = PeerInfo()
-        self._self.id = uuid.uuid4()
-        self._self.name = config.name
-        self._self.vip = self.encode_ip(config.address.split('/')[0])
-        self._my_pickle = pickle.dumps(self._self)
-              
 #        self.handle_packet = Event()
         self.handlers = {}
                         
-        self.filter = Crypter(config.key)
+        self.network = network
+        self.filter = Crypter(network.key)
 #        proto.receive += self.recv_udp
         proto.router = self
         self.pm = PeerManager(self)
-        tuntap.start()
+#        tuntap.start()
         
         self.pinger = Pinger(self)
         self.pinger.start()
                         
         self._proto = proto
         self._tuntap = tuntap
+        self._port = None
+    
+    def start(self):
+        self._tuntap.start()
+        self._tuntap.configure_iface(self.network.virtual_address)
+        self._port = reactor.listenUDP(self.network.port, self._proto)
+    
+        reactor.callLater(1, self.try_old_peers)
+    
+    def stop(self):
+        self.tuntap.stop()
+        # bring down iface?
+        if self._port is not None:
+            self._port.stopListening()
+            self._port = None
+    
+    def try_old_peers(self):
+        for address in self.network.known_addresses:
+            self.pm.try_register(address)    
     
     def send(self, type, data, address):
         data = pack('H', type) + data
@@ -320,14 +370,4 @@ class Router(object):
     def decode_ip(cls, ip):
         return '.'.join([str(x) for x in unpack('4B', ip)])
 
-if __name__ == '__main__':
 
-
-    rt = Router()
-    rt._tuntap.configure_iface(config.address)
-    reactor.listenUDP(config.port, rt._proto)        
-    if sys.argv[1] == 'c':
-            rt.pm.try_register(('10.10.10.216',8015))
-
-    print 'run'
-    reactor.run()

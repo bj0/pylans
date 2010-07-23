@@ -21,8 +21,8 @@ class Pinger(object):
 
     MAX_PING_TIME = 10.0 
     MAX_TIMEOUTS = 10
-    PING = 0x80 - 1
-    PONG = 0x80 - 2   
+    PING = 0x20 - 1
+    PONG = 0x20 - 2   
 
     def __init__(self, router, interval=2.0):
         self.interval = interval

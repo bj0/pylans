@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 
 #from xl import event, xdg
 #from xl.common import VersionError
-#from xl.nls import gettext as _
+#import gettext as _
 
 TYPE_MAPPING = {
     'I': int,
@@ -221,7 +221,7 @@ class SettingsManager(RawConfigParser):
             self.add_section(section)
             self.set(section, key, value)
 
-        event.log_event('option_set', self, option)
+#        event.log_event('option_set', self, option)
 
     def _val_to_str(self, value):
         """
@@ -235,8 +235,8 @@ class SettingsManager(RawConfigParser):
                 else:
                     return k + ": " + str(value)
 
-        raise ValueError(_("We don't know how to store that "
-            "kind of setting: "), type(value))
+        raise ValueError("We don't know how to store that "
+            "kind of setting: ", type(value))
 
     def _str_to_val(self, value):
         """
@@ -260,7 +260,7 @@ class SettingsManager(RawConfigParser):
 
             return value
         else:
-            raise ValueError(_("An Unknown type of setting was found!"))
+            raise ValueError("An Unknown type of setting was found!")
 
     def save(self):
         """
@@ -312,5 +312,6 @@ MANAGER = SettingsManager(
 
 get_option = MANAGER.get_option
 set_option = MANAGER.set_option
+save = MANAGER.save
 
 # vim: et sts=4 sw=4

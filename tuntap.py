@@ -41,7 +41,9 @@ class TunTap(object):
                 print 'error configuring address'
             
         utils.getProcessValue('/sbin/ip',('addr','add',ip,'dev',self.ifname)).addCallback(response)
-        utils.getProcessValue('/sbin/ip',('link','set',self.ifname,'up')).addCallback(response)
+        d = utils.getProcessValue('/sbin/ip',('link','set',self.ifname,'up'))
+        d.addCallback(response)
+        return d
 
     def doRead(self):
         '''
