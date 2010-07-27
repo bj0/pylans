@@ -12,6 +12,10 @@ import getopt, struct, textwrap
 
 
 class TunTap(object):
+    '''
+        Access to the virtual tun/tap device.
+    '''
+        
     implements(IReadDescriptor)
 
     TUNSETIFF = 0x400454ca
@@ -30,17 +34,22 @@ class TunTap(object):
         self.router = router
 
     def start(self):
+        '''Start monitoring tun/tap for input'''
         reactor.addReader(self)
         
     def stop(self):
+        '''Stop monitoring tun/tap for input'''
         reactor.removeReader(self)
           
-    def configure_iface(self, ip):
+    def configure_iface(self, address):
+        '''
+            Configure the tun/tap interface with given address/mask (ie: '10.1.1.1/24')
+        '''
         def response(retval):
             if retval != 0:
                 print 'error configuring address'
             
-        utils.getProcessValue('/sbin/ip',('addr','add',ip,'dev',self.ifname)).addCallback(response)
+        utils.getProcessValue('/sbin/ip',('addr','add',address,'dev',self.ifname)).addCallback(response)
         d = utils.getProcessValue('/sbin/ip',('link','set',self.ifname,'up'))
         d.addCallback(response)
         return d
@@ -59,6 +68,7 @@ class TunTap(object):
         os.write(self.f, data)
         
     def fileno(self):
+        '''Return the file identifier from os.open'''
         return self.f
 
     def logPrefix(self):

@@ -4,17 +4,19 @@ import os
 import uuid
 
 import settings
+import event
 from event import Event
 from router import Router
 
 class Network(object):
     
-    def __init__(self, name, key=None, user_name=None, address=None, port=None, id=None):
+    def __init__(self, name, key=None, username=None, address=None, port=None, id=None):
         
         self._name = name
         self.name = self._name
         self._id = id
         self.router = None
+        self._running = False
         
         networks = settings.get_option('settings/networks')
         if networks is None:
@@ -30,10 +32,10 @@ class Network(object):
         elif self.key == '':
             self.key = os.urandom(16)
             
-        if user_name is not None:
-            self.user_name = user_name
-        elif self.user_name is None:
-            self.user_name = 'user@%s'%name
+        if username is not None:
+            self.username = username
+        elif self.username is None:
+            self.username = 'user@%s'%name
             
         if address is not None:
             self.virtual_address = address
@@ -54,62 +56,81 @@ class Network(object):
         
         # Events
 #        self.address_changed = Event()
+#        self.started = Event()
+#        self.stopped = Event()
         
-    def new_connection(self, peer):
+    def new_connection(self, net, peer):
         peers = self.known_addresses
         if peer.address not in peers:
             peers.append(peer.address)
             self.known_addresses = peers
             
         
+    def is_running(self):
+        return self._running
+        
     def start(self):
+        if self._running:
+            return
         if self.router is None:
             self.router = Router(self)
 
-        self.router.pm.peer_added += self.new_connection
+        event.register_handler('peer-added', self.router.pm, self.new_connection);
+#        self.router.pm.peer_added += self.new_connection
         self.router.start()
+        self._running = True
+#        self.started()
+        event.emit('network-started', self)
         
     def stop(self):
+        if not self._running:
+            return
         if self.router is not None:
+            event.unregister_handler('peer-added', self.router.pm, self.new_connection);
             self.router.stop()
+            self._running = False
+#            self.stopped()
+            event.emit('network-stopped', self)
         
-    def get(self, item, default=None):
+    def _get(self, item, default=None):
         return settings.get_option(self._name+'/%s'%item, default)
         
-    def set(self, item, value):
+    def _set(self, item, value):
         return settings.set_option(self._name+'/%s'%item, value)
         
     @property
     def key(self):
         try:
-            return self.get('key','').decode('base64')
+            return self._get('key','').decode('base64')
         except Error:
-            return self.get('key')
+            return self._get('key')
         
     @key.setter
     def key(self, value):
-        self.set('key', value.encode('base64').replace('\n',''))
+        self._set('key', value.encode('base64').replace('\n',''))
         settings.save()
         
     @property
-    def user_name(self):
-        return self.get('name')
+    def username(self):
+        return self._get('name')
         
-    @user_name.setter
-    def user_name(self, value):
-        self.get('name', value)
+    @username.setter
+    def username(self, value):
+        self._set('name', value)
         settings.save()
         
     @property
     def virtual_address(self):
-        return self.get('virtual_address')
+        return self._get('virtual_address')
         
     @virtual_address.setter
     def virtual_address(self, value):
-        self.set('virtual_address', value)
+        self._set('virtual_address', value)
         settings.save()
         
 #        self.address_changed(value)
+        
+    address = virtual_address
         
     @property
     def virtual_ip(self):
@@ -129,36 +150,36 @@ class Network(object):
         
     @property
     def port(self):
-        return self.get('port')
+        return self._get('port')
         
     @port.setter
     def port(self, value):
-        self.set('port', value)
+        self._set('port', value)
         settings.save()
         
     @property
     def id(self):
-        if self._id is None and self.get('id') is not None:
-            self._id = uuid.UUID(hex=self.get('id'))
+        if self._id is None and self._get('id') is not None:
+            self._id = uuid.UUID(hex=self._get('id'))
         return self._id
         
     @id.setter
     def id(self, value):
         if isinstance(value, uuid.UUID):
-            self.set('id', value.hex)
+            self._set('id', value.hex)
             self._id = value
         else:
-            self.set('id', value)
+            self._set('id', value)
             self._id = uuid.UUID(hex=value)
         settings.save()
         
     @property
     def known_addresses(self):
-        return self.get('known_addresses', [])
+        return self._get('known_addresses', [])
         
     @known_addresses.setter
     def known_addresses(self, value):
-        self.set('known_addresses', value)
+        self._set('known_addresses', value)
         settings.save()
         
         
@@ -179,12 +200,21 @@ class NetworkManager(object):
         if name in networks:
             return True
         return False
-        
+
+    def start_network(self, network):
+        if network in self:
+            self[network].start()
+    
+    def start_all(self):
+        for net in self.network_list.values():
+            if not net.is_running():
+                net.start()
         
     def load(self, name):
         if self.network_exists(name):
             nw = Network(name)
             self.network_list[nw.id] = nw
+            event.emit('network-loaded',self, nw)
             return nw
         return None
         
@@ -194,19 +224,42 @@ class NetworkManager(object):
             for nw in networks:
                 self.load(nw)
         
-    def create(self, name, key=None, user_name=None, address=None, port=None, id=None):    
-        networks = settings.get_option('settings/networks')
+    def create(self, name, key=None, username=None, address=None, port=None, id=None):    
         if self.network_exists(name):
             print 'A network by that name already exists'
             return Network(name)
             
             
-        net = Network(name, key, user_name, address, port, id)
-        self.network_list[id] = net            
+        net = Network(name, key, username, address, port, id)
+        self.network_list[id] = net
+        event.emit('network-created',self, net)
         return net
+        
+    def remove(self, name):
+        if self.network_exists(name):
+            networks = settings.get_option('settings/networks')
+            networks.remove(name)
+            settings.set_option('settings/networks', networks)
+            settings.MANAGER.remove_section(name)
+        
+        if name in self:
+            net = self[name]
+            net.stop()
+            del self.network_list[net.id]
+
+    def get_by_vip(self, vip):
+        for net in self.network_list.values():
+            if net.router.pm.get_by_vip(vip) is not None:
+                return net
+
+    def get_by_peer(self, peer):
+        for net in self.network_list.values():
+            if peer in net.router.pm:
+                return net
+        return None
 
     def get_by_name(self, name):
-        for nw in self.network_list:
+        for nw in self.network_list.values():
             if nw.name == name:
                 return nw
         return None
@@ -215,7 +268,7 @@ class NetworkManager(object):
     
     def iterkeys(self):
         for nw in self.network_list:
-            yield peer
+            yield nw
     
     def __iter__(self):
         return self.iterkeys()
@@ -246,4 +299,4 @@ class NetworkManager(object):
             return (item in self.network_list)
     
 
-
+MANAGER = NetworkManager()

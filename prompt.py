@@ -3,6 +3,7 @@
 # todo: quit message?
 # more commands: dump peer, ??s
 
+import sys
 import uuid
 from cmd import Cmd
 
@@ -11,60 +12,115 @@ from twisted.internet.threads import deferToThread
 
 #import settings
 #import router
-from networks import NetworkManager
-from router import PeerInfo # for pickle
+#from networks import NetworkManager
+#from router import PeerInfo # for pickle
+from interface import Interface
 from chatter import ChatterBox
 
 class Prompt(Cmd):
 
-    def __init__(self, router):
-        self.router = router
+    def __init__(self, iface):
+        self.iface = iface
+        
+        # Events
+        iface.peer_added += lambda net, peer: sys.stdout.write('peer {0} added to network {1}'.format(peer.name, net.name))
+        iface.peer_removed += lambda net, peer: sys.stdout.write('peer {0} removed from network {1}'.format(peer.name, net.name))
+        iface.network_started += lambda net: sys.stdout.write('network {0} started'.format(net))
+        iface.network_stopped += lambda net: sys.stdout.write('network {0} stopped'.format(net))
+        iface.message_received += lambda net, peer, msg: sys.stdout.write('{0}@{1}: {2}'.format(peer.name, net.name, msg))
+        
         Cmd.__init__(self)
         
     def do_connect(self, line):
         try:
-            ip, port = line.split()
+            line = line.split()
+            ip, port = line[0:2]
             port = int(port)
+            
+            if len(line) > 2:
+                network = line[3]
+            else:
+                network = None
             print 'Trying to connect to %s @ %d' % (ip,port)
             
-            reactor.callFromThread(self.router.pm.try_register,(ip,port))
+            reactor.callFromThread(iface.connect_to_address,(ip,port), network)
             
         except ValueError:
             print 'Invalid arguments.'
             
             
     def do_status(self, line):
-        print '========= Network Status ========='
-        print 'name:        {0}'.format(self.router.network.name)
-        print 'id:          {0}'.format(self.router.network.id)
-        print 'address:     {0}'.format(self.router.network.virtual_address)
-        print 'port:        {0}'.format(self.router.network.port)
-        print 'my name:     {0}'.format(self.router.network.user_name)
-        print '# of peers:  {0}'.format(len(self.router.pm))
+        line = line.split()
+        if len(line) > 0:
+            nets = line
+            nets = [ iface.get_network(net) for net in nets if net is not None ]
+        else:
+            nets = iface.get_network_list()
             
+        for net in nets:
+#            net = iface.get_network(net)
+            print '========= Network Status ========='
+            print 'name:        {0}'.format(net.name)
+            print 'id:          {0}'.format(net.id)
+            print 'address:     {0}'.format(net.virtual_address)
+            print 'port:        {0}'.format(net.port)
+            print 'my name:     {0}'.format(net.username)
+            if net.router is not None:
+                print '# of peers:  {0}'.format(len(net.router.pm))
+            else:
+                print 'network offline'
+            
+    def complete_status(self, text, line, begidx, endidx):
+        nets = iface.get_network_names()
+        if not text:
+            return nets
+            
+        return [ net for net in nets if net.startswith(text) ]
+        
             
     def do_list(self, line):
-        pl = self.router.pm.peer_list
-
-        print '========= Peers ========='
-        for p in pl.values():
-            print 'name:      {0}'.format(p.name)
-            print 'id:        {0}'.format(p.id)
-            print 'vip:       {0}'.format(self.router.decode_ip(p.vip))
-            print 'address:   {0}'.format(p.address)
-            print 'is_direct: {0}'.format(p.is_direct)
-            if(p.is_direct):
-                print 'relay:     {0}'.format(p.relay_id)
-            print 'ping_time: {0} ms'.format(p.ping_time*1e3)
-            print 'timeouts:  {0}'.format(p.timeouts)
+        line = line.split()
+        if len(line) > 0:
+            nets = line
+            nets = [ iface.get_network(net) for net in nets if net is not None ]
+        else:
+            nets = iface.get_network_list()
+        
+        for net in nets:
+            print '========= Peers (%s) =========' % net.name
+            for p in iface.get_peer_list(net):
+                print 'name:      {0}'.format(p.name)
+                print 'id:        {0}'.format(p.id)
+                print 'vip:       {0}'.format(p.vip_str)
+                print 'address:   {0}'.format(p.address)
+                print 'is_direct: {0}'.format(p.is_direct)
+                if(not p.is_direct):
+                    print '  relay:   {0}'.format(p.relay_id)
+                print 'ping_time: {0} ms'.format(p.ping_time*1e3)
+                print 'timeouts:  {0}'.format(p.timeouts)
             
+    def complete_list(self, text, line, begidx, endidx):
+        nets = iface.get_network_names()
+        if not text:
+            return nets
+            
+        return [ net for net in nets if net.startswith(text) ]
             
     def do_msg(self, line):
+        # this doesn't work if the network as a '@' in it
         name = line.split()[0]
+        name = name.split('@')
+        if len(name) > 1:
+            name, net = '@'.join(name[:-1]),name[-1]
+        else:
+            name, net = name[0], None
         msg = ' '.join(line.split()[1:])
-        peer = self.router.pm.get_by_name(name)
-        if peer is not None:
-            reactor.callFromThread(cbox.send_message,peer.id, msg)
+        peer = iface.get_peer_info(name, net)
+        net = iface.get_network()
+        if peer is not None and net is not None:
+            reactor.callFromThread(cbox.send_message, net.id, peer.id, msg)
+        else:
+            print 'peer or network is not specified'
             
             
     def emptyline(self, *args):
@@ -80,18 +136,17 @@ class Prompt(Cmd):
 
 if __name__ == '__main__':
 
-    net_mgr = NetworkManager()
-    if len(net_mgr) < 1:
-        net = net_mgr.create('newnetwork')
-    else:
-        net = net_mgr.network_list.values()[0]
+    iface = Interface()
+    if len(iface.get_network_dict()) < 1:
+        iface.create_network('newnetwork')
 
-    net.start()
-    cbox = ChatterBox(net.router)
-    p = Prompt(net.router)
+    iface.start_all_networks()
+    cbox = ChatterBox(iface)
+    p = Prompt(iface)
     deferToThread(p.cmdloop)
 
-    reactor.callLater(5, reactor.listenTCP, cbox.port, cbox, interface=net.ip)
+    # give it time to bring up teh interface, then open tcp port
+    reactor.callLater(5, reactor.listenTCP, cbox.port, cbox)
 
     
     print 'run'

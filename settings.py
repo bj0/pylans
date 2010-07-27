@@ -201,6 +201,11 @@ class SettingsManager(RawConfigParser):
         section, key = "/".join(splitvals[:-1]), splitvals[-1]
 
         RawConfigParser.remove_option(self, section, key)
+        self._dirty = True
+
+    def remove_section(self, section):
+        if RawConfigParser.remove_section(section):
+            self._dirty = True
 
     def _set_direct(self, option, value):
         """
