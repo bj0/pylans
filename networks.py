@@ -2,11 +2,14 @@
 
 import os
 import uuid
+import logging
 
 import settings
 import event
 from event import Event
 from router import Router
+
+logger = logging.getLogger(__name__)
 
 class Network(object):
     
@@ -76,11 +79,10 @@ class Network(object):
             self.router = Router(self)
 
         event.register_handler('peer-added', self.router.pm, self.new_connection);
-#        self.router.pm.peer_added += self.new_connection
         self.router.start()
         self._running = True
-#        self.started()
         event.emit('network-started', self)
+        logger.info('network {0} started'.format(self.name))
         
     def stop(self):
         if not self._running:
@@ -89,8 +91,8 @@ class Network(object):
             event.unregister_handler('peer-added', self.router.pm, self.new_connection);
             self.router.stop()
             self._running = False
-#            self.stopped()
             event.emit('network-stopped', self)
+            logger.info('network {0} stopped'.format(self.name))
         
     def _get(self, item, default=None):
         return settings.get_option(self._name+'/%s'%item, default)
@@ -108,6 +110,7 @@ class Network(object):
     @key.setter
     def key(self, value):
         self._set('key', value.encode('base64').replace('\n',''))
+        #TODO impliment key change
         settings.save()
         
     @property
@@ -226,13 +229,14 @@ class NetworkManager(object):
         
     def create(self, name, key=None, username=None, address=None, port=None, id=None):    
         if self.network_exists(name):
-            print 'A network by that name already exists'
+            logger.warning('A network by that name already exists')
             return Network(name)
             
             
         net = Network(name, key, username, address, port, id)
         self.network_list[id] = net
         event.emit('network-created',self, net)
+        logger.debug('network {0} created'.format(net.name))
         return net
         
     def remove(self, name):
@@ -241,11 +245,13 @@ class NetworkManager(object):
             networks.remove(name)
             settings.set_option('settings/networks', networks)
             settings.MANAGER.remove_section(name)
+            logger.info('network {0} removed from settings'.format(name))
         
         if name in self:
             net = self[name]
             net.stop()
             del self.network_list[net.id]
+            logger.debug('network {0} removed from manager'.format(name))
 
     def get_by_vip(self, vip):
         for net in self.network_list.values():

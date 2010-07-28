@@ -1,22 +1,24 @@
 #! /usr/bin/env python
 
 from struct import pack, unpack
+import logging
 import sys
 import uuid
 import cPickle as pickle
 
-#from OpenSSL import SSL
 from zope.interface import implements
-from twisted.internet import reactor, defer, utils, protocol, ssl
+from twisted.internet import reactor, protocol
 from twisted.internet.protocol import DatagramProtocol, Factory, ClientFactory, Protocol
 from twisted.internet.task import LoopingCall
 
 import event
+import util
 from event import Event
 from tuntap import TunTap
 from crypto import Crypter
 from pinger import Pinger
-#import settings
+
+logger = logging.getLogger(__name__)
 
 class PeerInfo(object):
     '''Represents a peer connection'''   
@@ -38,7 +40,7 @@ class PeerInfo(object):
 
     @property
     def vip_str(self):
-        return Router.decode_ip(self.vip)
+        return util.decode_ip(self.vip)
 
 class PeerManager(object):
     '''Manages peer connections'''
@@ -55,7 +57,7 @@ class PeerManager(object):
         self._self = PeerInfo()
         self._self.id = router.network.id
         self._self.name = router.network.username
-        self._self.vip = Router.encode_ip(router.network.ip)
+        self._self.vip = util.encode_ip(router.network.ip)
         self._my_pickle = pickle.dumps(self._self,-1)
 
         self.router = router
@@ -110,7 +112,7 @@ class PeerManager(object):
         return None
         
     def _timeout(self, peer):
-        print 'peer timed out', Router.decode_ip(peer.vip)
+        logger.warning('peer {0} on network {1} timed out'.format(peer.name, self.router.network.name))
         self.remove_peer(peer)
         
         
@@ -121,12 +123,14 @@ class PeerManager(object):
         '''Initiate a peer exchange by sending a px packet.  The packet will be
         resent until an ack packet is recieved or MAX_PX_TRIES packets have been sent.
         This px packet includes the pickled peer list.'''
-        print 'px'
+        
+        logger.debug('initiating a peer exchange with {0}'.format(self.peer_list[pid].name))
+        
         def send_px(i):
-            print 'sendpx',i
-            if i > self.MAX_PX_TRIES or pid in self.peer_map:
+            if i <= self.MAX_PX_TRIES and pid not in self.peer_map:
                 return
             else:
+                logger.debug('sending PX packet #{0}'.format(i))
                 self.router.send(Router.PEER_XCHANGE, pickle.dumps(self.peer_list,-1), self.peer_list[pid].address)
                 reactor.callLater(PX_TRY_DELAY, send_px, i+1)
                 
@@ -135,9 +139,11 @@ class PeerManager(object):
     def handle_px(self, type, packet, address):
         '''Handle a peer exchange packet.  Load the peer list with the px packet 
         and send an ack packet with own peer list.'''
+        
         peer_list = pickle.loads(packet)
             
         # reply
+        logger.debug('received a PX packet, sending PX ACK')
         self.router.send(Router.PEER_XCHANGE_ACK, pickle.dumps(self.peer_list,-1), address)
         self.parse_peer_list(self.get_by_address(address), peer_list)
             
@@ -146,11 +152,15 @@ class PeerManager(object):
         '''
             Handle a px ack packet by parsing incoming peer list
         '''
+        
+        logger.debug('received a PX ACK packet')
+        
         peer_list = pickle.loads(packet)
         self.parse_peer_list(self.get_by_address(address), peer_list)
     
     def parse_peer_list(self, from_peer, peer_list):
         '''Parse a peer list from a px packet'''
+        
         if from_peer.id not in self.peer_map:
             self.peer_map[from_peer.id] = peer_list
 
@@ -171,45 +181,57 @@ class PeerManager(object):
         '''Try to register self with a peer by sending a register packet
         with own peer info.  Will continue to send this packet until an 
         ack is received or MAX_REG_TRIES packets have been sent.'''
+        
+        logger.debug('initiating a register xchange with {0}'.format(address))
+        
         if not (address in self.router.pm):
-            print 'here'
             
             def send_register(i):
-                print 'sendreg',i
-                if i > self.MAX_REG_TRIES or address in self.router.pm:
-                    return
-                else:
+                '''Send a register packet and re-queues self'''
+                if i <= self.MAX_REG_TRIES and address not in self.router.pm:
+                    logger.debug('sending REG packet #{0}'.format(i))
                     self.router.send(Router.REGISTER, self._my_pickle, address)
                     reactor.callLater(self.REG_TRY_DELAY, send_register, i+1)
                     
             reactor.callLater(self.REG_TRY_DELAY, send_register, 0)
         else:
-            print 'wtf'
+            logger.debug('address {0} already in peer list'.format(address))
                     
     def handle_reg(self, type, packet, address):
         '''Handle incoming reg packet by adding new peer and sending ack.'''
+        
+        logger.debug('received REG packet, sending ACK')
+        
         pi = pickle.loads(packet)    
         if pi.id not in self.peer_list:
-            print 'register from new peer',pi.id
+            logger.info('received a register from a new peer {0}'.format(pi.name))
             pi.address = address
             self.add_peer(pi)
         else:
-            self.peer_list[pi.id].update(pi)
+            opi = self.peer_list[pi.id]
+            
+            # incase there are changes to vip and name
+            if opi.vip != pi.vip:
+                logger.info('received REG packet from old peer with new virtual ip')
+                self.remove_peer(opi)
+                self.add_peer(pi)
+            else:
+                opi.update(pi)
 
         self.router.send(Router.REGISTER_ACK, self._my_pickle, address)
-        print 'sent ack to ',address
                 
         
     def handle_reg_ack(self, type, packet, address):
         '''Handle reg ack by adding new peer'''
+        
+        logger.debug('received REG ACK packet')
+        
         pi = pickle.loads(packet)
-        print 'got a register ack from',address
 
         if pi.id not in self.peer_list:
-            print 'ack with new peer',pi.id
+            logger.info('received REG ACK packet from new peer {0}'.format(pi.name))
             pi.address = address
             self.add_peer(pi)
-                
                 
                 
     ###### Container Type Overloads
@@ -263,18 +285,19 @@ class UDPPeerProtocol(DatagramProtocol):
         '''Send data to address'''
         try:
             self.transport.write(data, address)
-        except:
+        except Exception, e:
+            logger.warning('UDP send threw exception:\n  {0}'.format(e))
             ##TODO this is here because UDP socket fills up and just dies
             # but it's UDP so we can drop packets
-            pass
 
     def datagramReceived(self, data, address):
         '''Called by twisted when data is received from address'''
 #        self.receive(data, address)
         self.router.recv_udp(data, address)
+        logger.debug('received data on UDP port')
                 
     def connectionRefused(self):
-        pass
+        logger.debug('connectionRefused on UDP port')
             
 
 class Router(object):
@@ -302,15 +325,12 @@ class Router(object):
         if proto is None:
             proto = UDPPeerProtocol()
                         
-#        self.handle_packet = Event()
         self.handlers = {}
                         
         self.network = network
         self.filter = Crypter(network.key)
-#        proto.receive += self.recv_udp
         proto.router = self
         self.pm = PeerManager(self)
-#        tuntap.start()
         
         self.pinger = Pinger(self)
         self.pinger.start()
@@ -322,9 +342,12 @@ class Router(object):
     def start(self):
         '''Start the router.  Starts the tun/tap device and begins listening on
         the UDP port.'''
+        
         self._tuntap.start()
         self._tuntap.configure_iface(self.network.virtual_address)
         self._port = reactor.listenUDP(self.network.port, self._proto)
+
+        logger.info('router started, listening on UDP port {0}'.format(self._port))
     
         reactor.callLater(1, self.try_old_peers)
     
@@ -336,14 +359,20 @@ class Router(object):
         if self._port is not None:
             self._port.stopListening()
             self._port = None
+            
+        logger.info('router stopped')
     
     def try_old_peers(self):
         '''Try to connect to addresses that were peers in previous sessions.'''
+        
+        logger.debug('trying to connect to previously known addresses')
+        
         for address in self.network.known_addresses:
             self.pm.try_register(address)    
     
     def send(self, type, data, address):
         '''Send a packet of type with data to address'''
+        
         data = pack('H', type) + data
         data = self.filter.encrypt(data)
         self._proto.send(data, address)
@@ -365,6 +394,8 @@ class Router(object):
         if dst in self.pm.ip_map:
 #            print 'in map'
             self.send(self.DATA, packet, self.pm.ip_map[dst])
+#        else:
+#            print 'notinmap',dst.encode('hex')
 #        self.send(self.DATA, packet)
                 
     def send_data(self, data):
@@ -386,7 +417,6 @@ class Router(object):
         else:
             if dt in self.handlers:
                 self.handlers[dt](dt, data, address)
-#            self.handle_packet(dt, data, address)
     
         
     def recv_packet(self, packet):
@@ -401,6 +431,9 @@ class Router(object):
     def register_handler(self, type, callback):
         '''Register a handler for a specific packet type.  Handles will be
         called as 'callback(type, data, address)'.'''
+        
+        logger.debug('registering packet handler for packet type: {0}'.format(type))
+        
         if type in self.handlers:
             self.handlers[type] += callback
         else:
@@ -409,17 +442,10 @@ class Router(object):
            
     def unregister_handler(self, type, callback):
         '''Remove a registered handler for a specific packet type.'''
+
+        logger.debug('unregistering packet handler for packet type: {0}'.format(type))
+
         if type in self.handlers:
             self.handlers[type] -= callback
-
-    @classmethod
-    def encode_ip(cls, ip):
-        '''Encode a string IP into 4 bytes.'''
-        return pack('4B', *[int(x) for x in ip.split('.')])
-        
-    @classmethod
-    def decode_ip(cls, ip):
-        '''Decode a 4 byte IP into a string.'''
-        return '.'.join([str(x) for x in unpack('4B', ip)])
 
 

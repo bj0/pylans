@@ -3,9 +3,15 @@
 # should i switch to global events?
 # global interface "singleton" (like settings)
 
+import logging
+
 import networks
+import util
 import event
 from event import Event
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class Interface(object):
 
@@ -108,7 +114,7 @@ class Interface(object):
 
     def connect_to_address(self, address, network=None):
         if self.get_network(network) is not None:
-            self._current.pm.try_register(address)
+            self._current.router.pm.try_register(address)
             
     def send_message(self, network, peer):
         if self.get_network(network) is not None:

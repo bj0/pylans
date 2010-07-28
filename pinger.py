@@ -2,10 +2,18 @@
 
 from random import randint
 from struct import pack, unpack
-from time import time
+import logging
+
+from platform import system
+if system() == 'Windows':   # On Windows, time() has low resolution(~1ms)
+    from time import clock as time
+else:
+    from time import time
 
 from twisted.internet import reactor
 from twisted.internet.task import LoopingCall
+
+logger = logging.getLogger(__name__)
 
 class PingInfo(object):
     def __init__(self, peer_id):
@@ -35,12 +43,15 @@ class Pinger(object):
         router.register_handler(self.PONG, self.handle_pong)
         
     def send_ping(self, peer):
-#        print 'sending ping'
         pi = PingInfo(peer.id)
         self.active_pings[pi.id] = pi
         self.router.send(self.PING, pi.id, peer.address)
+        logger.debug('sending ping to {0}'.format(peer.name))
         
     def handle_ping(self, type, data, address):
+
+        logger.debug('received ping, sending pong')
+        
         self.router.send(self.PONG, data, address)
 
     def handle_pong(self, type, data, address):
@@ -50,7 +61,7 @@ class Pinger(object):
             self.router.pm.peer_list[pi.peer_id].ping_time = dt
             self.router.pm.peer_list[pi.peer_id].timeouts = 0
             del self.active_pings[data]
-            #print 'got ping response:',dt
+            logger.debug('received pong response from {0} with time {1}'.format(self.router.pm.peer_list[pi.peer_id].name, dt))
             
             
     def do_pings(self):
@@ -67,13 +78,15 @@ class Pinger(object):
                     peer.timeouts += 1
                     if peer.timeouts > self.MAX_TIMEOUTS:
                         self.router.pm._timeout(peer)
- #                   print 'ping died'
+
         
     def start(self):
         self.running = True
         self._lp.start(self.interval)
+        logger.info('starting pinger on {0} with {1}s interval'.format(self.router.network.name,self.interval))
         
     def stop(self):
         self.running = False
         self._lp.stop()
+        logger.info('stopping pinger on {0} with {1}s interval'.format(self.router.network.name,self.interval))
         

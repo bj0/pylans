@@ -2,6 +2,7 @@
 
 from random import randint
 from struct import pack, unpack
+import logging
 
 from twisted.protocols import basic
 from twisted.internet import protocol, reactor
@@ -11,6 +12,10 @@ import event
 from router import Router
 #from event import Event
 import settings
+import util
+
+
+logger = logging.getLogger(__name__)
 
 class Chatter(basic.LineReceiver):
     
@@ -21,13 +26,12 @@ class Chatter(basic.LineReceiver):
         self.factory.remove(self)
     
     def lineReceived(self, line):
-        print 'wtf',repr(line)
         self.factory.receive(self, line)
+        logger.debug('received chat msg from {0}:{1}'.format(self.pid.encode('hex'), line))
     
     def message(self, line):
         self.sendLine(line)
-#        self.transport.write(line+'\r\n')
-        print 'sendmsg',line
+        logger.debug('sent chat msg to {0}:{1}'.format(self.pid.encode('hex'), line))
   
     
 class ChatterBox(protocol.ClientFactory):
@@ -35,6 +39,8 @@ class ChatterBox(protocol.ClientFactory):
 
     CHAT_INIT = 0x10 + 1
     CHAT_ACK = 0x10 + 2    
+    MAX_INIT_TRIES = 3
+    CHAT_TRY_DELAY = 3
     
     def __init__(self, iface):
         self.iface = iface
@@ -70,32 +76,31 @@ class ChatterBox(protocol.ClientFactory):
         
     def add(self, chatter):
         host = chatter.transport.getPeer() # virtual host
-        vip = Router.encode_ip(host[1])
-        print 'add chatter',host
+        vip = util.encode_ip(host[1])
         if vip not in self.connections:
             net = self.iface.get_network_manager().get_by_vip(vip)
             peer = net.router.pm.get_by_vip(vip)
-#            chatter.pid = peer.id
             chatter.vip = vip
             chatter.pid = peer.id
             chatter.nid = net.id
             self.connections[vip] = chatter
+            logger.info('chatter connection created with {0}'.format(host))
+            
             if vip in self.msg_queue:
+                logger.debug('sending {1} queue\'d messages to {0}'.format(host, len(self.msg_queue[vip])))
                 msgs = self.msg_queue[vip]
-#                print msgs
                 for msg in msgs:
-#                    print 'sending',msg
                     chatter.message(msg)
                 del self.msg_queue[vip]
         else:
-            print 'connection dropped',host
             chatter.loseConnection()
+            logger.info('chatter connection dropped from {0}'.format(host))
     
     def remove(self, chatter):
-        print 'remove chatter'
         if hasattr(chatter, 'vip'):     # for bad connections that never get added
             if chatter.vip in self.connections:
                 del self.connections[chatter.vip]
+                logger.info('chatter connection to {0} closed'.format(util.decode_ip(chatter.vip)))
 
     def send_all(self, line):
         for con in self.connections.values():
@@ -103,7 +108,6 @@ class ChatterBox(protocol.ClientFactory):
     
     def send_message(self, nid, pid, line):
         # check to make sure 'line' is a str?
-#        print 'len',len(self.connections),self.connections
         peer = self.iface.get_network_dict()[nid].router.pm[pid]
         vip = peer.vip
         if vip in self.connections:
@@ -115,48 +119,35 @@ class ChatterBox(protocol.ClientFactory):
                 self.msg_queue[vip] = [line]
                 
             self.try_connect(peer)
-            print 'doing connect to',peer.name,peer.address
-            #self.connect(self.router.pm[pid]).addCallback(send_message, pid, line)
+            
     
     def receive(self, chatter, line):
-        print line, 'from'
 #        self.message_received(chatter.pid, line)
         event.emit('message-received', self, chatter.nid, chatter.pid, line)
     
     def try_connect(self, peer):
         if peer.vip not in self.connections:
             net = self.iface.get_network_manager().get_by_peer(peer)
-            print peer.name, net
-            # try to xchange port info
-            net.router.send(self.CHAT_INIT, pack('I',self.port), peer.address)
             
-#    def try_register(self, address):
-#        '''Try to register self with a peer by sending a register packet
-#        with own peer info.  Will continue to send this packet until an 
-#        ack is received or MAX_REG_TRIES packets have been sent.'''
-#        if not (address in self.router.pm):
-#            print 'here'
-#            
-#            def send_register(i):
-#                print 'sendreg',i
-#                if i > self.MAX_REG_TRIES or address in self.router.pm:
-#                    return
-#                else:
-#                    self.router.send(Router.REGISTER, self._my_pickle, address)
-#                    reactor.callLater(self.REG_TRY_DELAY, send_register, i+1)
-#                    
-#            reactor.callLater(self.REG_TRY_DELAY, send_register, 0)
-#        else:
-#            print 'wtf'
+            def send_init(i):
+                if i <= self.MAX_INIT_TRIES and peer.vip not in self.connections:
+                    logger.debug('sending chat init packet #{0}'.format(i))
+                    net.router.send(self.CHAT_INIT, pack('I',self.port), peer.address)
+                    reactor.callLater(self.CHAT_TRY_DELAY, send_init, i+1)
+                    
+            reactor.callLater(self.CHAT_TRY_DELAY, send_init, 0)
+            logger.info('initiating chatter connection to {0} on {1}'.format(peer.name, net.name))
             
-    def handle_chat_init(self, router, type, port, address):
+            
+    def handle_chat_init(self, router, type, port, address):    
         port = unpack('I',port)[0]
         peer = router.pm.get_by_address(address)
         if peer.id not in self.connections:
-            vaddress = (router.decode_ip(peer.vip), port)
+            vaddress = (util.decode_ip(peer.vip), port)
             reactor.connectTCP( vaddress[0], vaddress[1], self)
-        
+
         router.send(self.CHAT_ACK, pack('I',self.port), address)
+        logger.debug('received chat init packet from {0}, sending ack'.format(peer.name))
     
     def disconnect(self, peer):
         if peer.id in self.connections:

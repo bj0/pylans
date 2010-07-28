@@ -138,7 +138,7 @@ if __name__ == '__main__':
 
     iface = Interface()
     if len(iface.get_network_dict()) < 1:
-        iface.create_network('newnetwork')
+        iface.create_new_network('newnetwork')
 
     iface.start_all_networks()
     cbox = ChatterBox(iface)

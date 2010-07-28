@@ -1,3 +1,8 @@
+
+import logging
+
+logger = logging.getLogger(__name__)
+
 class Event:
     def __init__(self):
         self.handlers = set()
@@ -52,6 +57,7 @@ class EventManager(object):
                 self._handlers[type][id(obj)](obj, *args, **kwargs)
 
             self._handlers[type][id(None)](obj, *args, **kwargs)
+            logger.debug('event {0} emitted to {1} handlers'.format(type, len(self._handlers[type])))
             
 MANAGER = EventManager()
 register_handler = MANAGER.register_handler
