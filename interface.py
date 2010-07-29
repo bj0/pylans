@@ -10,6 +10,7 @@ import util
 import event
 from event import Event
 
+# levels: DEBUG, INFO, WARNING, ERROR
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 

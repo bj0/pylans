@@ -3,7 +3,6 @@
 from struct import pack, unpack
 import logging
 import sys
-import uuid
 import cPickle as pickle
 
 from zope.interface import implements
@@ -18,6 +17,8 @@ from tuntap import TunTap
 from crypto import Crypter
 from pinger import Pinger
 from peers import PeerManager
+
+logger = logging.getLogger(__name__)
 
 class UDPPeerProtocol(DatagramProtocol):
     '''Protocol or sending/receiving data to peers'''
@@ -99,17 +100,22 @@ class Router(object):
             
         logger.info('router stopped')
     
-    def try_old_peers(self):
+    def try_old_peers(self, idx=0):
         '''Try to connect to addresses that were peers in previous sessions.'''
         
-        logger.debug('trying to connect to previously known addresses')
+        logger.debug('trying to connect to previously known peers')
         
-        for address in self.network.known_addresses:
-            self.pm.try_register(address)    
+        for pid in self.network.known_addresses:
+            if pid not in self.pm:
+                addrs = self.network.known_addresses[pid]
+                n = len(addrs)
+                self.pm.try_register(addrs[idx%n])
             
-        if len(self.network.known_addresses) > len(self.pm):
-            # if there are some peers that are down, re-schedule a try
-            #reactor.callLater(600, self.try_old_peers)
+#        if len(self.network.known_addresses) > len(self.pm):
+#            pass
+
+        # re-schedule            
+        reactor.callLater(60, self.try_old_peers, idx+1)
     
     def send(self, type, data, address):
         '''Send a packet of type with data to address'''

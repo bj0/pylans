@@ -35,6 +35,7 @@ from ConfigParser import (
 import logging
 import os
 
+from uuid import UUID
 #import glib
 
 logger = logging.getLogger(__name__)

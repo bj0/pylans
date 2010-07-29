@@ -3,6 +3,8 @@
 # TODO rsa key exchange - new 'packet format'
 
 import logging
+import cPickle as pickle
+import uuid
 
 from twisted.internet import reactor
 
@@ -150,19 +152,19 @@ class PeerManager(object):
     
     ###### Peer XChange Functions
     
-    def try_px(self, pid):
+    def try_px(self, peer):
         '''Initiate a peer exchange by sending a px packet.  The packet will be
         resent until an ack packet is recieved or MAX_PX_TRIES packets have been sent.
         This px packet includes the pickled peer list.'''
         
-        logger.debug('initiating a peer exchange with {0}'.format(self.peer_list[pid].name))
+        logger.debug('initiating a peer exchange with {0}'.format(peer.name))
         
         def send_px(i):
-            if i <= self.MAX_PX_TRIES and pid not in self.peer_map:
+            if i <= self.MAX_PX_TRIES and peer.id not in self.peer_map:
                 return
             else:
                 logger.debug('sending PX packet #{0}'.format(i))
-                self.router.send(self.PEER_XCHANGE, pickle.dumps(self.peer_list,-1), self.peer_list[pid].address)
+                self.router.send(self.PEER_XCHANGE, pickle.dumps(self.peer_list,-1), peer.address)
                 reactor.callLater(self.PX_TRY_DELAY, send_px, i+1)
                 
         reactor.callLater(self.PX_TRY_DELAY, send_px, 0)
@@ -192,8 +194,8 @@ class PeerManager(object):
     def parse_peer_list(self, from_peer, peer_list):
         '''Parse a peer list from a px packet'''
         
-        if from_peer.id not in self.peer_map:
-            self.peer_map[from_peer.id] = peer_list
+#        if from_peer.id not in self.peer_map:
+        self.peer_map[from_peer.id] = peer_list
 
         for peer in peer_list:
             if peer.id != self._self.id:
