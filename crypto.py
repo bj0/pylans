@@ -1,8 +1,10 @@
 #!/usr/bin/python
 
 # encryption classes
-
+import os
+import cPickle as pickle
 from Crypto.Cipher import Blowfish
+from Crypto.PublicKey import RSA
 
 class Crypter(object):
     def __init__(self, key, mode=Blowfish.MODE_ECB):
@@ -18,10 +20,28 @@ class Crypter(object):
         string = self._obj.decrypt(string)
         return string[:-ord(string[-1])]
 
+class RSAxe(object):
+    def __init__(self, key=None):
+        self._key = key
 
+    def get_pubkey(self):
+        return self._key.publickey()
+        
+    def get_fullkey(self):
+        return self._key
+        
+    def gen_key(self, bits=1024):
+        self._key = RSA.generate(bits, os.urandom)
+        
+    def encrypt(self, string):
+        return pickle.dumps(self._key.encrypt(string, 0), -1)
+        
+    def decrypt(self, string):
+        return self._key.decrypt(pickle.loads(string))
+    
 
 # PyCrypto-based authenticated symetric encryption
-import cPickle as pickle
+#import cPickle as pickle
 import hashlib
 import hmac
 import os
