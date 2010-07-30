@@ -19,6 +19,7 @@ from chatter import ChatterBox
 
 class Prompt(Cmd):
 
+    #completekey = None
     def __init__(self, iface):
         self.iface = iface
         

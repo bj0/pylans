@@ -83,7 +83,7 @@ class TunTapDevice(object):
         
 #        print (ip+ipr+nm).encode('hex')
         w32f.DeviceIoControl(self._handle, TAP_IOCTL_CONFIG_TUN, ip+ipr+nm, 12)
-        logger.info('configuring interface to: {0}'.format(address))
+        logger.info('configuring interface to: {0}'.format(addr))
         
     def enable_iface(self):
         w32f.DeviceIoControl(self._handle, TAP_IOCTL_SET_MEDIA_STATUS, pack('I',True), calcsize('I'))

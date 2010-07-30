@@ -6,7 +6,7 @@ from twisted.internet.threads import deferToThread
 from twisted.internet.protocol import DatagramProtocol
 from twisted.internet.interfaces import IReadDescriptor, IPushProducer
 
-import os, sys, platform, threading
+import os, sys, platform
 import logging
 from binascii import hexlify
 from struct import unpack
