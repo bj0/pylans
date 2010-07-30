@@ -8,10 +8,15 @@ import logging
 import networks
 import util
 import event
+import settings
 from event import Event
 
 # levels: DEBUG, INFO, WARNING, ERROR
-logging.basicConfig(level=logging.INFO)
+__levels = { 0 : logging.ERROR,
+             1 : logging.WARNING,
+             2 : logging.INFO,
+             3 : logging.DEBUG }
+logging.basicConfig(level=__levels[settings.get_option('settings/loglevel',1)])
 logger = logging.getLogger(__name__)
 
 class Interface(object):
