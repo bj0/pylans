@@ -27,11 +27,11 @@ class Chatter(basic.LineReceiver):
     
     def lineReceived(self, line):
         self.factory.receive(self, line)
-        logger.debug('received chat msg from {0}:{1}'.format(self.pid.encode('hex'), line))
+        logger.debug('received chat msg from {0}:{1}'.format(self.get_hex(), line))
     
     def message(self, line):
         self.sendLine(line)
-        logger.debug('sent chat msg to {0}:{1}'.format(self.pid.encode('hex'), line))
+        logger.debug('sent chat msg to {0}:{1}'.format(self.pid.get_hex(), line))
   
     
 class ChatterBox(protocol.ClientFactory):

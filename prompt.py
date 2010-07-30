@@ -5,6 +5,7 @@
 
 import sys
 import uuid
+import logging
 from cmd import Cmd
 
 from twisted.internet import reactor
@@ -16,6 +17,15 @@ from twisted.internet.threads import deferToThread
 #from router import PeerInfo # for pickle
 from interface import Interface
 from chatter import ChatterBox
+import settings
+
+logger = logging.getLogger()
+__levels = { 0 : logging.CRITICAL,
+             1 : logging.ERROR,
+             2 : logging.WARNING,
+             3 : logging.INFO,
+             4 : logging.DEBUG }
+#logging.basicConfig(level=__levels.get(settings.get_option('settings/loglevel',0),0))
 
 class Prompt(Cmd):
 
@@ -31,6 +41,37 @@ class Prompt(Cmd):
         iface.message_received += lambda net, peer, msg: sys.stdout.write('{0}@{1}: {2}'.format(peer.name, net.name, msg))
         
         Cmd.__init__(self)
+        
+        
+    def do_log(self, line):
+        line = line.lower()
+        
+        if line == 'debug':
+            logger.setLevel(logging.DEBUG)
+            settings.set_option('settings/loglevel', 4)
+            print 'Logging threshold set to DEBUG'
+
+        elif line == 'info':
+            logger.setLevel(logging.INFO)
+            settings.set_option('settings/loglevel', 3)
+            print 'Logging threshold set to INFO'
+        
+        elif line.startswith('warn'):
+            logger.setLevel(logging.WARNING)
+            settings.set_option('settings/loglevel', 2)
+            print 'Logging threshold set to WARNING'
+        
+        elif line == 'error':
+            logger.setLevel(logging.ERROR)
+            settings.set_option('settings/loglevel', 1)
+            print 'Logging threshold set to ERROR'
+        
+        elif line.startswith('crit'):
+            logger.setLevel(logging.CRITICAL)
+            settings.set_option('settings/loglevel', 0)
+            print 'Logging threshold set to CRITICAL'
+        
+        
         
     def do_connect(self, line):
         try:

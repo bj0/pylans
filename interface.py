@@ -12,11 +12,12 @@ import settings
 from event import Event
 
 # levels: DEBUG, INFO, WARNING, ERROR
-__levels = { 0 : logging.ERROR,
-             1 : logging.WARNING,
-             2 : logging.INFO,
-             3 : logging.DEBUG }
-logging.basicConfig(level=__levels[settings.get_option('settings/loglevel',1)])
+__levels = { 0 : logging.CRITICAL,
+             1 : logging.ERROR,
+             2 : logging.WARNING,
+             3 : logging.INFO,
+             4 : logging.DEBUG }
+logging.basicConfig(level=__levels.get(settings.get_option('settings/loglevel',0),0))
 logger = logging.getLogger(__name__)
 
 class Interface(object):
