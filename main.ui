@@ -1,0 +1,128 @@
+<?xml version="1.0"?>
+<interface>
+  <requires lib="gtk+" version="2.16"/>
+  <!-- interface-naming-policy project-wide -->
+  <object class="GtkListStore" id="liststore1">
+    <columns>
+      <!-- column-name name -->
+      <column type="gchararray"/>
+    </columns>
+  </object>
+  <object class="GtkTreeStore" id="peer_model">
+    <columns>
+      <!-- column-name id -->
+      <column type="PyObject"/>
+      <!-- column-name name -->
+      <column type="gchararray"/>
+      <!-- column-name vip -->
+      <column type="gchararray"/>
+    </columns>
+  </object>
+  <object class="GtkWindow" id="main_window">
+    <child>
+      <object class="GtkVBox" id="vbox1">
+        <property name="visible">True</property>
+        <child>
+          <object class="GtkLabel" id="name_label">
+            <property name="visible">True</property>
+            <property name="label" translatable="yes">Name</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="padding">5</property>
+            <property name="position">0</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkTreeView" id="peer_treeview">
+            <property name="visible">True</property>
+            <property name="can_focus">True</property>
+            <property name="model">peer_model</property>
+            <property name="headers_visible">False</property>
+            <signal name="button_press_event" handler="on_peer_treeview_button_press_event"/>
+            <child>
+              <object class="GtkTreeViewColumn" id="name_tvcolumn">
+                <property name="title">name</property>
+                <child>
+                  <object class="GtkCellRendererText" id="cellrenderertext1"/>
+                  <attributes>
+                    <attribute name="text">1</attribute>
+                  </attributes>
+                </child>
+              </object>
+            </child>
+          </object>
+          <packing>
+            <property name="position">1</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkHButtonBox" id="hbuttonbox1">
+            <property name="visible">True</property>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="position">2</property>
+          </packing>
+        </child>
+      </object>
+    </child>
+  </object>
+  <object class="GtkMenu" id="peer_menu">
+    <property name="visible">True</property>
+    <child>
+      <object class="GtkMenuItem" id="info_menuitem">
+        <property name="visible">True</property>
+        <property name="label" translatable="yes">Info</property>
+        <property name="use_underline">True</property>
+	<signal name="activate" handler="on_peer_get_info"/>
+      </object>
+    </child>
+    <child>
+      <object class="GtkMenuItem" id="ip_menuitem">
+        <property name="visible">True</property>
+        <property name="label" translatable="yes">Copy IP</property>
+        <property name="use_underline">True</property>
+        <signal name="activate" handler="on_peer_copy_ip"/>
+      </object>
+    </child>
+  </object>
+  <object class="GtkMenu" id="network_menu">
+    <property name="visible">True</property>
+    <child>
+      <object class="GtkMenuItem" id="toggle_menuitem">
+        <property name="visible">True</property>
+        <property name="label" translatable="yes">Toggle Active</property>
+        <property name="use_underline">True</property>
+      </object>
+    </child>
+    <child>
+      <object class="GtkMenuItem" id="connect_menuitem">
+        <property name="visible">True</property>
+        <property name="label" translatable="yes">Connect to Address</property>
+        <property name="use_underline">True</property>
+	<signal name="activate" handler="on_network_connect_peer"/>
+      </object>
+    </child>
+    <child>
+      <object class="GtkMenuItem" id="info_menitem">
+        <property name="visible">True</property>
+        <property name="label" translatable="yes">Info</property>
+        <property name="use_underline">True</property>
+        <signal name="activate" handler="on_network_get_info"/>
+      </object>
+    </child>
+  </object>
+</interface>
