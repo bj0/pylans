@@ -23,6 +23,7 @@ class PeerInfo(object):
         self.vip = 0                    # virtual ip
         self.real_ips = []              # list of known real ips
         self.is_direct = False          # is this peer direct connected?
+        self.relays = 0
         self.relay_id = 0               # if not, who is the relay
         self.ping_time = 0              #
         self.timeouts = 0               # tracking ping timeouts
@@ -52,6 +53,8 @@ class PeerManager(object):
     def __init__(self, router):
         self.peer_list = {}
         self.peer_map = {}
+        self.relay_list = {}
+        self.relay_map = {}
         self.ip_map = {}
         
         self._self = PeerInfo()
@@ -81,7 +84,7 @@ class PeerManager(object):
             event.emit('peer-added', self, peer)
             self.send_announce(peer)
 #            self.peer_added(peer)
-            
+                        
     def remove_peer(self, peer):
         '''Remove a peer connection'''
         if peer.id in self.peer_list:
@@ -119,35 +122,69 @@ class PeerManager(object):
            
            
     def update_peer(self, opi, npi):
-                
-        # incase there are changes to vip and name
+        changed = False                
         if opi.vip != npi.vip:
-            logger.debug('updating peer info with new virtual ip')
-            self.remove_peer(opi)
-            self.add_peer(npi)
-        else:
-            opi.update(npi)
+            self.ip_map[npi.vip] = self.ip_map[opi.vip]
+            del self.ip_map[opi.vip]
+            opi.vip = npi.vip
+            changed = True
+            logger.info('peer {0} vip changed.'.format(opi.id))
+        if (opi.relays >= npi.relays and opi.address != npi.address):
+            self.ip_map[opi.vip] = npi.address
+            opi.address = npi.address
+            opi.relays = npi.relays
+            opi.is_direct = (opi.relays == 0)
+            changed = True
+            logger.info('peer {0} relay changed.'.format(opi.id))
+        if opi.name != npi.name:
+            opi.name = npi.name
+            changed = True            
+            logger.info('peer {0} name changed.'.format(opi.id))
 
+        if changed:
+            # fire event
+            event.emit('peer-changed', self, opi)
+            self.send_announce(opi)
+            
     
     ###### Announce Functions
     
-    def send_announce(self, peer):
+    def send_announce(self, peer, address=None):
         '''Send an announce about peer to all known connections'''
-        peerkle = pickle.dumps(peer, -1)
-        for p in self.peer_list.values():
-            if p.id != peer.id:
-                self.router.send(self.PEER_ANNOUNCE, peerkle, p.address)
-                logger.debug('sending announce about {0} to {1}'.format(peer.id, p.id))
+        if peer.id != self._self.id:
+            peer.relays += 1 # inc relay so routing works right
+            peerkle = pickle.dumps(peer, -1)
+            peer.relays -= 1
+        else:
+            peerkle = pickle.dumps(peer, -1)
+            
+        if address is not None:
+            self.router.send(self.PEER_ANNOUNCE, peerkle, address)        
+            logger.info('sending announce about {0} to {1}'.format(peer.id, address))
+        else:
+            for p in self.peer_list.values():
+                if p.id != peer.id:
+                    self.router.send(self.PEER_ANNOUNCE, peerkle, p.address)
+                    logger.info('sending announce about {0} to {1}'.format(peer.id, p.id))
         
     
     def handle_announce(self, type, packet, address):
-        logger.debug('received an announce packet from {0}'.format(address))
+        logger.info('received an announce packet from {0}'.format(address))
         pi = pickle.loads(packet)
         if pi.id != self._self.id:
             if pi.id not in self:
-                logger.debug('announce for unknown peer {0}, trying to connect'.format(pi.name))
-                self.try_register(pi.address)
+                if pi.relays == 0:
+                    pi.address = address
+                    pi.is_direct = True
+                    self.add_peer(pi)
+                    self.send_announce(self._self, address)
+                    logger.info('announce from unknown peer {0}, adding and announcing self'.format(pi.name))
+                else:
+                    self.add_relay(pi, address)
+                    logger.info('announce for unknown peer {0}, trying to connect'.format(pi.name))
+                    self.try_register(pi.address)
             else:
+                pi.address = address
                 self.update_peer(self.peer_list[pi.id],pi)
     
     ###### Peer XChange Functions
@@ -157,12 +194,10 @@ class PeerManager(object):
         resent until an ack packet is recieved or MAX_PX_TRIES packets have been sent.
         This px packet includes the pickled peer list.'''
         
-        logger.debug('initiating a peer exchange with {0}'.format(peer.name))
+        logger.info('initiating a peer exchange with {0}'.format(peer.name))
         
         def send_px(i):
             if i <= self.MAX_PX_TRIES and peer.id not in self.peer_map:
-                return
-            else:
                 logger.debug('sending PX packet #{0}'.format(i))
                 self.router.send(self.PEER_XCHANGE, pickle.dumps(self.peer_list,-1), peer.address)
                 reactor.callLater(self.PX_TRY_DELAY, send_px, i+1)
@@ -176,7 +211,7 @@ class PeerManager(object):
         peer_list = pickle.loads(packet)
             
         # reply
-        logger.debug('received a PX packet, sending PX ACK')
+        logger.info('received a PX packet, sending PX ACK')
         self.router.send(self.PEER_XCHANGE_ACK, pickle.dumps(self.peer_list,-1), address)
         self.parse_peer_list(self.get_by_address(address), peer_list)
             
@@ -186,7 +221,7 @@ class PeerManager(object):
             Handle a px ack packet by parsing incoming peer list
         '''
         
-        logger.debug('received a PX ACK packet')
+        logger.info('received a PX ACK packet')
         
         peer_list = pickle.loads(packet)
         self.parse_peer_list(self.get_by_address(address), peer_list)
@@ -197,15 +232,23 @@ class PeerManager(object):
 #        if from_peer.id not in self.peer_map:
         self.peer_map[from_peer.id] = peer_list
 
-        for peer in peer_list:
+        for peer in peer_list.values():
             if peer.id != self._self.id:
+                peer.relays += 1
                 if peer.id in self.peer_list:
-                    pass # known peer
+                    self.update_peer(self.peer_list[peer.id],peer)
                 else:
                     self.try_register(peer.address)
+                    self.add_relay(peer, from_peer.address)
                 
             # generate map?
     
+    def add_relay(self, peer, relay_addr):
+        peer.is_direct = False
+        peer.relay = self[relay_addr]
+        peer.address = relay_addr
+        self.add_peer(peer)
+        
     
     
     ###### Peer Register Functions
@@ -215,7 +258,7 @@ class PeerManager(object):
         with own peer info.  Will continue to send this packet until an 
         ack is received or MAX_REG_TRIES packets have been sent.'''
         
-        logger.debug('initiating a register xchange with {0}'.format(address))
+        logger.info('initiating a register xchange with {0}'.format(address))
         
         if not (address in self.router.pm):
             
@@ -225,7 +268,7 @@ class PeerManager(object):
                     logger.debug('sending REG packet #{0}'.format(i))
                     self.router.send(self.REGISTER, self._my_pickle, address)
                     reactor.callLater(self.REG_TRY_DELAY, send_register, i+1)
-                    
+
             reactor.callLater(self.REG_TRY_DELAY, send_register, 0)
         else:
             logger.debug('address {0} already in peer list'.format(address))
@@ -233,15 +276,18 @@ class PeerManager(object):
     def handle_reg(self, type, packet, address):
         '''Handle incoming reg packet by adding new peer and sending ack.'''
         
-        logger.debug('received REG packet, sending ACK')
+        logger.info('received REG packet, sending ACK')
         
         pi = pickle.loads(packet)    
         if pi.id not in self.peer_list:
             logger.info('received a register from a new peer {0}'.format(pi.name))
             pi.address = address
+            pi.is_direct = (pi.relays == 0)
             self.add_peer(pi)
             self.try_px(pi)
         else:
+            pi.address = address
+            pi.is_direct = (pi.relays == 0)
             self.update_peer(self.peer_list[pi.id], pi)
 
         self.router.send(self.REGISTER_ACK, self._my_pickle, address)
@@ -257,7 +303,12 @@ class PeerManager(object):
         if pi.id not in self.peer_list:
             logger.info('received REG ACK packet from new peer {0}'.format(pi.name))
             pi.address = address
+            pi.is_direct = (pi.relays == 0)
             self.add_peer(pi)
+        else:
+            pi.address = address
+            pi.is_direct = (pi.relays == 0)
+            self.update_peer(self.peer_list[pi.id], pi)
                 
                 
     ###### Container Type Overloads

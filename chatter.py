@@ -1,4 +1,5 @@
 # chatter.py
+# todo: switch to using UDP+ack for msgs instead of TCP to remove dependence on virtual adapter
 
 from random import randint
 from struct import pack, unpack

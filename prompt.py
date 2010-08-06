@@ -20,7 +20,7 @@ from chatter import ChatterBox
 import settings
 
 logger = logging.getLogger()
-__levels = { 0 : logging.CRITICAL,
+_levels = { 0 : logging.CRITICAL,
              1 : logging.ERROR,
              2 : logging.WARNING,
              3 : logging.INFO,
@@ -71,7 +71,10 @@ class Prompt(Cmd):
             settings.set_option('settings/loglevel', 0)
             print 'Logging threshold set to CRITICAL'
         
+        else:
+            print 'Logging threshold is currently {0}'.format(logging.getLevelName(_levels.get(settings.get_option('settings/loglevel',0),0)))
         
+        settings.save()        
         
     def do_connect(self, line):
         try:

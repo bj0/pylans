@@ -170,7 +170,13 @@ class Router(object):
         '''Got a data packet from a peer, need to inject it into tun/tap'''
         # check?
         #print 'get packet'
-        self._tuntap.doWrite(packet)
+        dst = packet[16:20]
+        if dst == self.pm._self.vip:
+            self._tuntap.doWrite(packet)
+        else:
+            self.send_packet(packet)
+            logger.debug('got packet with different dest ip, relay packet?')
+           
         
     def recv_data(self, data):
         pass
