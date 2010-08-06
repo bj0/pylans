@@ -44,7 +44,8 @@ class Pinger(object):
         
     def send_ping(self, peer):
         pi = PingInfo(peer.id)
-        self.active_pings[pi.id] = pi
+        timeout_call = reactor.callLater(self.MAX_PING_TIME, self._ping_timeout, pi.id)
+        self.active_pings[pi.id] = (pi, timeout_call)
         self.router.send(self.PING, pi.id, peer.address)
         logger.debug('sending ping to {0}'.format(peer.name))
         
@@ -56,8 +57,9 @@ class Pinger(object):
 
     def handle_pong(self, type, data, address):
         if data in self.active_pings:
-            pi = self.active_pings[data]
+            pi, timeout_call = self.active_pings[data]
             dt = pi.duration()
+            timeout_call.cancel()
             self.router.pm.peer_list[pi.peer_id].ping_time = dt
             self.router.pm.peer_list[pi.peer_id].timeouts = 0
             del self.active_pings[data]
@@ -69,15 +71,17 @@ class Pinger(object):
             for peer in self.router.pm.peer_list.values():
                 self.send_ping(peer)        
             
-        for ping in self.active_pings.values():
-            if ping.duration() > self.MAX_PING_TIME:
-                del self.active_pings[ping.id]
+
+    def _ping_timeout(self, id):
+        if id in self.active_pings:
+            pi = self.active_pings[id][0]
+            del self.active_pings[id]
                 
-                if ping.peer_id in self.router.pm.peer_list:
-                    peer = self.router.pm.peer_list[ping.peer_id]
-                    peer.timeouts += 1
-                    if peer.timeouts > self.MAX_TIMEOUTS:
-                        self.router.pm._timeout(peer)
+            if pi.peer_id in self.router.pm.peer_list:
+                peer = self.router.pm.peer_list[pi.peer_id]
+                peer.timeouts += 1
+                if peer.timeouts > self.MAX_TIMEOUTS:
+                    self.router.pm._timeout(peer)
 
         
     def start(self):
