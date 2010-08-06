@@ -28,7 +28,7 @@ class Chatter(basic.LineReceiver):
     
     def lineReceived(self, line):
         self.factory.receive(self, line)
-        logger.debug('received chat msg from {0}:{1}'.format(self.get_hex(), line))
+        logger.debug('received chat msg from {0}:{1}'.format(self.pid.get_hex(), line))
     
     def message(self, line):
         self.sendLine(line)
@@ -75,13 +75,15 @@ class ChatterBox(protocol.ClientFactory):
         iface.network_stopped += unregister_handler
         
     def is_running(self):
-        return self._tcp_port is None
+        return self._tcp_port is not None
 
     def start(self):
+        logger.info('starting chatter on port %d',self.port)
         self._tcp_port = reactor.listenTCP(self.port, self)
         
     def stop(self):        
         if self._tcp_port is not None:
+            logger.info('stopping chatter on port %d',self.port)
             self._tcp_port.stopListening()
             self._tcp_port = None
             
@@ -158,7 +160,7 @@ class ChatterBox(protocol.ClientFactory):
             reactor.connectTCP( vaddress[0], vaddress[1], self)
 
         router.send(self.CHAT_ACK, pack('I',self.port), address)
-        logger.debug('received chat init packet from {0}, sending ack'.format(peer.name))
+        logger.info('received chat init packet from {0}, sending ack'.format(peer.name))
     
     def disconnect(self, peer):
         if peer.id in self.connections:
