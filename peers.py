@@ -260,7 +260,7 @@ class PeerManager(object):
         
         logger.info('initiating a register xchange with {0}'.format(address))
         
-        if not (address in self.router.pm):
+        if (address not in self.router.pm):
             
             def send_register(i):
                 '''Send a register packet and re-queues self'''
@@ -279,7 +279,10 @@ class PeerManager(object):
         logger.info('received REG packet, sending ACK')
         
         pi = pickle.loads(packet)    
-        if pi.id not in self.peer_list:
+        if pi.id == self._self.id:
+            # we sent a reg to ourself?
+            pass
+        elif pi.id not in self.peer_list:
             logger.info('received a register from a new peer {0}'.format(pi.name))
             pi.address = address
             pi.is_direct = (pi.relays == 0)
@@ -300,11 +303,15 @@ class PeerManager(object):
         
         pi = pickle.loads(packet)
 
-        if pi.id not in self.peer_list:
+        if pi.id == self._self.id:
+            # yea yea...
+            pass
+        elif pi.id not in self.peer_list:
             logger.info('received REG ACK packet from new peer {0}'.format(pi.name))
             pi.address = address
             pi.is_direct = (pi.relays == 0)
             self.add_peer(pi)
+            self.try_px(pi)
         else:
             pi.address = address
             pi.is_direct = (pi.relays == 0)

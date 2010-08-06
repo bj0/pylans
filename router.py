@@ -163,6 +163,7 @@ class Router(object):
             
         else:
             if dt in self.handlers:
+                # need to check if this is from a known peer?
                 self.handlers[dt](dt, data, address)
     
         
