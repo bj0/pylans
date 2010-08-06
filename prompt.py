@@ -160,7 +160,7 @@ class Prompt(Cmd):
         peer = iface.get_peer_info(name, net)
         net = iface.get_network()
         if peer is not None and net is not None:
-            reactor.callFromThread(cbox.send_message, net.id, peer.id, msg)
+            reactor.callFromThread(iface.send_message, net.id, peer.id, msg)
         else:
             print 'peer or network is not specified'
             
@@ -183,12 +183,12 @@ if __name__ == '__main__':
         iface.create_new_network('newnetwork')
 
     iface.start_all_networks()
-    cbox = ChatterBox(iface)
+#    cbox = ChatterBox(iface)
     p = Prompt(iface)
     deferToThread(p.cmdloop)
 
     # give it time to bring up teh interface, then open tcp port
-    reactor.callLater(5, reactor.listenTCP, cbox.port, cbox)
+#    reactor.callLater(5, reactor.listenTCP, cbox.port, cbox)
 
     
     print 'run'

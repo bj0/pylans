@@ -48,6 +48,7 @@ class ChatterBox(protocol.ClientFactory):
         self.handler_list = {}
         self.msg_queue = {}
         self.port = settings.get_option('chatter/port',randint(15000, 45000))
+        self._tcp_port = None
 #        settings.get_option('network/chatter/port', self.port)
         
         # Event
@@ -72,8 +73,17 @@ class ChatterBox(protocol.ClientFactory):
         iface.network_started += register_handler
         iface.network_stopped += unregister_handler
         
+    def is_running(self):
+        return self._tcp_port is None
+
+    def start(self):
+        self._tcp_port = reactor.listenTCP(self.port, self)
         
-        
+    def stop(self):        
+        if self._tcp_port is not None:
+            self._tcp_port.stopListening()
+            self._tcp_port = None
+            
     def add(self, chatter):
         host = chatter.transport.getPeer() # virtual host
         vip = util.encode_ip(host[1])

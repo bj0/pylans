@@ -10,6 +10,7 @@ import util
 import event
 import settings
 from event import Event
+from chatter import ChatterBox
 
 # levels: DEBUG, INFO, WARNING, ERROR
 __levels = { 0 : logging.CRITICAL,
@@ -37,6 +38,8 @@ class Interface(object):
         self.peer_added = Event()
         self.peer_removed = Event()
         self.message_received = Event()
+
+        self._cbox = ChatterBox(self)
 
         event.register_handler('network-started', None, self.network_started)
         event.register_handler('network-stopped', None, self.network_stopped)
@@ -123,10 +126,12 @@ class Interface(object):
         if self.get_network(network) is not None:
             self._current.router.pm.try_register(address)
             
-    def send_message(self, network, peer):
+    def send_message(self, network, peer, msg):
+        if not self._cbox.is_running():
+            self._cbox.start()
         if self.get_network(network) is not None:
             if peer in self._current.pm:
-                pass#send msg?
+                self._cbox.send_message(network.id, peer.id, msg)
 
     def set_network_name(self, newname, network=None):
         if self.get_network(network) is not None:
