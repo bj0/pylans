@@ -4,6 +4,7 @@ from struct import pack, unpack
 import logging
 import sys
 import cPickle as pickle
+import random
 
 from zope.interface import implements
 from twisted.internet import reactor, protocol
@@ -51,6 +52,7 @@ class Router(object):
     Packet format: TBD'''
     SIGNATURE = 'PV'+pack('H',0)
     
+    TIMEOUT = 5 # 5s
     # packet types
     DATA = 1
     ACK = 2
@@ -128,7 +130,7 @@ class Router(object):
         if peer in self.pm:
             return self.send(type, data, self.pm[peer].address, id)
     
-    def send(self, type, data, address, id=0):
+    def send(self, type, data, address, ack=False, id=0):
         '''Send a packet of type with data to address'''
         if type == self.DATA:
             data = pack('H', type) + data
@@ -142,9 +144,11 @@ class Router(object):
                 vip = pack('4B',0,0,0,0)
             data = pack('2H', type, id) + vip + self.pm._self.vip + data
 
-            if id > 0: # want ack
+            if ack or id > 0: # want ack
+                if id == 0:
+                    id = random.randint(0, 0xFFFF)
                 d = defer.Deferred()
-                timeout_call = reactor.callLater(5, self._timeout, id)
+                timeout_call = reactor.callLater(self.TIMEOUT, self._timeout, id)
                 self._requested_acks[id] = (d, timeout_call)
             else:
                 d = None            

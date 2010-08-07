@@ -40,8 +40,8 @@ class PeerManager(object):
     '''Manages peer connections'''
     MAX_REG_TRIES = 5
     MAX_PX_TRIES = 5
-    REG_TRY_DELAY = 1
-    PX_TRY_DELAY = 1
+    REG_TRY_DELAY = 2
+    PX_TRY_DELAY = 2
 
     # packet types
     REGISTER = 4
@@ -198,8 +198,9 @@ class PeerManager(object):
         
         def send_px(i):
             if i <= self.MAX_PX_TRIES and peer.id not in self.peer_map:
-                logger.debug('sending PX packet #{0}'.format(i))
                 self.router.send(self.PEER_XCHANGE, pickle.dumps(self.peer_list,-1), peer.address)
+                logger.debug('sending PX packet #{0}'.format(i))
+ 
                 reactor.callLater(self.PX_TRY_DELAY, send_px, i+1)
                 
         reactor.callLater(self.PX_TRY_DELAY, send_px, 0)
@@ -224,7 +225,7 @@ class PeerManager(object):
         logger.info('received a PX ACK packet')
         
         peer_list = pickle.loads(packet)
-        print 'px',vip.encode('hex')
+#        print 'px',vip.encode('hex')
         self.parse_peer_list(self[vip], peer_list)
     
     def parse_peer_list(self, from_peer, peer_list):

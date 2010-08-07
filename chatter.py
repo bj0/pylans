@@ -41,7 +41,7 @@ class ChatterBox(protocol.ClientFactory):
     CHAT_INIT = 0x10 + 1
     CHAT_ACK = 0x10 + 2    
     MAX_INIT_TRIES = 3
-    CHAT_TRY_DELAY = 3
+    CHAT_TRY_DELAY = 2
     
     def __init__(self, iface):
         self.iface = iface
