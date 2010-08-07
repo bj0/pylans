@@ -168,7 +168,7 @@ class PeerManager(object):
                     logger.info('sending announce about {0} to {1}'.format(peer.id, p.id))
         
     
-    def handle_announce(self, type, packet, address):
+    def handle_announce(self, type, packet, address, vip):
         logger.info('received an announce packet from {0}'.format(address))
         pi = pickle.loads(packet)
         if pi.id != self._self.id:
@@ -204,7 +204,7 @@ class PeerManager(object):
                 
         reactor.callLater(self.PX_TRY_DELAY, send_px, 0)
 
-    def handle_px(self, type, packet, address):
+    def handle_px(self, type, packet, address, vip):
         '''Handle a peer exchange packet.  Load the peer list with the px packet 
         and send an ack packet with own peer list.'''
         
@@ -213,10 +213,10 @@ class PeerManager(object):
         # reply
         logger.info('received a PX packet, sending PX ACK')
         self.router.send(self.PEER_XCHANGE_ACK, pickle.dumps(self.peer_list,-1), address)
-        self.parse_peer_list(self.get_by_address(address), peer_list)
+        self.parse_peer_list(self[vip], peer_list)
             
 
-    def handle_px_ack(self, type, packet, address):
+    def handle_px_ack(self, type, packet, address, vip):
         '''
             Handle a px ack packet by parsing incoming peer list
         '''
@@ -224,7 +224,8 @@ class PeerManager(object):
         logger.info('received a PX ACK packet')
         
         peer_list = pickle.loads(packet)
-        self.parse_peer_list(self.get_by_address(address), peer_list)
+        print 'px',vip.encode('hex')
+        self.parse_peer_list(self[vip], peer_list)
     
     def parse_peer_list(self, from_peer, peer_list):
         '''Parse a peer list from a px packet'''
@@ -273,7 +274,7 @@ class PeerManager(object):
         else:
             logger.debug('address {0} already in peer list'.format(address))
                     
-    def handle_reg(self, type, packet, address):
+    def handle_reg(self, type, packet, address, vip):
         '''Handle incoming reg packet by adding new peer and sending ack.'''
         
         logger.info('received REG packet, sending ACK')
@@ -296,10 +297,10 @@ class PeerManager(object):
         self.router.send(self.REGISTER_ACK, self._my_pickle, address)
                 
         
-    def handle_reg_ack(self, type, packet, address):
+    def handle_reg_ack(self, type, packet, address, vip):
         '''Handle reg ack by adding new peer'''
         
-        logger.debug('received REG ACK packet')
+        logger.info('received REG ACK packet')
         
         pi = pickle.loads(packet)
 
@@ -342,6 +343,8 @@ class PeerManager(object):
             
         elif isinstance(item, str):  # name
             peer = self.get_by_name(item)
+            if peer is None:
+                peer = self.get_by_vip(item)
         else:
             raise TypeError('Unrecognized key type')
 
@@ -358,8 +361,9 @@ class PeerManager(object):
             return self.get_by_address(item) is not None
         elif isinstance(item, uuid.UUID):               # peer id
             return (item in self.peer_list)
-        elif isinstance(item, str):  # name
-            return self.get_by_name(item) is not None
+        elif isinstance(item, str):  # name or vip
+            return (self.get_by_name(item) is not None) or \
+                    (item in self.ip_map)
     
 
 

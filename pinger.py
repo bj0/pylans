@@ -49,13 +49,13 @@ class Pinger(object):
         self.router.send(self.PING, pi.id, peer.address)
         logger.debug('sending ping to {0}'.format(peer.name))
         
-    def handle_ping(self, type, data, address):
+    def handle_ping(self, type, data, address, vip):
 
         logger.debug('received ping, sending pong')
         
-        self.router.send(self.PONG, data, address)
+        self.router.send(self.PONG, data, vip)
 
-    def handle_pong(self, type, data, address):
+    def handle_pong(self, type, data, address, vip):
         if data in self.active_pings:
             pi, timeout_call = self.active_pings[data]
             dt = pi.duration()

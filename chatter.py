@@ -57,8 +57,8 @@ class ChatterBox(protocol.ClientFactory):
         
         # Closure magic
         def register_handler(net):
-            def handler(type, port, addr):
-                self.handle_chat_init(net.router, type, port, addr)
+            def handler(type, port, addr, vip):
+                self.handle_chat_init(net.router, type, port, addr, vip)
                 
             net.router.register_handler(self.CHAT_INIT, handler)
             self.handler_list[net.id] = handler
@@ -106,7 +106,7 @@ class ChatterBox(protocol.ClientFactory):
                     chatter.message(msg)
                 del self.msg_queue[vip]
         else:
-            chatter.loseConnection()
+            chatter.transport.loseConnection()
             logger.info('chatter connection dropped from {0}'.format(host))
     
     def remove(self, chatter):
@@ -145,21 +145,21 @@ class ChatterBox(protocol.ClientFactory):
             def send_init(i):
                 if i <= self.MAX_INIT_TRIES and peer.vip not in self.connections:
                     logger.debug('sending chat init packet #{0}'.format(i))
-                    net.router.send(self.CHAT_INIT, pack('I',self.port), peer.address)
+                    net.router.send(self.CHAT_INIT, pack('I',self.port), peer)
                     reactor.callLater(self.CHAT_TRY_DELAY, send_init, i+1)
                     
             reactor.callLater(self.CHAT_TRY_DELAY, send_init, 0)
             logger.info('initiating chatter connection to {0} on {1}'.format(peer.name, net.name))
             
             
-    def handle_chat_init(self, router, type, port, address):    
+    def handle_chat_init(self, router, type, port, address, vip):
         port = unpack('I',port)[0]
-        peer = router.pm.get_by_address(address)
+        peer = router.pm[vip]
         if peer.id not in self.connections:
             vaddress = (util.decode_ip(peer.vip), port)
             reactor.connectTCP( vaddress[0], vaddress[1], self)
 
-        router.send(self.CHAT_ACK, pack('I',self.port), address)
+        router.send(self.CHAT_ACK, pack('I',self.port), vip)
         logger.info('received chat init packet from {0}, sending ack'.format(peer.name))
     
     def disconnect(self, peer):
