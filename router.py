@@ -7,7 +7,7 @@ import cPickle as pickle
 import random
 
 from zope.interface import implements
-from twisted.internet import reactor, protocol
+from twisted.internet import reactor, protocol, defer
 from twisted.internet.protocol import DatagramProtocol, Factory, ClientFactory, Protocol
 from twisted.internet.task import LoopingCall
 
@@ -72,6 +72,7 @@ class Router(object):
         self.filter = Crypter(network.key)
         proto.router = self
         self.pm = PeerManager(self)
+        self.ip_map = self.pm.ip_map
         
         self.pinger = Pinger(self)
         self.pinger.start()
@@ -170,7 +171,7 @@ class Router(object):
         if id in self._requested_acks:
             d = self._requested_acks[id][0]
             del self._requested_acks[id]
-            d.errback()
+            d.errback(Exception('packet timeout'))
     
     def send_udp(self, data, address):
         data = self.filter.encrypt(data)
@@ -183,8 +184,8 @@ class Router(object):
 #        prot = unpack('1B',packet[9])[0]
         
         # if ip in peer list
-        if dst in self.pm.ip_map:
-            self.send(self.DATA, packet, self.pm.ip_map[dst])
+        if dst in self.ip_map:
+            self.send(self.DATA, packet, self.ip_map[dst])
         else:
             logger.debug('got packet on wire to unknown destination: {0}'.format(dst.encode('hex')))
                 

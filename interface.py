@@ -127,11 +127,11 @@ class Interface(object):
             self._current.router.pm.try_register(address)
             
     def send_message(self, network, peer, msg):
-        if not self._cbox.is_running():
-            self._cbox.start()
+#        if not self._cbox.is_running():
+#            self._cbox.start()
         if self.get_network(network) is not None:
             if peer in self._current.router.pm:
-                self._cbox.send_message(self._current.id, self._current.router.pm[peer], msg)
+                self._cbox.send_message(self._current.id, peer, msg)
 
     def set_network_name(self, newname, network=None):
         if self.get_network(network) is not None:

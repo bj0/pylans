@@ -350,7 +350,7 @@ class PeerManager(object):
             raise TypeError('Unrecognized key type')
 
         if peer is None:
-            raise KeyError('Address not in peer list.')
+            raise KeyError('Address {0} not in peer list.'.format(repr(item)))
         else:
             return peer
 
