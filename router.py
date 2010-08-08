@@ -27,6 +27,7 @@ class UDPPeerProtocol(DatagramProtocol):
     def send(self, data, address):
         '''Send data to address'''
         try:
+            logger.debug('sending data on UDP port to {0}'.format(address))
             self.transport.write(data, address)
         except Exception, e:
             logger.warning('UDP send threw exception:\n  {0}'.format(e))
@@ -37,7 +38,7 @@ class UDPPeerProtocol(DatagramProtocol):
         '''Called by twisted when data is received from address'''
 #        self.receive(data, address)
         self.router.recv_udp(data, address)
-        logger.debug('received data on UDP port')
+        logger.debug('received data on UDP port from {0}'.format(address))
                 
     def connectionRefused(self):
         logger.debug('connectionRefused on UDP port')
@@ -142,8 +143,10 @@ class Router(object):
                 address = peer.address
                 vip = peer.vip
             else: # unknown peer dst (like for reg's)
+                if isinstance(address, str):
+                    logger.warning('unknown dest {0} not an address tuple'.format(address.encode('hex')))
+                    return
                 vip = pack('4B',0,0,0,0)
-            data = pack('2H', type, id) + vip + self.pm._self.vip + data
 
             if ack or id > 0: # want ack
                 if id == 0:
@@ -153,6 +156,8 @@ class Router(object):
                 self._requested_acks[id] = (d, timeout_call)
             else:
                 d = None            
+
+            data = pack('2H', type, id) + vip + self.pm._self.vip + data
             
             #TODO exception handling for bad addresses
             self.send_udp(data, address)
@@ -161,17 +166,21 @@ class Router(object):
 
     def handle_ack(self, type, data, address, src):
         id = unpack('H', data)[0]
+        logger.info('got ack with id {0}'.format(id))
         if id in self._requested_acks:
             d, timeout_call = self._requested_acks[id]
             del self._requested_acks[id]
             timeout_call.cancel()
-            d.callback()
+            d.callback(None)
 
     def _timeout(self, id):
         if id in self._requested_acks:
             d = self._requested_acks[id][0]
             del self._requested_acks[id]
-            d.errback(Exception('packet timeout'))
+            d.errback()
+            logger.info('ack timeout')
+        else:
+            logger.info('timeout called with bad id??!!?')
     
     def send_udp(self, data, address):
         data = self.filter.encrypt(data)
@@ -206,7 +215,8 @@ class Router(object):
                     # need to check if this is from a known peer?
                     self.handlers[dt](dt, data[12:], address, data[8:12])
                 if id > 0: # ACK requested
-                    self.send(self.ACK, data[2:4], dst)
+                    logger.debug('sending ack')
+                    self.send(self.ACK, data[2:4], data[8:12])
                 logger.debug('handling {0} packet from {1}'.format(dt, data[8:12].encode('hex')))
             else: 
                 self.relay(data, dst)

@@ -67,14 +67,18 @@ class ChatterBox(object):
         logger.info('sending msg to {0}'.format(peer.name))
         
         def send_msg(err, i):
-            d = net.router.send(self.CHAT_MSG, line, peer, True)
-            d.addErrback(send_msg, i+1)
-            logger.debug('sending msg attempt #{0}'.format(i))
+            if i < self.MAX_CHAT_RETRIES:
+                d = net.router.send(self.CHAT_MSG, line, peer, True)
+                d.addErrback(send_msg, i+1)
+                logger.debug('sending msg attempt #{0}'.format(i))
+            else:
+                logger.warning('never got ack for sending msg to {0}'.format(peer.name))
             
         send_msg(None, 0)
             
             
     def handle_chat_msg(self, net, type, msg, addr, vip):
         event.emit('message-received', self, net.id, net.router.pm[vip].id, msg)
-        logger.info('got a msg from {0}'.format(repr(vip))
-    
+        logger.info('got a msg from {0}'.format(vip.encode('hex')))
+        
+        
