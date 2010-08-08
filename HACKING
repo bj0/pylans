@@ -1,0 +1,19 @@
+TODO:
+
+
+announces are kinda numerous when a new peer gets added.  there is an announce when a new peer is added as a relay from an announce and then a second announce if we can direct-connect to them.  This could end up causing a lot of unnecessary announces.
+  Instead, I could make an incoming announce cause a direct connect attempt, and only add the peer as a relay if that fails (via deferred).  The downside of this is that it could take longer for a peer's presence to propagate through the net.
+  The first method would propagate the peer as relays through the network really fast and then each relay would be updated when a direct connection is made, causing extra announces.  If there were a lot of peers this could cause a lot of traffic...?
+
+Crytpo:
+  Should I use a PGP key for the network, and generate new random keys between peers when they connect?  Right now I just use a symmetric cypher key for the network and encrypt all traffic with that (ala n2n).  
+  If I switch, I need to change the packet format to let the client know if the incoming packet is encrypted with PGP or a Cypher.
+
+Packet Format:
+  Currently, if it is a 'data' packet, or a packet that goes over the TUN wire, the packet is just [type-2B][data].  Since data is an IP packet, src and destination virtual IPs are included.
+  For non-data packets, the format is [type-2B][id-2B][dest-4B][src-4B][data].  The id field is there so we can send an ack packet with the same value to ensure delivery.  The src and dsg fields are used for routing.
+
+Routing relay packets:
+  Reg/Announce/Peer exchange packets contain .relay field, which are used to assign a 'relay' address to peers that don't have direct connections.  Whenever  packet comes in with info about a peer containing a better relay field, the source of that packet is used as the new relay address.  There is probably a better way to do this.
+
+
