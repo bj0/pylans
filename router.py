@@ -27,7 +27,7 @@ class UDPPeerProtocol(DatagramProtocol):
     def send(self, data, address):
         '''Send data to address'''
         try:
-            logger.debug('sending data on UDP port to {0}'.format(address))
+#            logger.debug('sending data on UDP port to {0}'.format(address))
             self.transport.write(data, address)
         except Exception, e:
             logger.warning('UDP send threw exception:\n  {0}'.format(e))
@@ -107,44 +107,42 @@ class Router(object):
             
         logger.info('router stopped')
     
-    def try_old_peers(self, idx=0):
+    def try_old_peers(self):
         '''Try to connect to addresses that were peers in previous sessions.'''
         
-        logger.debug('trying to connect to previously known peers')
+        logger.info('trying to connect to previously known peers')
         
         for pid in self.network.known_addresses:
             if pid not in self.pm:
                 addrs = self.network.known_addresses[pid]
-                n = len(addrs)
-                self.pm.try_register(addrs[idx%n])
+                self.pm.try_register(addrs)
             
-#        if len(self.network.known_addresses) > len(self.pm):
-#            pass
 
         # re-schedule            
-        reactor.callLater(60*5, self.try_old_peers, idx+1)
+        reactor.callLater(60*5, self.try_old_peers)
     
     def relay(self, data, vip):
         if vip in self.pm:
+            logger.debug('relaying packet to {0}'.format(vip.encode('hex')))
             self.send_udp(data, self.ip_map[vip])
 
-    def send_peer(self, type, data, peer, id=0):
-        if peer in self.pm:
-            return self.send(type, data, self.pm[peer].address, id)
+#    def send_peer(self, type, data, peer, id=0):
+#        if peer in self.pm:
+#            return self.send(type, data, self.pm[peer].address, id)
     
-    def send(self, type, data, address, ack=False, id=0):
-        '''Send a packet of type with data to address'''
+    def send(self, type, data, dest, ack=False, id=0):
+        '''Send a packet of type with data to address.  Address should be a vip if the peer is known, since address tuples aren't unique with relaying'''
         if type == self.DATA:
             data = pack('H', type) + data
-            self.send_udp(data, address)
+            self.send_udp(data, dest)
         else:
-            if address in self.pm: # known peer dst
-                peer = self.pm[address]
-                address = peer.address
+            if dest in self.pm: # known peer dst
+                peer = self.pm[dest]
                 vip = peer.vip
+                dest = peer.address
             else: # unknown peer dst (like for reg's)
-                if isinstance(address, str):
-                    logger.warning('unknown dest {0} not an address tuple'.format(address.encode('hex')))
+                if isinstance(dest, str):
+                    logger.warning('unknown dest {0} not an address tuple'.format(dest.encode('hex')))
                     return
                 vip = pack('4B',0,0,0,0)
 
@@ -160,7 +158,7 @@ class Router(object):
             data = pack('2H', type, id) + vip + self.pm._self.vip + data
             
             #TODO exception handling for bad addresses
-            self.send_udp(data, address)
+            self.send_udp(data, dest)
             
             return d
 
@@ -177,7 +175,7 @@ class Router(object):
         if id in self._requested_acks:
             d = self._requested_acks[id][0]
             del self._requested_acks[id]
-            d.errback()
+            d.errback(Exception('call {0} timed out'.format(id)))
             logger.info('ack timeout')
         else:
             logger.info('timeout called with bad id??!!?')
@@ -210,14 +208,15 @@ class Router(object):
         else:
             id = unpack('H', data[2:4])[0]
             dst = data[4:8]
+            src = data[8:12]
             if dst == self.pm._self.vip or dst == '\x00\x00\x00\x00': #handle
                 if dt in self.handlers:
                     # need to check if this is from a known peer?
-                    self.handlers[dt](dt, data[12:], address, data[8:12])
+                    self.handlers[dt](dt, data[12:], address, src)
                 if id > 0: # ACK requested
                     logger.debug('sending ack')
-                    self.send(self.ACK, data[2:4], data[8:12])
-                logger.debug('handling {0} packet from {1}'.format(dt, data[8:12].encode('hex')))
+                    self.send(self.ACK, data[2:4], src)
+                logger.debug('handling {0} packet from {1}'.format(dt, src.encode('hex')))
             else: 
                 self.relay(data, dst)
                 logger.debug('relaying {0} packet to {1}'.format(dt, dst.encode('hex')))
@@ -240,7 +239,7 @@ class Router(object):
         
     def register_handler(self, type, callback):
         '''Register a handler for a specific packet type.  Handles will be
-        called as 'callback(type, data, address)'.'''
+        called as 'callback(type, data, address, vip)'.'''
         
         logger.debug('registering packet handler for packet type: {0}'.format(type))
         

@@ -46,7 +46,7 @@ class Pinger(object):
         pi = PingInfo(peer.id)
         timeout_call = reactor.callLater(self.MAX_PING_TIME, self._ping_timeout, pi.id)
         self.active_pings[pi.id] = (pi, timeout_call)
-        self.router.send(self.PING, pi.id, peer.address)
+        self.router.send(self.PING, pi.id, peer)
         logger.debug('sending ping to {0}'.format(peer.name))
         
     def handle_ping(self, type, data, address, vip):

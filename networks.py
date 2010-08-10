@@ -63,13 +63,14 @@ class Network(object):
 #        self.stopped = Event()
         
     def new_connection(self, net, peer):
-        peers = self.known_addresses
-        if peer.id not in peers:
-            peers[peer.id] = [peer.address]
-            self.known_addresses = peers
-        elif peer.address not in peers[peer.id]:
-            peers[peer.id].append(peer.address)
-            self.known_addresses = peers
+        if peer.is_direct:
+            peers = self.known_addresses
+            if peer.id not in peers:
+                peers[peer.id] = [peer.address]
+                self.known_addresses = peers
+            elif peer.address not in peers[peer.id]:
+                peers[peer.id].append(peer.address)
+                self.known_addresses = peers
             
         
     def is_running(self):

@@ -1,3 +1,11 @@
+relay causes peers to time out for some reason, also the relayed ping was always lower than the normal ping, why?  routing probably scrweed up
+
+k, addresses weren't tracking true addresses, they were being overwritten by relay stuff.  3 options:
+1) keep separate list of relays.  seems like a lot of extra checks
+2) keep peer.address as the relay address, and add a new field for DC addresses
+3) keep peer.address unchanged unless we have a DC
+we need to know the DC addresses to try and establish a DC on a relay peer.
+
 TODO:
 
 
