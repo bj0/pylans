@@ -8,6 +8,9 @@ we need to know the DC addresses to try and establish a DC on a relay peer.
 
 TODO:
 
+periodically try to DC relay peers?
+
+convert to TAP: ethernet packets, with mac addresses?
 
 announces are kinda numerous when a new peer gets added.  there is an announce when a new peer is added as a relay from an announce and then a second announce if we can direct-connect to them.  This could end up causing a lot of unnecessary announces.
   Instead, I could make an incoming announce cause a direct connect attempt, and only add the peer as a relay if that fails (via deferred).  The downside of this is that it could take longer for a peer's presence to propagate through the net.

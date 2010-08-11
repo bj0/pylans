@@ -79,7 +79,7 @@ class TunTapDevice(object):
         ipr = ip[:ip.rfind('.')] + '.0'
         ip = pack('4B', *[int(x) for x in ip.split('.')])
         ipr = pack('4B', *[int(x) for x in ipr.split('.')])
-        nm = pack('4B',0xff, 0xff, 0xff, 0) #TODO: fix
+        nm = pack('4B',0xff, 0xff, 0xff, 0) #TODO: fix, and use netsh
         
 #        print (ip+ipr+nm).encode('hex')
         w32f.DeviceIoControl(self._handle, TAP_IOCTL_CONFIG_TUN, ip+ipr+nm, 12)

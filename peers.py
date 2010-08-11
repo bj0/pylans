@@ -1,5 +1,4 @@
 # peers.py
-# TODO reconnection stuff should save addresses/peer-id and only try those addresses if the peer-id isn't already connected
 # TODO rsa key exchange - new 'packet format'
 
 import logging
@@ -21,17 +20,17 @@ class PeerInfo(object):
         self.alias = None
         self.address = ('ip','port')
         self.direct_addresses = []
+        self.mac = 0
         self.vip = 0                    # virtual ip
-        self.real_ips = []              # list of known real ips
         self.is_direct = False          # is this peer direct connected?
         self.relays = 0
         self.relay_id = 0               # if not, who is the relay
         self.ping_time = 0              #
         self.timeouts = 0               # tracking ping timeouts
         
-    def update(self, peer):
-        self.name = peer.name
-        self.vip = peer.vip
+#    def update(self, peer):
+#        self.name = peer.name
+#        self.vip = peer.vip
 
     @property
     def vip_str(self):
@@ -207,7 +206,7 @@ class PeerManager(object):
 #                    self.try_register(pi)
             else:
                 pi.address = address
-                self.update_peer(self.peer_list[pi.id],pi)
+                self.update_peer(self.peer_list[pi.id], pi)
     
     ###### Peer XChange Functions
     

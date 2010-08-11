@@ -1,4 +1,21 @@
 #! /usr/bin/env python
+# 
+# TUN mode - Layer 3, only IP packets are passed to the device:
+# -- packet format is: 
+# -- http://en.wikipedia.org/wiki/IPv4
+# -- src ip address is at 12 (96)
+# -- dst ip address is at 16 (128)
+# 
+# TAP mode - layer 2, ethernet packets, which sometimes (but not always)
+#  embed IP packets.
+# -- packet format is:
+# -- [mac dst] [mac src] [type] [data] [crc]
+# --     6         6       2       ?     4
+# common types:
+# -- 0x0800 - ipv4
+# -- 0x0806 - arp
+# 
+# 
 
 from zope.interface import implements
 from twisted.internet import reactor, defer, utils
@@ -16,7 +33,33 @@ import util
 
 logger = logging.getLogger(__name__)
 
-class TunTapLinux(object):
+class TunTapBase(object):
+    '''
+        Access to the virtual tun/tap device (Base Class).
+    '''
+
+#    @classmethod
+#    def is_ip6_discovery(mac):
+#    '''ip6 neighbor discovery address are between 33:33:00:00:00:00 - 33:33:FF:FF:FF:FF (n2n et al)'''
+#        if mac[0:2] == '\x33\x33':
+#            return True
+#        return False
+
+    @classmethod
+    def is_multicast(mac):
+        '''ethernet (ipv4) multicast addresses are 01:00:5E:??:??:??'''
+        if mac[0:3] == '\x01\x00\x5e':
+            return True
+        return False
+
+    @classmethod
+    def is_broadcast(mac):
+        '''ethernet broadcast is typically FF:FF:FF:FF:FF:FF, but we can just check the LSB of the first octet (which includes multicast)'''
+        if ord(mac[0]) & 1 == 1:
+            return True
+        return False
+
+class TunTapLinux(TunTapBase):
     '''
         Access to the virtual tun/tap device.
     '''
@@ -89,7 +132,7 @@ class TunTapLinux(object):
         self.stop()
         
                 
-class TunTapWindows(object):
+class TunTapWindows(TunTapBase):
     def __init__(self, router):
         self._running = False
         
@@ -152,6 +195,7 @@ if __name__ == '__main__':
             
     
     else:
+#        tt = TunTap()
         pass    
     
 
