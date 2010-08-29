@@ -1,3 +1,5 @@
+HOW to do multiple networks???
+
 relay causes peers to time out for some reason, also the relayed ping was always lower than the normal ping, why?  routing probably scrweed up
 
 k, addresses weren't tracking true addresses, they were being overwritten by relay stuff.  3 options:
@@ -11,6 +13,12 @@ TODO:
 periodically try to DC relay peers?
 
 convert to TAP: ethernet packets, with mac addresses?
+TAP:
+ iperf from dev to naz: 17.8
+ iperf from naz to dev: 33.7
+TUN:
+ iperf from dev to naz: 18.0
+ iperf from naz to dev: 28.8
 
 announces are kinda numerous when a new peer gets added.  there is an announce when a new peer is added as a relay from an announce and then a second announce if we can direct-connect to them.  This could end up causing a lot of unnecessary announces.
   Instead, I could make an incoming announce cause a direct connect attempt, and only add the peer as a relay if that fails (via deferred).  The downside of this is that it could take longer for a peer's presence to propagate through the net.

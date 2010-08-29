@@ -7,6 +7,8 @@ import win32event as w32e
 import winerror
 import pywintypes
 import logging
+
+import util
 #from win32file import CreateFile, ReadFile, WriteFile
 #from win32event import CreateEvent, ResetEvent
 #from twisted.internet import iocpreactor
@@ -76,13 +78,14 @@ class TunTapDevice(object):
         
     def configure_iface(self, addr):
         ip = addr.split('/')[0]
-        ipr = ip[:ip.rfind('.')] + '.0'
-        ip = pack('4B', *[int(x) for x in ip.split('.')])
-        ipr = pack('4B', *[int(x) for x in ipr.split('.')])
-        nm = pack('4B',0xff, 0xff, 0xff, 0) #TODO: fix, and use netsh
+        _, host, subnet = util.ip_to_net_host_subnet(addr)
+
+        ip = util.encode_ip(ip)
+        host = util.encode_ip(host)
+        subnet = util.encode_ip(subnet)
         
 #        print (ip+ipr+nm).encode('hex')
-        w32f.DeviceIoControl(self._handle, TAP_IOCTL_CONFIG_TUN, ip+ipr+nm, 12)
+        w32f.DeviceIoControl(self._handle, TAP_IOCTL_CONFIG_TUN, ip+host+subnet, 12)
         logger.info('configuring interface to: {0}'.format(addr))
         
     def enable_iface(self):

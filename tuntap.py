@@ -25,6 +25,7 @@ from twisted.internet.interfaces import IReadDescriptor, IPushProducer
 
 import os, sys, platform
 import logging
+import socket
 from binascii import hexlify
 from struct import unpack
 import getopt, struct
@@ -46,14 +47,14 @@ class TunTapBase(object):
 #        return False
 
     @classmethod
-    def is_multicast(mac):
+    def is_multicast(cls, mac):
         '''ethernet (ipv4) multicast addresses are 01:00:5E:??:??:??'''
         if mac[0:3] == '\x01\x00\x5e':
             return True
         return False
 
     @classmethod
-    def is_broadcast(mac):
+    def is_broadcast(cls, mac):
         '''ethernet broadcast is typically FF:FF:FF:FF:FF:FF, but we can just check the LSB of the first octet (which includes multicast)'''
         if ord(mac[0]) & 1 == 1:
             return True
@@ -66,22 +67,33 @@ class TunTapLinux(TunTapBase):
         
     implements(IReadDescriptor)
 
+    SIOCGIFHWADDR = 0x8927
     TUNSETIFF = 0x400454ca
     IFF_TUN   = 0x0001
     IFF_TAP   = 0x0002
     IFF_NO_PI = 0x1000
 
     TUNMODE = IFF_TUN
+    TAPMODE = IFF_TAP
+
+    @property
+    def is_tap(self):
+        return (self.mode == self.TAPMODE)
+        
+    @property
+    def is_tun(self):
+        return not self.is_tap
     
-    def __init__(self, router):
+    def __init__(self, router, mode):
         f = os.open("/dev/net/tun", os.O_RDWR)
-        ifs = ioctl(f, self.TUNSETIFF, struct.pack("16sH", "pytun%d", self.TUNMODE|self.IFF_NO_PI))
+        ifs = ioctl(f, self.TUNSETIFF, struct.pack("16sH", "pytun%d", mode|self.IFF_NO_PI))
         self.ifname = ifs[:16].strip("\x00")
 
         logger.info('opened tun device as interface {0}'.format(self.ifname))
 
         self.f = f
         self.router = router
+        self.mode = mode
 
     def start(self):
         '''Start monitoring tun/tap for input'''
@@ -92,6 +104,16 @@ class TunTapLinux(TunTapBase):
         '''Stop monitoring tun/tap for input'''
         reactor.removeReader(self)
         logger.info('linux tun/tap stopped')
+
+    def get_mac(self):
+        s = socket.socket(type=socket.SOCK_DGRAM)   
+        ifr = self.ifname + '\0'*(32-len(self.ifname))    
+        ifs = ioctl(s.fileno(), self.SIOCGIFHWADDR, ifr)
+        mac = ifs[18:24]
+        
+        logger.debug('got mac address: {0}'.format(mac.encode('hex')))
+
+        return mac
           
     def configure_iface(self, address):
         '''

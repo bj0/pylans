@@ -32,13 +32,14 @@ class Pinger(object):
     PING = 0x20 - 1
     PONG = 0x20 - 2   
 
-    def __init__(self, router, interval=2.0):
+    def __init__(self, router, interval=None):
+        if interval is None:
+            interval = settings.get_option(router.net.name+'/interval',5.0)
         self.interval = interval
         self.router = router
         self.active_pings = {}
         self._lp = LoopingCall(self.do_pings)
         
-#        router.handle_packet += self.handle_packet
         router.register_handler(self.PING, self.handle_ping)
         router.register_handler(self.PONG, self.handle_pong)
         

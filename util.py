@@ -1,6 +1,7 @@
 # util.py
 
 import threading
+import socket
 from struct import pack, unpack
 from functools import wraps
 
@@ -15,11 +16,11 @@ def decode_mac(mac_bin):
 
 def encode_ip(ip_str):
     '''Encode a string IP into 4 bytes.'''
-    return pack('4B', *[int(x) for x in ip_str.split('.')])
+    return socket.inet_aton(ip_str)
         
 def decode_ip(ip_bin):
     '''Decode a 4 byte IP into a string.'''
-    return '.'.join([str(x) for x in unpack('4B', ip_bin)])
+    return socket.inet_ntoa(ip_bin)
 
 def threaded(f):
     """
@@ -33,3 +34,32 @@ def threaded(f):
 
     return wrapper
 
+
+def ip_atol(ip_str):
+    ipn = encode_ip(ip_str)
+    return unpack('!L',ipn)[0]
+    
+def ip_ltoa(ip_long):
+    ipn = pack('!L',ip_long)
+    return decode_ip(ipn)
+    
+def ip_to_net_host_subnet(addr_str, mask=None):
+    '''Takes an address in either 'X.X.X.X/Mask' or with mask passed separately,
+    and returns (net, host, subnet).'''
+    if mask is not None:
+        if isinstance(mask, str):
+            mask = long(mask)
+        
+    else:
+        addr_str, mask = addr_str.split('/')
+        mask = long(mask)
+        #check mask
+    
+    mask = (1L<<(32-mask))-1
+    add = ip_atol(addr_str)
+
+    net = add & mask
+    host = add - net
+    
+    return (ip_ltoa(net), ip_ltoa(host), ip_ltoa(0xFFFFFFFF-mask))
+    

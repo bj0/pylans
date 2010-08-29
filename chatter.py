@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class ChatterBox(object):
 
-    CHAT_MSG = 0x10 + 1
+    CHAT_MSG = 21
     MAX_CHAT_RETRIES = 2
     
     def __init__(self, iface):
@@ -77,8 +77,8 @@ class ChatterBox(object):
         send_msg(None, 0)
             
             
-    def handle_chat_msg(self, net, type, msg, addr, vip):
-        event.emit('message-received', self, net.id, net.router.pm[vip].id, msg)
-        logger.info('got a msg from {0}'.format(vip.encode('hex')))
+    def handle_chat_msg(self, net, type, msg, addr, src_id):
+        event.emit('message-received', self, net.id, src_id, msg)
+        logger.info('got a msg from {0}'.format(src.encode('hex')))
         
         

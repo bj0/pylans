@@ -7,7 +7,8 @@ import logging
 import settings
 import event
 from event import Event
-from router import Router
+import router
+#from router import Router
 
 logger = logging.getLogger(__name__)
 
@@ -65,9 +66,11 @@ class Network(object):
     def new_connection(self, net, peer):
         if peer.is_direct:
             peers = self.known_addresses
+            
             if peer.id not in peers:
                 peers[peer.id] = [peer.address]
                 self.known_addresses = peers
+                
             elif peer.address not in peers[peer.id]:
                 peers[peer.id].append(peer.address)
                 self.known_addresses = peers
@@ -80,7 +83,7 @@ class Network(object):
         if self._running:
             return
         if self.router is None:
-            self.router = Router(self)
+            self.router = router.get_router(self)
 
         event.register_handler('peer-added', self.router.pm, self.new_connection);
         self.router.start()

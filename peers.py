@@ -1,5 +1,8 @@
 # peers.py
 # TODO rsa key exchange - new 'packet format'
+# TODO local clients behind a firewall that use an external intermediary need a way to 
+#     realize that they can DC using local addresses
+# TODO introducer (bittorrent?)
 
 import logging
 import cPickle as pickle
@@ -20,7 +23,7 @@ class PeerInfo(object):
         self.alias = None
         self.address = ('ip','port')
         self.direct_addresses = []
-        self.mac = 0
+        self.addr = 0                   # can be vip or mac
         self.vip = 0                    # virtual ip
         self.is_direct = False          # is this peer direct connected?
         self.relays = 0
@@ -44,23 +47,22 @@ class PeerManager(object):
     PX_TRY_DELAY = 2
 
     # packet types
-    REGISTER = 4
-    REGISTER_ACK = 5
-    PEER_XCHANGE = 6
-    PEER_XCHANGE_ACK = 7
-    PEER_ANNOUNCE = 8
+    REGISTER = 14
+    REGISTER_ACK = 15
+    PEER_XCHANGE = 16
+    PEER_XCHANGE_ACK = 17
+    PEER_ANNOUNCE = 18
     
     def __init__(self, router):
         self.peer_list = {}
         self.peer_map = {}
-#        self.relay_list = {}
-#        self.relay_map = {}
-        self.ip_map = {}
+        self.addr_map = {}
         
         self._self = PeerInfo()
         self._self.id = router.network.id
         self._self.name = router.network.username
         self._self.vip = util.encode_ip(router.network.ip)
+        self._self.addr = '\x00'*router.addr_size # temp fake mac?
         self._my_pickle = pickle.dumps(self._self,-1)
 
         self.router = router
@@ -74,12 +76,16 @@ class PeerManager(object):
 #        self.peer_added = Event()
 #        self.peer_removed = Event()
 
+    def _update_pickle(self):
+        self._my_pickle = pickle.dumps(self._self,-1)
+
     def add_peer(self, peer):
         '''Add a peer connection'''
         if peer.id not in self.peer_list:
             if peer.relays > 0:
                 peer.is_direct = False
                 peer.relay_id = self[peer.address].id
+                self.try_register(peer.direct_addresses)
             else:
                 peer.is_direct = True
                 peer.relay_id = None
@@ -87,7 +93,8 @@ class PeerManager(object):
                     peer.direct_addresses.append(peer.address)
 
             self.peer_list[peer.id] = peer
-            self.ip_map[peer.vip] = peer.address
+#            self.ip_map[peer.vip] = peer.address
+            self.addr_map[peer.addr] = peer.address
             
             # fire event
             event.emit('peer-added', self, peer)
@@ -100,8 +107,10 @@ class PeerManager(object):
             del self.peer_list[peer.id]
 #        if peer.id in self.relay_list[peer.id]:
 #            del self.relay_list[peer.id]
-        if peer.vip in self.ip_map:
-            del self.ip_map[peer.vip]
+#        if peer.vip in self.ip_map:
+#            del self.ip_map[peer.vip]
+        if peer.addr in self.addr_map:
+            del self.addr_map[peer.addr]
             
             # fire event
 #            self.peer_removed(peer)
@@ -113,11 +122,18 @@ class PeerManager(object):
             if p.name == name:
                 return p
         return None
-            
+
     def get_by_vip(self, vip):
         '''Get a peer connection by virtual ip'''
         for p in self.peer_list.values():
             if p.vip == vip:
+                return p
+        return None
+ 
+    def get_by_addr(self, addr):
+        '''Get a peer connection by mac or vip address'''
+        for p in self.peer_list.values():
+            if p.addr == addr:
                 return p
         return None
             
@@ -136,18 +152,27 @@ class PeerManager(object):
     def update_peer(self, opi, npi):
         changed = False                
         if (opi.relays >= npi.relays and opi.address != npi.address):
-            self.ip_map[opi.vip] = npi.address
+#            self.ip_map[opi.vip] = npi.address
+            self.addr_map[opi.addr] = npi.address
             opi.address = npi.address
             opi.relays = npi.relays
             opi.is_direct = (opi.relays == 0)
             #relay id?
             changed = True
             logger.info('peer {0} relay changed.'.format(opi.id))
+ 
+        if opi.addr != npi.addr:
+            # check for collision?
+            self.addr_map[npi.addr] = self.addr_map[opi.addr]
+            del self.addr_map[opi.addr]
+            opi.addr = npi.addr
+            changed = True
+            logger.info('peer {0} addr changed.'.format(opi.id))
             
         if opi.vip != npi.vip:
             # check for collision
-            self.ip_map[npi.vip] = self.ip_map[opi.vip]
-            del self.ip_map[opi.vip]
+#            self.ip_map[npi.vip] = self.ip_map[opi.vip]
+#            del self.ip_map[opi.vip]
             opi.vip = npi.vip
             changed = True
             logger.info('peer {0} vip changed.'.format(opi.id))
@@ -189,7 +214,7 @@ class PeerManager(object):
                     logger.info('sending announce about {0} to {1}'.format(peer.id, p.id))
         
     
-    def handle_announce(self, type, packet, address, vip):
+    def handle_announce(self, type, packet, address, src_id):
         logger.info('received an announce packet from {0}'.format(address))
         pi = pickle.loads(packet)
         if pi.id != self._self.id:
@@ -226,7 +251,7 @@ class PeerManager(object):
                 
         reactor.callLater(self.PX_TRY_DELAY, send_px, 0)
 
-    def handle_px(self, type, packet, address, vip):
+    def handle_px(self, type, packet, address, src_id):
         '''Handle a peer exchange packet.  Load the peer list with the px packet 
         and send an ack packet with own peer list.'''
         
@@ -234,11 +259,11 @@ class PeerManager(object):
             
         # reply
         logger.info('received a PX packet, sending PX ACK')
-        self.router.send(self.PEER_XCHANGE_ACK, pickle.dumps(self.peer_list,-1), vip)
-        self.parse_peer_list(self[vip], peer_list)
+        self.router.send(self.PEER_XCHANGE_ACK, pickle.dumps(self.peer_list,-1), src_id)
+        self.parse_peer_list(self[src_id], peer_list)
             
 
-    def handle_px_ack(self, type, packet, address, vip):
+    def handle_px_ack(self, type, packet, address, src_id):
         '''
             Handle a px ack packet by parsing incoming peer list
         '''
@@ -247,7 +272,7 @@ class PeerManager(object):
         
         peer_list = pickle.loads(packet)
 #        print 'px',vip.encode('hex')
-        self.parse_peer_list(self[vip], peer_list)
+        self.parse_peer_list(self[src_id], peer_list)
     
     def parse_peer_list(self, from_peer, peer_list):
         '''Parse a peer list from a px packet'''
@@ -327,7 +352,7 @@ class PeerManager(object):
         return main_d #TODO this funky thing needs testing                
 
                         
-    def handle_reg(self, type, packet, address, vip):
+    def handle_reg(self, type, packet, address, src_id):
         '''Handle incoming reg packet by adding new peer and sending ack.'''
         
         logger.info('received REG packet, sending ACK')
@@ -346,10 +371,10 @@ class PeerManager(object):
 #            pi.is_direct = (pi.relays == 0)
             self.update_peer(self.peer_list[pi.id], pi)
 
-        self.router.send(self.REGISTER_ACK, self._my_pickle, vip)
+        self.router.send(self.REGISTER_ACK, self._my_pickle, src_id)
                 
         
-    def handle_reg_ack(self, type, packet, address, vip):
+    def handle_reg_ack(self, type, packet, address, src_id):
         '''Handle reg ack by adding new peer'''
         
         logger.info('received REG ACK packet')
@@ -396,7 +421,12 @@ class PeerManager(object):
         elif isinstance(item, str):  # name
             peer = self.get_by_name(item)
             if peer is None:
-                peer = self.get_by_vip(item)
+                if len(item) == 4:
+                    peer = self.get_by_vip(item)
+                elif len(item) == 6:
+                    peer = self.get_by_addr(item)
+                elif len(item) == 16:
+                    peer = self[uuid.UUID(bytes=item)]
         else:
             raise TypeError('Unrecognized key type')
 
@@ -405,6 +435,12 @@ class PeerManager(object):
         else:
             return peer
 
+    def get(self, item, default=None):
+        try:
+            item = self[item]
+        except KeyError:
+            item = default
+        return item
     
     def __contains__(self, item):
         if isinstance(item, PeerInfo):
@@ -414,8 +450,7 @@ class PeerManager(object):
         elif isinstance(item, uuid.UUID):               # peer id
             return (item in self.peer_list)
         elif isinstance(item, str):  # name or vip
-            return (self.get_by_name(item) is not None) or \
-                    (item in self.ip_map)
+            return (self.get(item) != None)
     
 
 
