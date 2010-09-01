@@ -3,6 +3,7 @@
 from random import randint
 from struct import pack, unpack
 import logging
+import settings
 
 from platform import system
 if system() == 'Windows':   # On Windows, time() has low resolution(~1ms)
@@ -34,7 +35,7 @@ class Pinger(object):
 
     def __init__(self, router, interval=None):
         if interval is None:
-            interval = settings.get_option(router.net.name+'/interval',5.0)
+            interval = settings.get_option(router.network.name+'/interval',5.0)
         self.interval = interval
         self.router = router
         self.active_pings = {}

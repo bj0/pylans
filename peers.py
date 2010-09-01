@@ -9,6 +9,7 @@ import cPickle as pickle
 import uuid
 
 from twisted.internet import reactor, defer
+from twisted.python import log
 
 import event
 import util
@@ -349,6 +350,7 @@ class PeerManager(object):
 #            return err
         
         reactor.callLater(0, try_address, None, 0)
+        main_d.addErrback(log.err)
         return main_d #TODO this funky thing needs testing                
 
                         
@@ -371,7 +373,7 @@ class PeerManager(object):
 #            pi.is_direct = (pi.relays == 0)
             self.update_peer(self.peer_list[pi.id], pi)
 
-        self.router.send(self.REGISTER_ACK, self._my_pickle, src_id)
+        self.router.send(self.REGISTER_ACK, self._my_pickle, address) # can't send to src_id, might not be known
                 
         
     def handle_reg_ack(self, type, packet, address, src_id):

@@ -90,6 +90,9 @@ class Router(object):
         self._tuntap = tuntap
         self._port = None
         
+        import bootstrap
+        self._bootstrap = bootstrap.TrackerBootstrap(self.network)
+        
         self.register_handler(self.ACK, self.handle_ack)
 
     def get_my_address(self):
@@ -108,6 +111,7 @@ class Router(object):
 
         logger.info('router started, listening on UDP port {0}'.format(self._port))
     
+        self._bootstrap.run()
         reactor.callLater(1, self.try_old_peers)
     
     def stop(self):

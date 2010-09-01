@@ -8,6 +8,8 @@ k, addresses weren't tracking true addresses, they were being overwritten by rel
 3) keep peer.address unchanged unless we have a DC
 we need to know the DC addresses to try and establish a DC on a relay peer.
 
+drop uuids and just generate byte string ids of desired size?
+
 TODO:
 
 periodically try to DC relay peers?
