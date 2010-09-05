@@ -4,15 +4,13 @@
 #     realize that they can DC using local addresses
 # TODO introducer (bittorrent?)
 
-import logging
+from twisted.internet import reactor, defer
 import cPickle as pickle
+import event
+import logging
+import util
 import uuid
 
-from twisted.internet import reactor, defer
-#from twisted.python import log
-
-import event
-import util
 
 logger = logging.getLogger(__name__)
 

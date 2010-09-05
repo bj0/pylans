@@ -17,20 +17,18 @@
 # 
 # 
 
-from zope.interface import implements
-from twisted.internet import reactor, defer, utils
+from twisted.internet import reactor, utils
+from twisted.internet.interfaces import IReadDescriptor
 from twisted.internet.threads import deferToThread
-from twisted.internet.protocol import DatagramProtocol
-from twisted.internet.interfaces import IReadDescriptor, IPushProducer
-
-import os, sys, platform
+from zope.interface import implements
 import logging
+import os
+import platform
 import socket
-from binascii import hexlify
-from struct import unpack
-import getopt, struct
-
+import struct
 import util
+
+
 
 logger = logging.getLogger(__name__)
 

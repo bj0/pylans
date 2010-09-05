@@ -1,14 +1,13 @@
 # networks.py
 
-import os
-import uuid
-import logging
 import binascii
-
-import settings
 import event
-from event import Event
+import logging
+import os
 import router
+import settings
+import uuid
+
 #from router import Router
 
 logger = logging.getLogger(__name__)

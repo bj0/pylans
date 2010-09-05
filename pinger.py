@@ -1,18 +1,18 @@
 # pinger.py
 
+from platform import system
 from random import randint
-from struct import pack, unpack
+from struct import pack
+from twisted.internet import reactor
+from twisted.internet.task import LoopingCall
 import logging
 import settings
 
-from platform import system
 if system() == 'Windows':   # On Windows, time() has low resolution(~1ms)
     from time import clock as time
 else:
     from time import time
 
-from twisted.internet import reactor
-from twisted.internet.task import LoopingCall
 
 logger = logging.getLogger(__name__)
 

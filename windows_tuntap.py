@@ -1,18 +1,18 @@
 # windows_tuntap.py
 
-from struct import pack, unpack, calcsize
+from struct import pack, calcsize
+from winerror import ERROR_IO_PENDING
 import _winreg as reg
-import win32file as w32f
-import win32event as w32e
-import winerror
-import pywintypes
 import logging
-
+import pywintypes
 import util
+import win32event as w32e
+import win32file as w32f
+import winerror
+
 
 logger = logging.getLogger(__name__)
 
-from winerror import ERROR_IO_PENDING
 
 FILE_DEVICE_UNKNOWN = 0x22
 METHOD_BUFFERED = 0x0

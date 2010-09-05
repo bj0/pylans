@@ -1,9 +1,9 @@
 # util.py
 
-import threading
-import socket
-from struct import pack, unpack
 from functools import wraps
+from struct import pack, unpack
+import socket
+import threading
 
 def encode_mac(mac_str):
     '''Encode a string MAC address into 6 bytes.'''

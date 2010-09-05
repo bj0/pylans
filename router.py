@@ -2,26 +2,20 @@
 #TODO another way to check if an id is known, if there are going to be multiple networks using the same router...
 #TODO make tun/tap both work, selectable
 
+from crypto import Crypter
+from event import Event
+from peers import PeerManager
+from pinger import Pinger
 from struct import pack, unpack
+from tuntap import TunTap
+from twisted.internet import reactor, defer
+from twisted.internet.protocol import DatagramProtocol
 import logging
-import sys
-import cPickle as pickle
 import random
+import settings
 import uuid
 
-from zope.interface import implements
-from twisted.internet import reactor, protocol, defer
-from twisted.internet.protocol import DatagramProtocol, Factory, ClientFactory, Protocol
-from twisted.internet.task import LoopingCall
 
-import event
-import util
-import settings
-from event import Event
-from tuntap import TunTap
-from crypto import Crypter
-from pinger import Pinger
-from peers import PeerManager
 
 logger = logging.getLogger(__name__)
 

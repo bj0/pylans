@@ -3,14 +3,13 @@
 # should i switch to global events?
 # global interface "singleton" (like settings)
 
-import logging
-
-import networks
-import util
-import event
-import settings
-from event import Event
 from chatter import ChatterBox
+from event import Event
+import event
+import logging
+import networks
+import settings
+
 
 # levels: DEBUG, INFO, WARNING, ERROR
 __levels = { 0 : logging.CRITICAL,
@@ -18,7 +17,7 @@ __levels = { 0 : logging.CRITICAL,
              2 : logging.WARNING,
              3 : logging.INFO,
              4 : logging.DEBUG }
-logging.basicConfig(level=__levels.get(settings.get_option('settings/loglevel',0),0))
+logging.basicConfig(level=__levels.get(settings.get_option('settings/loglevel', 0), 0))
 logger = logging.getLogger(__name__)
 
 class Interface(object):

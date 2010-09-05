@@ -1,10 +1,12 @@
 #!/usr/bin/python
 
 # encryption classes
-import os
-import cPickle as pickle
-from Crypto.Cipher import Blowfish
+from Crypto.Cipher import AES, Blowfish
 from Crypto.PublicKey import RSA
+import cPickle as pickle
+import hashlib
+import hmac
+import os
 
 class Crypter(object):
     def __init__(self, key, mode=Blowfish.MODE_ECB):
@@ -13,7 +15,7 @@ class Crypter(object):
 
     def encrypt(self, string):
         pad = self.BLOCK_SIZE - len(string) % self.BLOCK_SIZE
-        string = string + pad*chr(pad)
+        string = string + pad * chr(pad)
         return self._obj.encrypt(string)
     
     def decrypt(self, string):
@@ -42,10 +44,6 @@ class RSAxe(object):
 
 # PyCrypto-based authenticated symetric encryption
 #import cPickle as pickle
-import hashlib
-import hmac
-import os
-from Crypto.Cipher import AES
 
 class AuthenticationError(Exception): pass
 
@@ -71,7 +69,7 @@ class Crypticle(object):
         else:
             size = key_size / 8 + cls.SIG_SIZE
             key = hashlib.sha256(passwd).digest()
-            key = key*((size-1)//len(key)+1)
+            key = key * ((size - 1) // len(key) + 1)
             key = key[:size]
         return key.encode("base64").replace("\n", "")
 

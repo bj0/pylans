@@ -3,21 +3,19 @@
 # todo: quit message?
 # more commands: dump peer, ??s
 
-import sys
-import uuid
-import logging
 from cmd import Cmd
-
+from interface import Interface
 from twisted.internet import reactor
 from twisted.internet.threads import deferToThread
+import logging
+import settings
+
+
 
 #import settings
 #import router
 #from networks import NetworkManager
 #from router import PeerInfo # for pickle
-from interface import Interface
-from chatter import ChatterBox
-import settings
 
 logger = logging.getLogger()
 _levels = { 0 : logging.CRITICAL,
@@ -72,7 +70,7 @@ class Prompt(Cmd):
             print 'Logging threshold set to CRITICAL'
         
         else:
-            print 'Logging threshold is currently {0}'.format(logging.getLevelName(_levels.get(settings.get_option('settings/loglevel',0),0)))
+            print 'Logging threshold is currently {0}'.format(logging.getLevelName(_levels.get(settings.get_option('settings/loglevel', 0), 0)))
         
         settings.save()        
         
@@ -86,9 +84,9 @@ class Prompt(Cmd):
                 network = line[2]
             else:
                 network = None
-            print 'Trying to connect to %s @ %d' % (ip,port)
+            print 'Trying to connect to %s @ %d' % (ip, port)
             
-            reactor.callFromThread(iface.connect_to_address,(ip,port), network)
+            reactor.callFromThread(iface.connect_to_address, (ip, port), network)
             
         except ValueError:
             print 'Invalid arguments.'
@@ -141,7 +139,7 @@ class Prompt(Cmd):
                 print 'is_direct: {0}'.format(p.is_direct)
                 if(not p.is_direct):
                     print '  relay:   {0}'.format(p.relay_id)
-                print 'ping_time: {0} ms'.format(p.ping_time*1e3)
+                print 'ping_time: {0} ms'.format(p.ping_time * 1e3)
                 print 'timeouts:  {0}'.format(p.timeouts)
             
     def complete_list(self, text, line, begidx, endidx):
@@ -156,7 +154,7 @@ class Prompt(Cmd):
         name = line.split()[0]
         name = name.split('@')
         if len(name) > 1:
-            name, net = '@'.join(name[:-1]),name[-1]
+            name, net = '@'.join(name[:-1]), name[-1]
         else:
             name, net = name[0], None
         msg = ' '.join(line.split()[1:])

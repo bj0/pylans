@@ -1,16 +1,16 @@
 # tracker bootstrap
 
-from twisted.web import client
-from twisted.internet import reactor
-
-import settings
-import util
-import urllib2
-import bencode
-import logging
-
 from hashlib import sha1
 from struct import unpack
+from twisted.internet import reactor
+from twisted.web import client
+import bencode
+import logging
+import settings
+import urllib2
+import util
+
+
 
 logger = logging.getLogger(__name__)
 

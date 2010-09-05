@@ -1,18 +1,11 @@
 # chatter.py
 
-from random import randint
-from struct import pack, unpack
+import event
 import logging
 
-from twisted.protocols import basic
-from twisted.internet import protocol, reactor
 #from twisted.internet.endpoints import TCP4ClientEndpoint   # - new in 10.1
 
-import event
-from router import Router
 #from event import Event
-import settings
-import util
 
 
 logger = logging.getLogger(__name__)
@@ -79,6 +72,6 @@ class ChatterBox(object):
             
     def handle_chat_msg(self, net, type, msg, addr, src_id):
         event.emit('message-received', self, net.id, src_id, msg)
-        logger.info('got a msg from {0}'.format(src.encode('hex')))
+        logger.info('got a msg from {0}'.format(src_id.encode('hex')))
         
         
