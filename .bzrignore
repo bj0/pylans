@@ -3,3 +3,5 @@ server.pem
 settings.ini
 _build
 Makefile
+.project
+.pydevproject
