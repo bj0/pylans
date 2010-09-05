@@ -34,11 +34,11 @@ class Prompt(Cmd):
         self.iface = iface
         
         # Events
-        iface.peer_added += lambda net, peer: sys.stdout.write('peer {0} added to network {1}'.format(peer.name, net.name))
-        iface.peer_removed += lambda net, peer: sys.stdout.write('peer {0} removed from network {1}'.format(peer.name, net.name))
-        iface.network_started += lambda net: sys.stdout.write('network {0} started'.format(net))
-        iface.network_stopped += lambda net: sys.stdout.write('network {0} stopped'.format(net))
-        iface.message_received += lambda net, peer, msg: sys.stdout.write('{0}@{1}: {2}'.format(peer.name, net.name, msg))
+        iface.peer_added += lambda net, peer: logger.info('peer {0} added to network {1}'.format(peer.name, net.name))
+        iface.peer_removed += lambda net, peer: logger.info('peer {0} removed from network {1}'.format(peer.name, net.name))
+        iface.network_started += lambda net: logger.info('network {0} started'.format(net))
+        iface.network_stopped += lambda net: logger.info('network {0} stopped'.format(net))
+        iface.message_received += lambda net, peer, msg: logger.critical('{0}@{1}: {2}'.format(peer.name, net.name, msg))
         
         Cmd.__init__(self)
         
@@ -83,7 +83,7 @@ class Prompt(Cmd):
             port = int(port)
             
             if len(line) > 2:
-                network = line[3]
+                network = line[2]
             else:
                 network = None
             print 'Trying to connect to %s @ %d' % (ip,port)
@@ -126,7 +126,7 @@ class Prompt(Cmd):
     def do_list(self, line):
         line = line.split()
         if len(line) > 0:
-            nets = line
+            nets = line.split()
             nets = [ iface.get_network(net) for net in nets if net is not None ]
         else:
             nets = iface.get_network_list()
@@ -194,6 +194,6 @@ if __name__ == '__main__':
 #    reactor.callLater(5, reactor.listenTCP, cbox.port, cbox)
 
     
-    print 'run'
+#    print 'run'
     reactor.run()    
     

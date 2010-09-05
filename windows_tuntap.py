@@ -9,12 +9,6 @@ import pywintypes
 import logging
 
 import util
-#from win32file import CreateFile, ReadFile, WriteFile
-#from win32event import CreateEvent, ResetEvent
-#from twisted.internet import iocpreactor
-#iocpreactor.install()
-
-#from twisted.internet import reactor
 
 logger = logging.getLogger(__name__)
 
@@ -51,13 +45,24 @@ HKLM = reg.HKEY_LOCAL_MACHINE
     
     
 class TunTapDevice(object):
-    def __init__(self, handle=None):
+    IFF_TUN   = 0x0001
+    IFF_TAP   = 0x0002
+    IFF_NO_PI = 0x1000
+
+    TUNMODE = IFF_TUN
+    TAPMODE = IFF_TAP
+
+    def __init__(self, mode, handle=None):
     
         if handle is None:
-            handle = self.get_tap_handle()
+            handle, devid = self.get_tap_handle()
+    
+        if handle is None:
+            raise Exception('Could not get TAP adapter handle')
     
         logger.debug('got tap handle: {0}'.format(handle))
         self._handle = handle
+        self._devid = devid
         self.overlapped_read = pywintypes.OVERLAPPED()
         self.overlapped_write = pywintypes.OVERLAPPED()
         
@@ -65,6 +70,7 @@ class TunTapDevice(object):
         self.overlapped_write.hEvent = w32e.CreateEvent(None,True,False,None)
         
         self.mtu = 2000
+        self.mode = mode
         #mac, ip, mask, mtu
         
         # get mac handle
@@ -85,7 +91,8 @@ class TunTapDevice(object):
         subnet = util.encode_ip(subnet)
         
 #        print (ip+ipr+nm).encode('hex')
-        w32f.DeviceIoControl(self._handle, TAP_IOCTL_CONFIG_TUN, ip+host+subnet, 12)
+        if self.mode == self.TUNMODE:
+            w32f.DeviceIoControl(self._handle, TAP_IOCTL_CONFIG_TUN, ip+host+subnet, 12)
         logger.info('configuring interface to: {0}'.format(addr))
         
     def enable_iface(self):
@@ -131,21 +138,20 @@ class TunTapDevice(object):
                 continue
                 
             tapname = '%s%s%s' % (USERMODEDEVICEDIR, devid, TAPSUFFX)
-#            print 'tapname:',tapname
             try:
                 f = w32f.CreateFile(tapname,
-                            w32f.GENERIC_READ | w32f.GENERIC_WRITE,
-                            0,
-                            None,
-                            w32f.OPEN_EXISTING,
-                            w32f.FILE_ATTRIBUTE_SYSTEM | w32f.FILE_FLAG_OVERLAPPED,
-                            0)
+                        w32f.GENERIC_READ | w32f.GENERIC_WRITE,
+                        0,
+                        None,
+                        w32f.OPEN_EXISTING,
+                        w32f.FILE_ATTRIBUTE_SYSTEM | w32f.FILE_FLAG_OVERLAPPED,
+                        0)
             except Exception, s:
                 print repr(s)
                 continue
             else:
                 logger.debug('found tap device {0}'.format(tapname))
-                return f
+                return (f, devid)
 
             return None    
     
@@ -157,11 +163,9 @@ class TunTapDevice(object):
         if err == ERROR_IO_PENDING:
             w32e.WaitForSingleObject(self.overlapped_read.hEvent, w32e.INFINITE)
             size = w32f.GetOverlappedResult(self._handle, self.overlapped_read, False)
-#            print 'olr',size
         else:
             # need to get size
             size = w32f.GetOverlappedResult(self._handle, self.overlapped_read, False)
-#            print 'nopend',size
             
         return str(data[:size])
         

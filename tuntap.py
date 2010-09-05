@@ -39,6 +39,13 @@ class TunTapBase(object):
         Access to the virtual tun/tap device (Base Class).
     '''
 
+    IFF_TUN   = 0x0001
+    IFF_TAP   = 0x0002
+    IFF_NO_PI = 0x1000
+
+    TUNMODE = IFF_TUN
+    TAPMODE = IFF_TAP
+
 #    @classmethod
 #    def is_ip6_discovery(mac):
 #    '''ip6 neighbor discovery address are between 33:33:00:00:00:00 - 33:33:FF:FF:FF:FF (n2n et al)'''
@@ -69,12 +76,6 @@ class TunTapLinux(TunTapBase):
 
     SIOCGIFHWADDR = 0x8927
     TUNSETIFF = 0x400454ca
-    IFF_TUN   = 0x0001
-    IFF_TAP   = 0x0002
-    IFF_NO_PI = 0x1000
-
-    TUNMODE = IFF_TUN
-    TAPMODE = IFF_TAP
 
     @property
     def is_tap(self):
@@ -155,15 +156,28 @@ class TunTapLinux(TunTapBase):
         
                 
 class TunTapWindows(TunTapBase):
-    def __init__(self, router):
+    def __init__(self, router, mode):
         self._running = False
         
-        self._tuntap = TunTapDevice()
+        self._tuntap = TunTapDevice(mode)
         self.router = router
         
     def configure_iface(self, addr):
         self._tuntap.configure_iface(addr)
         
+    def get_mac(self):
+        ai = util.get_adapters_info()
+        did = self._tuntap._devid
+        if did in ai:
+            mac_str = ai[did]['address']
+            mac = util.encode_mac(mac_str)
+        else:
+            logger.critical('selected adapter not in get_adapters_info()')
+            raise Exception('selected adapter not returned by get_adapters_info()')
+
+        logger.debug('got mac address: {0}'.format(mac_str))
+        return mac
+
     def got_data(self, data):
 #        print data[12:14].encode('hex'),unpack('H',data[12:14])[0]
 #        if unpack('H',data[12:14])[0] == 0x8:

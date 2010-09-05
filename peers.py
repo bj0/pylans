@@ -9,7 +9,7 @@ import cPickle as pickle
 import uuid
 
 from twisted.internet import reactor, defer
-from twisted.python import log
+#from twisted.python import log
 
 import event
 import util
@@ -350,7 +350,7 @@ class PeerManager(object):
 #            return err
         
         reactor.callLater(0, try_address, None, 0)
-        main_d.addErrback(log.err)
+        main_d.addErrback(logger.info)
         return main_d #TODO this funky thing needs testing                
 
                         

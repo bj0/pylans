@@ -3,6 +3,7 @@
 import os
 import uuid
 import logging
+import binascii
 
 import settings
 import event
@@ -111,7 +112,7 @@ class Network(object):
     def key(self):
         try:
             return self._get('key','').decode('base64')
-        except Error:
+        except binascii.Error:
             return self._get('key')
         
     @key.setter
