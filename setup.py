@@ -52,7 +52,8 @@ data_files = [# ("Microsoft.VC90.CRT", py26MSdll),
 
 
 
-options = {'includes':['sip'],
+options = {
+                 'includes':['twisted.web.resource'],
                  'excludes':excludes,
                  'optimize':2,
 # these options bundle everything into the .exe/.zip file (except msvcr71.dll)
