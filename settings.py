@@ -1,15 +1,3 @@
-# config.py
-
-#name = 'bob'
-
-#key = 'dis beh teh encrytpokey'
-
-#address = '10.1.1.1/24'
-
-#port = 8015
-
-#tcp_port = 15034
-
 # Copyright (C) 2008-2010 Adam Olsen
 #
 # This program is free software; you can redistribute it and/or modify
