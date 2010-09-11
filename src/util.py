@@ -6,20 +6,36 @@ import socket
 import threading
 
 def encode_mac(mac_str):
-    '''Encode a string MAC address into 6 bytes.'''
+    '''Encode a string MAC address into 6 bytes.
+    
+    >>> encode_mac('0a:00:27:00:00:00').encode('hex')
+    '0a0027000000'
+    '''
     return pack('6B', *[int(x,16) for x in mac_str.split(':')])
 
 def decode_mac(mac_bin):
-    '''Decode a 6 byte MAC address into a string.'''
-    return ':'.join(['{0:x}'.format(x) for x in unpack('6B', mac_bin)])
+    '''Decode a 6 byte MAC address into a string.
+    
+    >>> decode_mac('0a0027000000'.decode('hex'))
+    '0a:00:27:00:00:00'
+    '''
+    return ':'.join(['{0:02x}'.format(x) for x in unpack('6B', mac_bin)])
 
 
 def encode_ip(ip_str):
-    '''Encode a string IP into 4 bytes.'''
+    '''Encode a string IP into 4 bytes.
+    
+    >>> encode_ip('192.1.128.3').encode('hex')
+    'c0018003'
+    '''
     return socket.inet_aton(ip_str)
         
 def decode_ip(ip_bin):
-    '''Decode a 4 byte IP into a string.'''
+    '''Decode a 4 byte IP into a string.
+    
+    >>> decode_ip('c0018003'.decode('hex'))
+    '192.1.128.3'
+    '''
     return socket.inet_ntoa(ip_bin)
 
 def threaded(f):
@@ -36,16 +52,33 @@ def threaded(f):
 
 
 def ip_atol(ip_str):
+    '''Encode a string IP into a long integer
+    
+    >>> ip_atol('10.1.2.15')
+    167838223
+    '''
     ipn = encode_ip(ip_str)
     return unpack('!L',ipn)[0]
     
 def ip_ltoa(ip_long):
+    '''Decode a long integer into a string IP
+    
+    >>> ip_ltoa(167838223)
+    '10.1.2.15'
+    '''
     ipn = pack('!L',ip_long)
     return decode_ip(ipn)
     
 def ip_to_net_host_subnet(addr_str, mask=None):
     '''Takes an address in either 'X.X.X.X/Mask' or with mask passed separately,
-    and returns (net, host, subnet).'''
+    and returns (net, host, subnet).
+    
+    >>> ip_to_net_host_subnet('10.1.3.5/24')
+    ('0.0.0.5', '10.1.3.0', '255.255.255.0')
+    
+    >> ip_to_net_host_subnet('10.1.3.5', 24)
+    ('0.0.0.5', '10.1.3.0', '255.255.255.0')
+    '''
     if mask is not None:
         if isinstance(mask, str):
             mask = long(mask)
@@ -66,23 +99,33 @@ def ip_to_net_host_subnet(addr_str, mask=None):
     
     
 def get_adapters_info():
-    '''Function for Getting the Address Information for local Network Interfaces in Windows'''
+    '''Function for Getting the Address Information for local Network Interfaces in Windows
+        * most of this is from an answer at: http://stackoverflow.com/questions/166506/finding-local-ip-addresses-in-python
+    '''
     from ctypes import Structure, windll, sizeof
     from ctypes import POINTER, byref
     from ctypes import c_ulong, c_uint, c_ubyte, c_char
+    
+    #
+    # setup ctypes definitions
+    #
     MAX_ADAPTER_DESCRIPTION_LENGTH = 128
     MAX_ADAPTER_NAME_LENGTH = 256
     MAX_ADAPTER_ADDRESS_LENGTH = 8
+    
     class IP_ADDR_STRING(Structure):
         pass
+        
     LP_IP_ADDR_STRING = POINTER(IP_ADDR_STRING)
     IP_ADDR_STRING._fields_ = [
         ("next", LP_IP_ADDR_STRING),
         ("ipAddress", c_char * 16),
         ("ipMask", c_char * 16),
         ("context", c_ulong)]
+        
     class IP_ADAPTER_INFO (Structure):
         pass
+        
     LP_IP_ADAPTER_INFO = POINTER(IP_ADAPTER_INFO)
     IP_ADAPTER_INFO._fields_ = [
         ("next", LP_IP_ADAPTER_INFO),
@@ -103,16 +146,24 @@ def get_adapters_info():
         ("secondaryWinsServer", IP_ADDR_STRING),
         ("leaseObtained", c_ulong),
         ("leaseExpires", c_ulong)]
+        
     GetAdaptersInfo = windll.iphlpapi.GetAdaptersInfo
     GetAdaptersInfo.restype = c_ulong
     GetAdaptersInfo.argtypes = [LP_IP_ADAPTER_INFO, POINTER(c_ulong)]
+    
     adapter_list = (IP_ADAPTER_INFO * 10)()
     buflen = c_ulong(sizeof(adapter_list))
+    
+    # Make the API call
     rc = GetAdaptersInfo(byref(adapter_list[0]), byref(buflen))
+    
     def iter_list(node):
+        '''Turn a returned linked-list into a generator'''
         while node:
             yield node
             node = node.next
+
+    # Parse the output into a more usable form dict of dicts    
     adapters = {}
     if rc == 0:
         for a in adapter_list:
