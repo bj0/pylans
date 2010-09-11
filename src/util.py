@@ -11,7 +11,7 @@ def encode_mac(mac_str):
 
 def decode_mac(mac_bin):
     '''Decode a 6 byte MAC address into a string.'''
-    return ':'.join([str(x) for x in unpack('6B', mac_bin)])
+    return ':'.join(['{0:x}'.format(x) for x in unpack('6B', mac_bin)])
 
 
 def encode_ip(ip_str):

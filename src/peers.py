@@ -37,6 +37,13 @@ class PeerInfo(object):
     @property
     def vip_str(self):
         return util.decode_ip(self.vip)
+        
+    @property
+    def addr_str(self):
+        if len(self.addr) == 4:
+            return util.decode_ip(self.addr)
+        else:
+            return util.decode_mac(self.addr)
 
 class PeerManager(object):
     '''Manages peer connections'''
@@ -77,6 +84,10 @@ class PeerManager(object):
 
     def _update_pickle(self):
         self._my_pickle = pickle.dumps(self._self,-1)
+        
+        # should announce my change to my peerz
+        self.send_announce(self._self, None)
+        
 
     def add_peer(self, peer):
         '''Add a peer connection'''
@@ -151,7 +162,6 @@ class PeerManager(object):
     def update_peer(self, opi, npi):
         changed = False                
         if (opi.relays >= npi.relays and opi.address != npi.address):
-#            self.ip_map[opi.vip] = npi.address
             self.addr_map[opi.addr] = npi.address
             opi.address = npi.address
             opi.relays = npi.relays
@@ -170,8 +180,6 @@ class PeerManager(object):
             
         if opi.vip != npi.vip:
             # check for collision
-#            self.ip_map[npi.vip] = self.ip_map[opi.vip]
-#            del self.ip_map[opi.vip]
             opi.vip = npi.vip
             changed = True
             logger.info('peer {0} vip changed.'.format(opi.id))
@@ -201,7 +209,8 @@ class PeerManager(object):
             peerkle = pickle.dumps(peer, -1)
             peer.relays -= 1
         else:
-            peerkle = pickle.dumps(peer, -1)
+            #peerkle = pickle.dumps(peer, -1)
+            peerkle = self._my_pickle
             
         if address is not None:
             self.router.send(self.PEER_ANNOUNCE, peerkle, address)        
@@ -221,7 +230,6 @@ class PeerManager(object):
                 if pi.relays == 0: #potential replacement for reg packets?
                     pi.address = address
                     self.add_peer(pi)
-#                    self.send_announce(self._self, address)
                     logger.info('announce from unknown peer {0}, adding and announcing self'.format(pi.name))
                 else:
                     pi.address = address
@@ -270,7 +278,6 @@ class PeerManager(object):
         logger.info('received a PX ACK packet')
         
         peer_list = pickle.loads(packet)
-#        print 'px',vip.encode('hex')
         self.parse_peer_list(self[src_id], peer_list)
     
     def parse_peer_list(self, from_peer, peer_list):

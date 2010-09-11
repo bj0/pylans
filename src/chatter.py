@@ -25,8 +25,8 @@ class ChatterBox(object):
         
         # Closure magic
         def register_handler(net):
-            def handler(type, msg, addr, vip):
-                self.handle_chat_msg(net, type, msg, addr, vip)
+            def handler(type, msg, addr, src_id):
+                self.handle_chat_msg(net, type, msg, addr, src_id)
                 
             net.router.register_handler(self.CHAT_MSG, handler)
             self.handler_list[net.id] = handler

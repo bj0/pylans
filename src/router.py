@@ -14,6 +14,7 @@ import logging
 import random
 import settings
 import uuid
+import util
 
 
 
@@ -67,6 +68,8 @@ class Router(object):
         if proto is None:
             proto = UDPPeerProtocol()
                         
+        logger.info('Initializing router in {0} mode.'.format('TAP' if tuntap.is_tap else 'TUN'))
+                        
         self.handlers = {}
         self._requested_acks = {}
                         
@@ -90,7 +93,7 @@ class Router(object):
         self.register_handler(self.ACK, self.handle_ack)
 
     def get_my_address(self):
-        '''Get interface address (IP or MAC)'''
+        '''Get interface address (IP or MAC), return a deferred'''
         pass
     
     def start(self):
@@ -101,12 +104,15 @@ class Router(object):
         self._tuntap.configure_iface(self.network.virtual_address)
         self._port = reactor.listenUDP(self.network.port, self._proto)
 
-        self.get_my_address()
+        d = self.get_my_address()
 
         logger.info('router started, listening on UDP port {0}'.format(self._port))
     
-        self._bootstrap.run()
-        reactor.callLater(1, self.try_old_peers)
+        def start_connections(*x):
+            self._bootstrap.run()
+            reactor.callLater(1, self.try_old_peers)
+            
+        d.addCallback(start_connections)
     
     def stop(self):
         '''Stop the router.  Stops the tun/tap device and stops listening on the 
@@ -211,6 +217,7 @@ class Router(object):
 
         # should only be this on TAP
         elif dt == self.DATA_BROADCAST:
+            logger.debug('got broadcast from {0}'.format(util.decode_mac(data[2:8])))
             if data[2:8] == self.pm._self.addr:
                 self.recv_packet(data[8:])
             else:
@@ -269,9 +276,34 @@ class TapRouter(Router):
 
     def get_my_address(self):
         '''Get interface address (MAC)'''
+        # get mac addr
         self.pm._self.addr = self._tuntap.get_mac()
-        self.pm._update_pickle()
-    
+
+        d = defer.Deferred()
+        def do_ips(ips=None):
+            if ips is None:
+                ips = self._tuntap.get_ips()
+            if len(ips) > 0:
+    #            ips = [x[0] for x in ips]
+                if self.pm._self.vip_str not in ips:
+                    logger.critical('TAP addresses ({0}) don\'t contain configured address ({1}), taking address from adapter ({2})'.format(ips,self.pm._self.vip_str, ips[0]))
+                    self.pm._self.vip = util.encode_ip(ips[0])
+            else:
+                logger.crititcal('TAP adapater has no addresses')
+
+            self.pm._update_pickle()
+            
+            reactor.callLater(0, d.callback, ips)
+        
+        # Grap VIP, so we display the right one
+        ips = self._tuntap.get_ips()
+        if len(ips) == 1 and ips[0] == '0.0.0.0': # interface not ready yet?
+            logger.warning('Adapter not read, delaying...')
+            reactor.callLater(3, do_ips)            
+        else:
+            do_ips(ips)
+
+        return d    
 
     def send_packet(self, packet):
         '''Got a packet from the tun/tap device that needs to be sent out'''
@@ -310,8 +342,17 @@ class TunRouter(Router):
 
     def get_my_address(self):
         '''Get interface address (IP)'''
-        self.pm._self.addr = self.pm._self.vip
-        #TODO get vip from adapter?
+        ips = self._tuntap.get_ips()
+        if len(ips) > 0:
+#            ips = [x[0] for x in ips] # if we return (addr,mask)
+            if self.pm._self.vip_str not in ips:
+                logger.critical('TUN addresses ({0}) don\'t contain configured address ({1}), taking address from adapter ({2})'.format(ips,self.pm._self.vip_str, ips[0]))
+                self.pm._self.vip = util.encode_ip(ips[0])
+                self.pm._self.addr = self.pm._self.vip
+        else:
+            logger.crititcal('TUN adapater has no addresses')
+            self.pm._self.addr = self.pm._self.vip
+
         self.pm._update_pickle()
 
     def send_packet(self, packet):

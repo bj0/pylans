@@ -112,6 +112,8 @@ class Prompt(Cmd):
                 print '# of peers:  {0}'.format(len(net.router.pm))
             else:
                 print 'network offline'
+            print 'my vip       {0}'.format(net.router.pm._self.vip_str)
+            print 'my addr      {0}'.format(net.router.pm._self.addr_str)
             
     def complete_status(self, text, line, begidx, endidx):
         nets = iface.get_network_names()
@@ -135,6 +137,7 @@ class Prompt(Cmd):
                 print 'name:      {0}'.format(p.name)
                 print 'id:        {0}'.format(p.id)
                 print 'vip:       {0}'.format(p.vip_str)
+                print 'addr:      {0}'.format(p.addr_str)
                 print 'address:   {0}'.format(p.address)
                 print 'is_direct: {0}'.format(p.is_direct)
                 if(not p.is_direct):

@@ -51,6 +51,14 @@ class TunTapBase(object):
 #            return True
 #        return False
 
+    @property
+    def is_tap(self):
+        return (self.mode == self.TAPMODE)
+        
+    @property
+    def is_tun(self):
+        return not self.is_tap
+    
     @classmethod
     def is_multicast(cls, mac):
         '''ethernet (ipv4) multicast addresses are 01:00:5E:??:??:??'''
@@ -75,14 +83,6 @@ class TunTapLinux(TunTapBase):
     SIOCGIFHWADDR = 0x8927
     TUNSETIFF = 0x400454ca
 
-    @property
-    def is_tap(self):
-        return (self.mode == self.TAPMODE)
-        
-    @property
-    def is_tun(self):
-        return not self.is_tap
-    
     def __init__(self, router, mode):
         f = os.open("/dev/net/tun", os.O_RDWR)
         ifs = ioctl(f, self.TUNSETIFF, struct.pack("16sH", "pytun%d", mode|self.IFF_NO_PI))
@@ -110,10 +110,22 @@ class TunTapLinux(TunTapBase):
         ifs = ioctl(s.fileno(), self.SIOCGIFHWADDR, ifr)
         mac = ifs[18:24]
         
-        logger.debug('got mac address: {0}'.format(mac.encode('hex')))
+        logger.debug('got mac address: {0}'.format(util.decode_mac(mac)))
 
         return mac
           
+    def get_ips(self):
+    
+        import subprocess as sp
+        
+        out = sp.Popen(["ifconfig {0} |grep 'inet add'".format(self.ifname)], shell=True, stdout=sp.PIPE).communicate()[0]
+        out = out.strip().split()
+        ips = [ x[5:] for x in out if x.startswith('addr:') ]
+        masks = [ x[5:] for x in out if x.startswith('Mask:') ]
+                        
+        logger.debug('got {0} ip addresses: {1}'.format(len(ips),ips))
+        return ips
+
     def configure_iface(self, address):
         '''
             Configure the tun/tap interface with given address/mask (ie: '10.1.1.1/24')
@@ -159,10 +171,24 @@ class TunTapWindows(TunTapBase):
         
         self._tuntap = TunTapDevice(mode)
         self.router = router
+        self.mode = mode
         
     def configure_iface(self, addr):
         self._tuntap.configure_iface(addr)
-        
+
+    def get_ips(self):
+        ai = util.get_adapters_info()
+        did = self._tuntap._devid
+        if did in ai:
+            ips = ai[did]['ipAddressList']
+        else:
+            logger.critical('selected adapter not in get_adapters_info()')
+                    
+        logger.debug('got {0} ip addresses: {1}'.format(len(ips),ips))
+#        import pprint
+#        pprint.pprint( ai[did])
+        return [ x[0] for x in ips ]
+
     def get_mac(self):
         ai = util.get_adapters_info()
         did = self._tuntap._devid
@@ -200,8 +226,14 @@ class TunTapWindows(TunTapBase):
     
     @util.threaded        
     def run(self):
+        IPV4_HIGH = 0x08
+        IPV4_LOW = 0x00
+        IPV4_UDP = 17
         while self._running:
             data = self._tuntap.read()
+            if data[12] == IPV4_HIGH and data[13] == IPV4_LOW and data[14+9] == IPV4_UDP:
+                logger.warning('IPV4 udp: {0}'.format(util.decode_ip(data[26:30])))
+                
             reactor.callFromThread(self.got_data, data)
         
 

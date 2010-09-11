@@ -308,4 +308,12 @@ get_option = MANAGER.get_option
 set_option = MANAGER.set_option
 save = MANAGER.save
 
+def new(file):
+    global MANAGER, get_option, set_option, save
+    MANAGER = SettingsManager(file)
+    get_option = MANAGER.get_option
+    set_option = MANAGER.set_option
+    save = MANAGER.save
+    
+
 # vim: et sts=4 sw=4
