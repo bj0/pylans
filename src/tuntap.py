@@ -49,7 +49,6 @@ import struct
 import util
 
 
-
 logger = logging.getLogger(__name__)
 
 class TunTapBase(object):
@@ -57,10 +56,12 @@ class TunTapBase(object):
         Access to the virtual tun/tap device (Base Class).
     '''
 
+    # definitions from linux driver
     IFF_TUN   = 0x0001
     IFF_TAP   = 0x0002
     IFF_NO_PI = 0x1000
 
+    # modes for settings
     TUNMODE = IFF_TUN
     TAPMODE = IFF_TAP
 
@@ -73,22 +74,43 @@ class TunTapBase(object):
 
     @property
     def is_tap(self):
+        '''Is this a TAP device?'''
         return (self.mode == self.TAPMODE)
         
     @property
     def is_tun(self):
+        '''Is this a TUN device?'''
         return not self.is_tap
     
     @classmethod
     def is_multicast(cls, mac):
-        '''ethernet (ipv4) multicast addresses are 01:00:5E:??:??:??'''
+        '''ethernet (ipv4) multicast addresses are 01:00:5E:??:??:??
+        
+        >>> import util
+        >>> TunTapBase.is_multicast(util.encode_mac('01:00:5e:a1:00:3c'))
+        True
+
+        >>> TunTapBase.is_multicast(util.encode_mac('FF:00:5e:a1:00:3c'))
+        False
+        '''
         if mac[0:3] == '\x01\x00\x5e':
             return True
         return False
 
     @classmethod
     def is_broadcast(cls, mac):
-        '''ethernet broadcast is typically FF:FF:FF:FF:FF:FF, but we can just check the LSB of the first octet (which includes multicast)'''
+        '''ethernet broadcast is typically FF:FF:FF:FF:FF:FF, but we can just check the LSB of the first octet (which includes multicast)
+
+        >>> import util
+        >>> TunTapBase.is_broadcast(util.encode_mac('01:00:5e:a1:00:3c'))
+        True
+
+        >>> TunTapBase.is_broadcast(util.encode_mac('FF:00:5e:a1:00:3c'))
+        True
+
+        >>> TunTapBase.is_broadcast(util.encode_mac('FE:00:5e:a1:00:3c'))
+        False
+        '''
         if ord(mac[0]) & 1 == 1:
             return True
         return False
@@ -125,6 +147,7 @@ class TunTapLinux(TunTapBase):
         logger.info('linux tun/tap stopped')
 
     def get_mac(self):
+        '''Use socket ioctl call to get MAC address'''
         s = socket.socket(type=socket.SOCK_DGRAM)   
         ifr = self.ifname + '\0'*(32-len(self.ifname))    
         ifs = ioctl(s.fileno(), self.SIOCGIFHWADDR, ifr)
@@ -135,7 +158,7 @@ class TunTapLinux(TunTapBase):
         return mac
           
     def get_ips(self):
-    
+        '''Use subprocess+ifconfig+grep to get ip addresses on the interface'''
         import subprocess as sp
         
         out = sp.Popen(["ifconfig {0} |grep 'inet add'".format(self.ifname)], shell=True, stdout=sp.PIPE).communicate()[0]
@@ -154,10 +177,13 @@ class TunTapLinux(TunTapBase):
             if retval != 0:
                 logger.error('error configuring address {0} on interface {1}'.format(address, self.ifname))
             
+        # re-do this to chain deferreds?TODO
         utils.getProcessValue('/sbin/ip',('addr','add',address,'dev',self.ifname)).addCallback(response)
         d = utils.getProcessValue('/sbin/ip',('link','set',self.ifname,'up'))
         d.addCallback(response)
+        
         logger.info('configuring interface {1} to: {0}'.format(address, self.ifname))
+        
         return d
 
     def doRead(self):
@@ -178,6 +204,7 @@ class TunTapLinux(TunTapBase):
         return self.f
 
     def logPrefix(self):
+        '''Required but not used?'''
         return '.>'
         
     def connectionLost(self, reason):
