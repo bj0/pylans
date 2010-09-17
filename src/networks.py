@@ -1,3 +1,19 @@
+# Copyright (C) 2010  Brian Parma (execrable@gmail.com)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
 # networks.py
 
 import binascii
@@ -14,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 class Network(object):
     
-    def __init__(self, name, key=None, username=None, address=None, port=None, id=None):
+    def __init__(self, name, key=None, username=None, address=None, port=None, id=None, enabled=None):
         
         self._name = name
         self.name = self._name
@@ -30,6 +46,9 @@ class Network(object):
         if name not in networks:
             networks.append(name)
             settings.set_option('settings/networks',networks)
+
+        if enabled is not None:
+            self.enabled = enabled
 
         if key is not None:
             self.key = key
@@ -76,20 +95,24 @@ class Network(object):
                 self.known_addresses = peers
             
         
+    @property
     def is_running(self):
         return self._running
         
     def start(self):
-        if self._running:
-            return
-        if self.router is None:
-            self.router = router.get_router(self)
+        if self.enabled:
+            if self._running:
+                return
+            if self.router is None:
+                self.router = router.get_router(self)
 
-        event.register_handler('peer-added', self.router.pm, self.new_connection);
-        self.router.start()
-        self._running = True
-        event.emit('network-started', self)
-        logger.info('network {0} started'.format(self.name))
+            event.register_handler('peer-added', self.router.pm, self.new_connection);
+            self.router.start()
+            self._running = True
+            event.emit('network-started', self)
+            logger.info('network {0} started'.format(self.name))
+        else:
+            logger.info('network {0} not starting, disabled'.format(self.name))
         
     def stop(self):
         if not self._running:
@@ -106,6 +129,17 @@ class Network(object):
         
     def _set(self, item, value):
         return settings.set_option(self._name+'/%s'%item, value)
+        
+    @property
+    def enabled(self):
+        return self._get('enabled',True)
+        
+    @enabled.setter
+    def enabled(self, value):
+        if isinstance(value, bool):
+            self._set('enabled',value)
+        else:
+            raise TypeError('enabled must be True or False')
         
     @property
     def key(self):
@@ -217,7 +251,7 @@ class NetworkManager(object):
     
     def start_all(self):
         for net in self.network_list.values():
-            if not net.is_running():
+            if not net.is_running:
                 net.start()
         
     def load(self, name):

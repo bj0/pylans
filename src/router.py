@@ -1,4 +1,22 @@
 #! /usr/bin/env python
+# Copyright (C) 2010  Brian Parma (execrable@gmail.com)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
+# router.py
+# 
 #TODO another way to check if an id is known, if there are going to be multiple networks using the same router...
 #TODO make tun/tap both work, selectable
 
@@ -15,7 +33,6 @@ import random
 import settings
 import uuid
 import util
-
 
 
 logger = logging.getLogger(__name__)
@@ -289,7 +306,7 @@ class TapRouter(Router):
                     logger.critical('TAP addresses ({0}) don\'t contain configured address ({1}), taking address from adapter ({2})'.format(ips,self.pm._self.vip_str, ips[0]))
                     self.pm._self.vip = util.encode_ip(ips[0])
             else:
-                logger.crititcal('TAP adapater has no addresses')
+                logger.critical('TAP adapater has no addresses')
 
             self.pm._update_pickle()
             
@@ -350,7 +367,7 @@ class TunRouter(Router):
                 self.pm._self.vip = util.encode_ip(ips[0])
                 self.pm._self.addr = self.pm._self.vip
         else:
-            logger.crititcal('TUN adapater has no addresses')
+            logger.critical('TUN adapater has no addresses')
             self.pm._self.addr = self.pm._self.vip
 
         self.pm._update_pickle()

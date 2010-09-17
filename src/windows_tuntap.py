@@ -1,4 +1,21 @@
+# Copyright (C) 2010  Brian Parma (execrable@gmail.com)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
 # windows_tuntap.py
+# TunTapDevice interface for windows
 
 from struct import pack, calcsize
 from winerror import ERROR_IO_PENDING
@@ -12,7 +29,6 @@ import winerror
 
 
 logger = logging.getLogger(__name__)
-
 
 FILE_DEVICE_UNKNOWN = 0x22
 METHOD_BUFFERED = 0x0
@@ -71,7 +87,7 @@ class TunTapDevice(object):
         
         self.mtu = 2000
         self.mode = mode
-        #mac, ip, mask, mtu
+        # mac, ip, mask, mtu
         
         # get mac handle
         self.mac_addr = w32f.DeviceIoControl(handle, TAP_IOCTL_GET_MAC, None, 6)
@@ -86,14 +102,22 @@ class TunTapDevice(object):
         ip = addr.split('/')[0]
         _, host, subnet = util.ip_to_net_host_subnet(addr)
 
-        ip = util.encode_ip(ip)
-        host = util.encode_ip(host)
-        subnet = util.encode_ip(subnet)
+        ipb = util.encode_ip(ip)
+        hostb = util.encode_ip(host)
+        subnetb = util.encode_ip(subnet)
         
-#        print (ip+ipr+nm).encode('hex')
         if self.mode == self.TUNMODE:
-            w32f.DeviceIoControl(self._handle, TAP_IOCTL_CONFIG_TUN, ip+host+subnet, 12)
+            w32f.DeviceIoControl(self._handle, TAP_IOCTL_CONFIG_TUN, ipb+hostb+subnetb, 12)
         logger.info('configuring interface to: {0}'.format(addr))
+
+        def response(retval):
+            if retval != 0:
+                logger.error('error configuring address {0} on interface {1}'.format(address, self.ifname))
+            
+        d = utils.getProcessValue('netsh',('interface','ip','set','address',self.ifname,'static',ip,subnet))
+        d.addCallback(response)
+        logger.info('configuring interface {1} to: {0}'.format(address, self.ifname))
+        return d
         
     def enable_iface(self):
         w32f.DeviceIoControl(self._handle, TAP_IOCTL_SET_MEDIA_STATUS, pack('I',True), calcsize('I'))

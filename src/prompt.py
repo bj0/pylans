@@ -1,4 +1,20 @@
 #!/usr/bin/python
+# Copyright (C) 2010  Brian Parma (execrable@gmail.com)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
 # prompt.py
 # todo: quit message?
 # more commands: dump peer, ??s
@@ -108,12 +124,12 @@ class Prompt(Cmd):
             print 'address:     {0}'.format(net.virtual_address)
             print 'port:        {0}'.format(net.port)
             print 'my name:     {0}'.format(net.username)
-            if net.router is not None:
+            if net.router is not None and net.is_running:
                 print '# of peers:  {0}'.format(len(net.router.pm))
+                print 'my vip       {0}'.format(net.router.pm._self.vip_str)
+                print 'my addr      {0}'.format(net.router.pm._self.addr_str)
             else:
                 print 'network offline'
-            print 'my vip       {0}'.format(net.router.pm._self.vip_str)
-            print 'my addr      {0}'.format(net.router.pm._self.addr_str)
             
     def complete_status(self, text, line, begidx, endidx):
         nets = iface.get_network_names()
@@ -124,7 +140,7 @@ class Prompt(Cmd):
         
             
     def do_list(self, line):
-        line = line.split()
+        line = line.strip()
         if len(line) > 0:
             nets = line.split()
             nets = [ iface.get_network(net) for net in nets if net is not None ]

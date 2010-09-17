@@ -1,11 +1,23 @@
+# Copyright (C) 2010  Brian Parma (execrable@gmail.com)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
 # chatter.py
 
 import event
 import logging
-
-#from twisted.internet.endpoints import TCP4ClientEndpoint   # - new in 10.1
-
-#from event import Event
 
 
 logger = logging.getLogger(__name__)
@@ -36,7 +48,7 @@ class ChatterBox(object):
             del self.handler_list[net.id]
                 
         for net in iface.get_network_list():
-            if net.is_running():
+            if net.is_running:
                 register_handler(net)
             
         iface.network_started += register_handler

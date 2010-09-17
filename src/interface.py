@@ -1,4 +1,20 @@
-
+# Copyright (C) 2010  Brian Parma (execrable@gmail.com)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
+# interface.py
 # how much to put in this?
 # should i switch to global events?
 # global interface "singleton" (like settings)
@@ -120,6 +136,14 @@ class Interface(object):
     
     def start_all_networks(self):
         self._mgr.start_all()
+        
+    def enable_network(self, network):        
+        if self.get_network(network) is not None:
+            self._current.enabled = True
+            
+    def disable_network(self, network):
+        if self.get_network(network) is not None:
+            self._current.enabled = False    
 
     def connect_to_address(self, address, network=None):
         if self.get_network(network) is not None:
