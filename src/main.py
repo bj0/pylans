@@ -20,6 +20,7 @@ from twisted.internet import gtk2reactor
 gtk2reactor.install()
 
 import gtk
+import gobject
 import uuid
 from gtk import glade
 from twisted.internet import reactor, defer
@@ -32,24 +33,81 @@ import util
 from interface import Interface
 from chatter import ChatterBox
 
+def find_iter(model, obj, col):
+#        iter = model.iter_children(None)
+#        def next_iter(iter):
+#            while iter:
+#                yield iter
+#                iter = model.iter_children(iter) or model.iter_next(iter)
+
+#        for it in next_iter(iter):
+#            print 'count',it,self._treestore1.get_value(it,0)
+#            if model.get_value(it, col) is obj:
+#                return it        
+
+    for row in model:
+        if row[col] is obj:
+            return row.iter
+        
+    return None
+
+
+class NetPage:
+    def __init__(self, net, parent=None):
+        
+        self.net = net
+        self.widget = gtk.VBox()
+        self.label = gtk.Label()
+        
+        self.label.set_markup('<b>{0}</b>\n<i>{1}</i>'.format(net.username,net.ip))
+        self.label.set_justify(gtk.JUSTIFY_CENTER)
+        
+        # list store: name, ip, peer_id
+        self.model = gtk.ListStore(str, str, str)
+        
+        self.list = gtk.TreeView(self.model)
+        
+        self.widget.pack_start(self.label, False, False, 0)
+        self.widget.pack_end(self.list, True, True, 0)
+        
+#        return self.widget
+    def add_peer(self, peer):
+        iter = find_iter(self.model, peer.id, 2)
+        #print iter
+        if iter is not None:
+            print 'add',peer.name
+            self.model.append([peer.name,net.ip,peer.id])
+            
+    def remove_peer(self, peer):
+        iter = find_iter(self.model, peer.id, 2)
+        
+        if iter is not None:
+            print 'rem',peer.name
+            self.model.remove(iter)
+        
+
 class MainWin:
     def __init__(self, iface):
 
         self.builder = gtk.Builder()
-        self.builder.add_from_file('main.ui')
+        self.builder.add_from_file('../gui/main.ui')
 
-
+        # get objects from xml
         self.get_objects()
+        
+        # a dict to store the pages in
+        self._net_page = {}
 
         self.builder.connect_signals(self)
-        self._selection = self._peer_treeview.get_selection()
+#        self._selection = self._peer_treeview.get_selection()
         
         self._main_window.resize(200,400)
         self._main_window.connect('delete-event', lambda *x: reactor.stop())
         self._main_window.show_all()
         
-        nw = iface.get_network_list()[0]
-        self._name_label.set_text('%s - %s' % (nw.username, nw.virtual_ip))
+#        nw = iface.get_network_list()[0]
+#        self._name_label.set_text('%s - %s' % (nw.username, nw.virtual_ip))
+        
         
         #Events
         iface.peer_added += self._add_peer
@@ -60,74 +118,87 @@ class MainWin:
         
         nws = iface.get_network_list()
         for nw in nws:
-            self._peer_model.append(None, [nw, nw.name, ''])
+            np = NetPage(nw)
+            self._net_page[nw.id] = np
+            
+            lab = gtk.Label(nw.name)
+            lab.set_angle(270)
+            self._netbook.append_page(np.widget, lab)
+            self._netbook.set_tab_reorderable(np.widget, True)
+            np.widget.show_all()
+#            if nw.enabled:
+#                self._peer_model.append(None, [nw, "<b>"+nw.name+"</b>", ''])
+#            else:
+#                self._peer_model.append(None, [nw, "<i>"+nw.name+"</i>", ''])
         
         self.iface = iface
 
     def get_objects(self):
-        objects = ('main_window','name_label','peer_treeview','peer_model','peer_menu','network_menu')
+        objects = ('main_window','name_label','peer_menu','network_menu','netbook')
         go = self.builder.get_object
         for obj_name in objects:
             setattr(self, "_" + obj_name, go(obj_name))
 
     def on_network_get_info(self, widget):
-        model, iter = self._selection.get_selected()
+#        model, iter = self._selection.get_selected()
 
-        if iter is not None:
-            net = model.get_value(iter, 0)
-            print 'NET INFO:',net.name,net.id,net.virtual_address,net.port,net.username
-            
+#        if iter is not None:
+#            net = model.get_value(iter, 0)
+#            print 'NET INFO:',net.name,net.id,net.virtual_address,net.port,net.username
+        pass
     
     def on_peer_get_info(self, widget):
-        model, iter = self._selection.get_selected()
+#        model, iter = self._selection.get_selected()
 
-        if iter is not None:
-            peer = model.get_value(iter, 0)
+#        if iter is not None:
+#            peer = model.get_value(iter, 0)
+        pass
         
     def on_network_connect_peer(self, widget):
-        model, iter = self._selection.get_selected()
-        if iter is not None:
-            net = model.get_value(iter, 0)
-            
-            # get address
-            def get_address(dialog, responseid, entry):
-                if responseid == gtk.RESPONSE_OK:
-                    txt = entry.get_text()
-                    addr, port = txt.split(':')
-                    addr = (addr, int(port))
-                    self.iface.connect_to_address(addr, net)
-                dialog.destroy()
-                
-            time = None
-            dialog = gtk.MessageDialog(
-                        None,
-                        gtk.DIALOG_MODAL | gtk.DIALOG_DESTROY_WITH_PARENT,
-                        gtk.MESSAGE_QUESTION,
-                        gtk.BUTTONS_OK,
-                        None)
+#        model, iter = self._selection.get_selected()
+#        if iter is not None:
+#            net = model.get_value(iter, 0)
+#            
+#            # get address
+#            def get_address(dialog, responseid, entry):
+#                if responseid == gtk.RESPONSE_OK:
+#                    txt = entry.get_text()
+#                    addr, port = txt.split(':')
+#                    addr = (addr, int(port))
+#                    self.iface.connect_to_address(addr, net)
+#                dialog.destroy()
+#                
+#            time = None
+#            dialog = gtk.MessageDialog(
+#                        None,
+#                        gtk.DIALOG_MODAL | gtk.DIALOG_DESTROY_WITH_PARENT,
+#                        gtk.MESSAGE_QUESTION,
+#                        gtk.BUTTONS_OK,
+#                        None)
 
-            dialog.set_title("Connect to address...")
-            dialog.set_markup('Enter address:')
-            dialog.format_secondary_markup('Accepts input of the form: &lt;address&gt;:&lt;port&gt;')
-            hbox = gtk.HBox(False, 0)
-            hbox.pack_start(gtk.Label('Address: '), False, 5, 5)
-            entry = gtk.Entry()
-            entry.connect('activate', lambda *x: dialog.response(gtk.RESPONSE_OK))
-            hbox.pack_end(entry)
-            dialog.vbox.pack_end(hbox, True, True, 0)
-            dialog.show_all()
-            dialog.connect('response', get_address, entry)
-                
+#            dialog.set_title("Connect to address...")
+#            dialog.set_markup('Enter address:')
+#            dialog.format_secondary_markup('Accepts input of the form: &lt;address&gt;:&lt;port&gt;')
+#            hbox = gtk.HBox(False, 0)
+#            hbox.pack_start(gtk.Label('Address: '), False, 5, 5)
+#            entry = gtk.Entry()
+#            entry.connect('activate', lambda *x: dialog.response(gtk.RESPONSE_OK))
+#            hbox.pack_end(entry)
+#            dialog.vbox.pack_end(hbox, True, True, 0)
+#            dialog.show_all()
+#            dialog.connect('response', get_address, entry)
+        pass
             
         
     def on_peer_copy_ip(self, widget):
-        model, iter = self._selection.get_selected()
+#        model, iter = self._selection.get_selected()
 
-        if iter is not None:
-            peer = model.get_value(iter, 0)
-            clip = gtk.clipboard_get()
-            clip.set_text(util.decode_ip(peer.vip))
-            print 'clip'
+#        if iter is not None:
+#            peer = model.get_value(iter, 0)
+#            clip = gtk.clipboard_get()
+#            clip.set_text(util.decode_ip(peer.vip))
+#            print 'clip'
+        pass
         
     def on_peer_treeview_button_press_event(self, widget, event):
         if event.button == 3:
@@ -145,39 +216,32 @@ class MainWin:
                     self._peer_menu.popup(None, None, None, event.button, event.time)
 
     def _add_peer(self, net, peer):
-        iter = self._find_iter(net)
+        self._net_page[net.id].add_peer(peer)
+#        iter = self._find_iter(net)
         #print iter
-        if iter is not None:
-            print 'add',peer.name
-            self._peer_model.append(iter, [peer, '%s - %s'%(peer.name,util.decode_ip(peer.vip)), peer.vip])
+#        if iter is not None:
+#            print 'add',peer.name
+#            self._net_page[net.id].model.append([peer.name,util.decode_ip(peer.vip),peer.id])
+#            self._peer_model.append(iter, [peer, '%s - %s'%(peer.name,util.decode_ip(peer.vip)), peer.vip])
     
-    def _find_iter(self, obj):
-        iter = self._peer_model.iter_children(None)
-        def next_iter(iter):
-            while iter:
-                yield iter
-                iter = self._peer_model.iter_children(iter) or self._peer_model.iter_next(iter)
-
-        for it in next_iter(iter):
-#            print 'count',it,self._treestore1.get_value(it,0)
-            if self._peer_model.get_value(it, 0) is obj:
-                return it        
-            
-        return None
             
     
     def _remove_peer(self, net, peer):
-        iter = self._find_iter(peer)
-        if iter is not None:
-            self._peer_model.remove(iter)
-    
-        print 'rem',peer.name
-    
+        self._net_page[net.id].remove_peer(peer)
+#        iter = self._find_iter(peer)
+#        if iter is not None:
+#            self._peer_model.remove(iter)
+#        iter = find_iter(self._net_page[net.id].model, peer.id, 2)
+#        if iter is not None:
+#            self._net_page[net.id].model.remove(iter)
+#    
+#        print 'rem',peer.name
+#    
     def _network_on(self, net):
-        iter = self._find_iter(net)
+#        iter = self._find_iter(net)
         #print iter
-        if iter is None:
-            self._peer_model.append(None, [net, net.name, ''])
+#        if iter is None:
+#            self._peer_model.append(None, [net, "<b>"+net.name"</b>", ''])
 
         print 'on',net.name
     

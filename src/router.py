@@ -52,7 +52,6 @@ class UDPPeerProtocol(DatagramProtocol):
 
     def datagramReceived(self, data, address):
         '''Called by twisted when data is received from address'''
-#        self.receive(data, address)
         self.router.recv_udp(data, address)
         logger.debug('received data on UDP port from {0}'.format(address))
                 
@@ -98,7 +97,7 @@ class Router(object):
         self.addr_map = self.pm.addr_map
         
         self.pinger = Pinger(self)
-        self.pinger.start()
+        self.pinger.start() #TODO shouldn't this be in 'start'
                         
         self._proto = proto
         self._tuntap = tuntap
@@ -173,7 +172,7 @@ class Router(object):
                 dst_id = peer.id.bytes
                 dst = peer.address
                 
-            else: # unknown peer dst (like for reg's)
+            else: # unknown peer dst (like for reg's) TODO: this should return an erroring deferred?
                 if not isinstance(dst, tuple):
                     logger.warning('unknown dest {0} not an address tuple'.format(repr(dst)))
                     return
