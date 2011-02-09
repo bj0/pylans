@@ -18,7 +18,11 @@
 # router.py
 # 
 #TODO another way to check if an id is known, if there are going to be multiple networks using the same router...
+# #### each network has it's own adapter/router
 #TODO make tun/tap both work, selectable
+#TODO starting/stopping router doesn't owrk right
+#     * clear peer list when going offline, if we go back online other peer things we are still connected
+#     * should we keep the peer list and just refresh/let it timeout, or clear it?
 
 from crypto import Crypter
 from event import Event
@@ -97,7 +101,6 @@ class Router(object):
         self.addr_map = self.pm.addr_map
         
         self.pinger = Pinger(self)
-        self.pinger.start() #TODO shouldn't this be in 'start'
                         
         self._proto = proto
         self._tuntap = tuntap
@@ -125,7 +128,9 @@ class Router(object):
         logger.info('router started, listening on UDP port {0}'.format(self._port))
     
         def start_connections(*x):
-            self._bootstrap.run()
+            print 'does this fire'
+            self._bootstrap.start()
+            self.pinger.start() #TODO shouldn't this be in 'start'
             reactor.callLater(1, self.try_old_peers)
             
         d.addCallback(start_connections)
@@ -133,8 +138,11 @@ class Router(object):
     def stop(self):
         '''Stop the router.  Stops the tun/tap device and stops listening on the 
         UDP port.'''
-        self.tuntap.stop()
+        self.pinger.stop()
+        self._bootstrap.stop()
+        self._tuntap.stop()
         # bring down iface?
+        self.pm.clear()
         if self._port is not None:
             self._port.stopListening()
             self._port = None

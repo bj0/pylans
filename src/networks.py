@@ -15,6 +15,7 @@
 #
 #
 # networks.py
+# TODO disabled vs stopped?
 
 import binascii
 import event
@@ -254,6 +255,25 @@ class NetworkManager(object):
             if not net.is_running:
                 net.start()
         
+    def stop_network(self, network):
+        if network in self:
+            self[network].stop()
+            
+    def enable_network(self, network):
+        print 'wtf',network.name
+        if network in self:
+            self[network].enabled = True
+            event.emit('network-enabled', network)
+            print 'ennna'
+
+            
+    def disable_network(self, network):
+        if network in self:
+            self[network].enabled = False
+            event.emit('network-disabled', network)
+            self.stop_network(network)         
+            print 'dissa'
+        
     def load(self, name):
         if self.network_exists(name):
             nw = Network(name)
@@ -330,6 +350,9 @@ class NetworkManager(object):
         elif isinstance(item, uuid.UUID):               # network id
             net = self.network_list[item]
             
+        elif isinstance(item, Network):                 # network reference
+            if item in self:
+                return item
         else:
             raise TypeError('Unrecognized key type')
 
@@ -344,6 +367,8 @@ class NetworkManager(object):
             return self.get_by_name(item) is not None
         elif isinstance(item, uuid.UUID):               # network id
             return (item in self.network_list)
+        elif isinstance(item, Network):                 # network reference
+            return (item in self.network_list.values())
     
 
 MANAGER = NetworkManager()

@@ -98,6 +98,11 @@ class PeerManager(object):
 #        self.peer_added = Event()
 #        self.peer_removed = Event()
 
+    def clear(self):
+        self.peer_list = {}
+        self.peer_map = {}
+        self.addr_map = {}
+
     def _update_pickle(self):
         self._my_pickle = pickle.dumps(self._self,-1)
         

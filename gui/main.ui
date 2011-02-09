@@ -84,10 +84,11 @@
   <object class="GtkMenu" id="network_menu">
     <property name="visible">True</property>
     <child>
-      <object class="GtkMenuItem" id="toggle_menuitem">
+      <object class="GtkMenuItem" id="info_menitem">
         <property name="visible">True</property>
-        <property name="label" translatable="yes">Toggle Active</property>
+        <property name="label" translatable="yes">Info</property>
         <property name="use_underline">True</property>
+        <signal name="activate" handler="on_network_get_info"/>
       </object>
     </child>
     <child>
@@ -99,11 +100,19 @@
       </object>
     </child>
     <child>
-      <object class="GtkMenuItem" id="info_menitem">
+      <object class="GtkMenuItem" id="online_menuitem">
         <property name="visible">True</property>
-        <property name="label" translatable="yes">Info</property>
+        <property name="label" translatable="yes">Toggle Online</property>
         <property name="use_underline">True</property>
-        <signal name="activate" handler="on_network_get_info"/>
+        <signal name="activate" handler="on_network_toggle_online"/>
+      </object>
+    </child>
+    <child>
+      <object class="GtkMenuItem" id="enable_menuitem">
+        <property name="visible">True</property>
+        <property name="label" translatable="yes">Toggle Enabled</property>
+        <property name="use_underline">True</property>
+        <signal name="activate" handler="on_network_toggle_enabled"/>
       </object>
     </child>
   </object>

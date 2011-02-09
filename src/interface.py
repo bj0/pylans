@@ -50,16 +50,22 @@ class Interface(object):
         # Events
         self.network_started = Event()
         self.network_stopped = Event()
+        self.network_enabled = Event()
+        self.network_disabled = Event()
         self.peer_added = Event()
         self.peer_removed = Event()
+        self.peer_changed = Event()
         self.message_received = Event()
 
         self._cbox = ChatterBox(self)
 
         event.register_handler('network-started', None, self.network_started)
         event.register_handler('network-stopped', None, self.network_stopped)
+        event.register_handler('network-enabled', None, self.network_enabled)
+        event.register_handler('network-disabled', None, self.network_disabled)
         event.register_handler('peer-added', None, self._peer_added)
         event.register_handler('peer-removed', None, self._peer_removed)
+        event.register_handler('peer-changed', None, self._peer_changed)
         event.register_handler('message-received', None, self._message_received)
 
     def _peer_added(self, pm, peer):
@@ -67,6 +73,9 @@ class Interface(object):
     
     def _peer_removed(self, pm, peer):    
         self.peer_removed(pm.router.network, peer)
+        
+    def _peer_changed(self, pm, peer):
+        self.peer_changed(pm.router.network, peer)
         
     def _message_received(self, cbox, nid, pid, text):
         network = self._mgr[nid]
@@ -137,13 +146,14 @@ class Interface(object):
     def start_all_networks(self):
         self._mgr.start_all()
         
-    def enable_network(self, network):        
-        if self.get_network(network) is not None:
-            self._current.enabled = True
+    def stop_network(self, network):
+        self._mgr.stop_network(network)
+        
+    def enable_network(self, network):
+        self._mgr.enable_network(network)
             
     def disable_network(self, network):
-        if self.get_network(network) is not None:
-            self._current.enabled = False    
+        self._mgr.disable_network(network)
 
     def connect_to_address(self, address, network=None):
         if self.get_network(network) is not None:

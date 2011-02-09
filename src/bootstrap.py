@@ -56,8 +56,15 @@ class TrackerBootstrap(object):
             
         return client.getPage(url)
         
+    def start(self):
+        self._running = True
+        self.run()
+        
+    def stop(self):
+        self._running = False
+        
     def run(self):
-        if self.use_tracker:
+        if self.use_tracker and self._running:
             
             # function for successful response from tracker:
             def do_response(result):
