@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 class TrackerBootstrap(object):
 
     def __init__(self, net, tracker=None):
-        self.net = net
+        self.net = util.get_weakref_proxy(net)
         
         if tracker is None:
             tracker = settings.get_option(net.name+'/tracker','http://tracker.openbittorrent.com/announce')

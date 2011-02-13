@@ -23,6 +23,7 @@ from twisted.internet import reactor
 from twisted.internet.task import LoopingCall
 import logging
 import settings
+import util
 
 if system() == 'Windows':   # On Windows, time() has low resolution(~1ms)
     from time import clock as time
@@ -53,7 +54,7 @@ class Pinger(object):
         if interval is None:
             interval = settings.get_option(router.network.name+'/interval',5.0)
         self.interval = interval
-        self.router = router
+        self.router = util.get_weakref_proxy(router)
         self.active_pings = {}
         self._lp = LoopingCall(self.do_pings)
         

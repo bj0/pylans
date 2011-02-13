@@ -87,7 +87,7 @@ class PeerManager(object):
         self._self.addr = '\x00'*router.addr_size # temp fake mac?
         self._my_pickle = pickle.dumps(self._self,-1)
 
-        self.router = router
+        self.router = util.get_weakref_proxy(router)
         router.register_handler(self.PEER_XCHANGE, self.handle_px)
         router.register_handler(self.PEER_XCHANGE_ACK, self.handle_px_ack)
         router.register_handler(self.REGISTER, self.handle_reg)

@@ -38,7 +38,6 @@ import settings
 import uuid
 import util
 
-
 logger = logging.getLogger(__name__)
 
 class UDPPeerProtocol(DatagramProtocol):
@@ -81,7 +80,6 @@ class Router(object):
     USER = 0x80
 
     def __init__(self, network, proto=None, tuntap=None):
-    
         if tuntap is None:
             mode = settings.get_option('settings/mode', TunTap.TAPMODE)
             tuntap = TunTap(self, mode)
@@ -93,9 +91,9 @@ class Router(object):
         self.handlers = {}
         self._requested_acks = {}
                         
-        self.network = network
+        self.network = util.get_weakref_proxy(network)
         self.filter = Crypter(network.key)
-        proto.router = self
+        proto.router = util.get_weakref_proxy(self)
         self.pm = PeerManager(self)
         #self.ip_map = self.pm.ip_map
         self.addr_map = self.pm.addr_map
@@ -107,9 +105,12 @@ class Router(object):
         self._port = None
         
         import bootstrap
-        self._bootstrap = bootstrap.TrackerBootstrap(self.network)
+        self._bootstrap = bootstrap.TrackerBootstrap(network)
         
         self.register_handler(self.ACK, self.handle_ack)
+
+#    def __del__(self):
+#        print 'router del'
 
     def get_my_address(self):
         '''Get interface address (IP or MAC), return a deferred'''
@@ -118,23 +119,19 @@ class Router(object):
     def start(self):
         '''Start the router.  Starts the tun/tap device and begins listening on
         the UDP port.'''
-        
         self._tuntap.start()
         self._tuntap.configure_iface(self.network.virtual_address)
         self._port = reactor.listenUDP(self.network.port, self._proto)
-
         d = self.get_my_address()
 
         logger.info('router started, listening on UDP port {0}'.format(self._port))
-    
         def start_connections(*x):
-            print 'does this fire'
             self._bootstrap.start()
             self.pinger.start() #TODO shouldn't this be in 'start'
-            reactor.callLater(1, self.try_old_peers)
+            reactor.callLater(1, util.get_weakref_proxy(self.try_old_peers))
             
         d.addCallback(start_connections)
-    
+            
     def stop(self):
         '''Stop the router.  Stops the tun/tap device and stops listening on the 
         UDP port.'''
@@ -160,7 +157,7 @@ class Router(object):
                 self.pm.try_register(addrs)            
 
         # re-schedule            
-        reactor.callLater(60*5, self.try_old_peers)
+        reactor.callLater(60*5, util.get_weakref_proxy(self.try_old_peers))
     
     def relay(self, data, dst):
         if dst in self.pm:
@@ -190,7 +187,7 @@ class Router(object):
                 if id == 0:
                     id = random.randint(0, 0xFFFF)
                 d = defer.Deferred()
-                timeout_call = reactor.callLater(self.TIMEOUT, self._timeout, id)
+                timeout_call = reactor.callLater(self.TIMEOUT, util.get_weakref_proxy(self._timeout), id)
                 self._requested_acks[id] = (d, timeout_call)
                 
             else:

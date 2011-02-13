@@ -18,7 +18,7 @@
 
 import event
 import logging
-
+import util
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ class ChatterBox(object):
     MAX_CHAT_RETRIES = 2
     
     def __init__(self, iface):
-        self.iface = iface
+        self.iface = util.get_weakref_proxy(iface)
         self.handler_list = {}
 #        self.msg_queue = {}
         
@@ -84,6 +84,6 @@ class ChatterBox(object):
             
     def handle_chat_msg(self, net, type, msg, addr, src_id):
         event.emit('message-received', self, net.id, src_id, msg)
-        logger.info('got a msg from {0}'.format(src_id.encode('hex')))
+        logger.info('got a msg from {0}'.format(src_id.hex))
         
         

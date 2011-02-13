@@ -49,6 +49,7 @@ import struct
 import util
 
 
+
 logger = logging.getLogger(__name__)
 
 class TunTapBase(object):
@@ -133,8 +134,13 @@ class TunTapLinux(TunTapBase):
         logger.info('opened tun device as interface {0}'.format(self.ifname))
 
         self.f = f
-        self.router = router
+        self.router = util.get_weakref_proxy(router)
         self.mode = mode
+
+    def __del__(self):
+        '''Make sure device is closed.'''
+        logger.info('closing tun device {0}'.format(self.ifname))
+        os.close(self.f)
 
     def start(self):
         '''Start monitoring tun/tap for input'''
@@ -217,7 +223,7 @@ class TunTapWindows(TunTapBase):
         self._running = False
         
         self._tuntap = TunTapDevice(mode)
-        self.router = router
+        self.router = util.get_weakref_proxy(router)
         self.mode = mode
         
     def configure_iface(self, addr):

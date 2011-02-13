@@ -260,19 +260,20 @@ class NetworkManager(object):
             self[network].stop()
             
     def enable_network(self, network):
-        print 'wtf',network.name
         if network in self:
             self[network].enabled = True
             event.emit('network-enabled', network)
-            print 'ennna'
 
             
     def disable_network(self, network):
         if network in self:
             self[network].enabled = False
             event.emit('network-disabled', network)
-            self.stop_network(network)         
-            print 'dissa'
+            self.stop_network(network)
+#            import sys
+#            print 'count',sys.getrefcount(network.router)
+#            del network.router
+            network.router = None # shut down the adapter?      
         
     def load(self, name):
         if self.network_exists(name):
