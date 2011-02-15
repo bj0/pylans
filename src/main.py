@@ -156,6 +156,8 @@ class MainWin:
         iface.network_stopped += self._network_off
         iface.network_enabled += self._network_enabled
         iface.network_disabled += self._network_disabled
+        iface.network_created += self._add_network
+        iface.network_removed += self._remove_network
         iface.message_received += self._message
         
         nws = iface.get_network_list()
