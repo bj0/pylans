@@ -172,10 +172,6 @@ class MainWin:
                 dn.append(nw)
         for nw in (en+dn):
             self._add_network(nw)
-#            if nw.enabled:
-#                self._peer_model.append(None, [nw, "<b>"+nw.name+"</b>", ''])
-#            else:
-#                self._peer_model.append(None, [nw, "<i>"+nw.name+"</i>", ''])
         
         self.iface = iface
 

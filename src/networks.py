@@ -15,7 +15,6 @@
 #
 #
 # networks.py
-# TODO disabled vs stopped?
 
 import binascii
 import event
@@ -34,20 +33,11 @@ class Network(object):
     def __init__(self, name, key=None, username=None, address=None, port=None, id=None, enabled=None):
         
         self._name = name
-        self.name = self._name
+#        self.name = self._name
         self._id = id
         self.router = None
         self._running = False
         
-        networks = settings.get_option('settings/networks')
-        if networks is None:
-            networks = []
-            settings.set_option('settings/networks',networks)
-            
-        if name not in networks:
-            networks.append(name)
-            settings.set_option('settings/networks',networks)
-
         if enabled is not None:
             self.enabled = enabled
 
@@ -100,6 +90,17 @@ class Network(object):
     def is_running(self):
         return self._running
         
+    @property
+    def name(self):
+        return self._name
+ 
+    @name.setter
+    def name(self, value):
+        settings.MANAGER.rename_section(self._name, value)
+            
+        
+        self._name = value
+        
     def start(self):
         if self.enabled:
             if self._running:
@@ -141,6 +142,7 @@ class Network(object):
             self._set('enabled',value)
         else:
             raise TypeError('enabled must be True or False')
+        settings.save()
         
     @property
     def key(self):
@@ -190,6 +192,7 @@ class Network(object):
         else:
             mask = self.virtual_address.split('/')[1]
         self.virtual_address = '%s/%s'%(value, mask)
+        settings.save()
         
     ip = virtual_ip
         
@@ -208,15 +211,15 @@ class Network(object):
             self._id = uuid.UUID(hex=self._get('id'))
         return self._id
         
-    @id.setter
-    def id(self, value):
-        if isinstance(value, uuid.UUID):
-            self._set('id', value.hex)
-            self._id = value
-        else:
-            self._set('id', value)
-            self._id = uuid.UUID(hex=value)
-        settings.save()
+#    @id.setter
+#    def id(self, value):
+#        if isinstance(value, uuid.UUID):
+#            self._set('id', value.hex)
+#            self._id = value
+#        else:
+#            self._set('id', value)
+#            self._id = uuid.UUID(hex=value)
+#        settings.save()
         
     @property
     def known_addresses(self):
@@ -237,14 +240,7 @@ class NetworkManager(object):
             self.load_all()
         
     def network_exists(self, name):
-        networks = settings.get_option('settings/networks')
-        if networks is None:
-            settings.set_option('settings/networks',[])
-            return False
-            
-        if name in networks:
-            return True
-        return False
+        return settings.MANAGER.has_section(name)
 
     def start_network(self, network):
         if network in self:
@@ -284,15 +280,16 @@ class NetworkManager(object):
         return None
         
     def load_all(self):
-        networks = settings.get_option('settings/networks')
-        if networks is not None:
-            for nw in networks:
-                self.load(nw)
+        for nw in self._saved_networks():
+            self.load(nw)
         
     def create(self, name, key=None, username=None, address=None, port=None, id=None):    
         if self.network_exists(name):
-            logger.warning('A network by that name already exists')
-            return Network(name)
+            logger.warning('A network by that name already exists') #TODO throw exception?
+            if name in self:
+                return self[name]
+            else:
+                return Network(name)
             
             
         net = Network(name, key, username, address, port, id)
@@ -303,16 +300,15 @@ class NetworkManager(object):
         
     def remove(self, name):
         if self.network_exists(name):
-            networks = settings.get_option('settings/networks')
-            networks.remove(name)
-            settings.set_option('settings/networks', networks)
+            net = self[name]
             settings.MANAGER.remove_section(name)
+            event.emit('network-removed', self, net)
             logger.info('network {0} removed from settings'.format(name))
         
         if name in self:
             net = self[name]
             net.stop()
-            del self.network_list[net.id]
+            del self.network_list[net.id]# TODO check refcount
             logger.debug('network {0} removed from manager'.format(name))
 
     def get_by_vip(self, vip):
@@ -331,6 +327,12 @@ class NetworkManager(object):
             if nw.name == name:
                 return nw
         return None
+
+    def _saved_networks(self):
+        nl = settings.MANAGER.sections()
+        if 'settings' in nl:
+            nl.remove('settings')
+        return nl
     
     ###### Container Type Overloads
     
@@ -370,6 +372,8 @@ class NetworkManager(object):
             return (item in self.network_list)
         elif isinstance(item, Network):                 # network reference
             return (item in self.network_list.values())
+        
+        return False
     
 
 MANAGER = NetworkManager()

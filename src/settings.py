@@ -195,8 +195,18 @@ class SettingsManager(RawConfigParser):
         self._dirty = True
 
     def remove_section(self, section):
-        if RawConfigParser.remove_section(section):
+        if RawConfigParser.remove_section(self, section):
             self._dirty = True
+
+    def rename_section(self, section, new_section):
+        if self.has_section(section):
+            self.add_section(new_section) # throws error on duplicate
+            for (name, value) in self.items(section):
+                self.set(new_section, name, value)
+            self.remove_section(section)
+            
+        else:
+            raise NoSectionError
 
     def _set_direct(self, option, value):
         """
