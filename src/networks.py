@@ -266,9 +266,6 @@ class NetworkManager(object):
             self[network].enabled = False
             event.emit('network-disabled', network)
             self.stop_network(network)
-#            import sys
-#            print 'count',sys.getrefcount(network.router)
-#            del network.router
             network.router = None # shut down the adapter?      
         
     def load(self, name):

@@ -182,10 +182,75 @@ class MainWin:
         return None
 
     def get_objects(self):
-        objects = ('main_window','name_label','peer_menu','network_menu','netbook')
+        objects = ('main_window','name_label','peer_menu','network_menu','main_menu','netbook')
         go = self.builder.get_object
         for obj_name in objects:
             setattr(self, "_" + obj_name, go(obj_name))
+
+    def on_menu_button_event(self, widget, event):
+        if event.type == gtk.gdk.BUTTON_PRESS:
+            def menu_pos(menu, user_data=None):
+                r = widget.get_allocation()
+                (x,y) = widget.window.get_origin()
+                return (x+r.x, y+r.y, False)
+            self._main_menu.popup(None, None, menu_pos, event.button, event.time)
+
+    def on_exit(self, *x):
+        reactor.callFromThread(reactor.stop)
+
+    def on_view_log(self, widget):
+        print 'view log'
+        
+    def on_rename(self, *x):
+        n = self._netbook.get_current_page()
+        np = self._get_np(self._netbook.get_nth_page(n))
+        if np is not None:
+            net = np.net
+            dlg = gtk.MessageDialog(self._main_window, type=gtk.MESSAGE_QUESTION, 
+                buttons=gtk.BUTTONS_OK_CANCEL, message_format='Enter new name for network \'{0}\':'.format(net.name))
+            dlg.set_title('Rename Network')
+            entry = gtk.Entry()
+            hbox = gtk.HBox()
+            hbox.pack_start(gtk.Label('Name:') ,False, 5, 5)
+            hbox.pack_end(entry)
+            dlg.vbox.pack_end(hbox, True, True, 0)
+            entry.connect('activate', lambda entry, dialog, res: dlg.response(res))
+            
+            def response(dialog, rid):
+                if rid == gtk.RESPONSE_OK:
+                    print 'rename',entry.get_text()
+                dialog.destroy()
+            
+            dlg.connect('response',response)
+            dlg.show_all()
+        
+    def on_delete(self, *x):
+        n = self._netbook.get_current_page()
+        np = self._get_np(self._netbook.get_nth_page(n))
+        if np is not None:
+            net = np.net
+            dlg = gtk.MessageDialog(self._main_window, type=gtk.MESSAGE_QUESTION, 
+                buttons=gtk.BUTTONS_YES_NO, message_format='Really delete network \'{0}\'?'.format(net.name))
+            dlg.set_title('Delete Network')
+            
+            def response(dialog, rid):
+                dialog.destroy()
+                if rid == gtk.RESPONSE_YES:
+                    print 'delete'
+            
+            dlg.connect('response',response)
+            dlg.show_all()
+        
+    def on_create(self, *x):
+
+        
+        def response(dialog, rid):
+            if rid == gtk.RESPONSE_OK:
+                print 'create',entry.get_text()
+            dialog.destroy()
+        
+        dlg.connect('response',response)
+        dlg.show_all()
 
     def on_network_get_info(self, widget):
         n = self._netbook.get_current_page()
@@ -315,6 +380,8 @@ class MainWin:
             np.widget.show_all()
             eb.show_all()
             
+    def _remove_network(self, nw):
+        print 'remove'
 
     def _add_peer(self, net, peer):
         self._net_page[net.id].add_peer(peer)
@@ -329,7 +396,6 @@ class MainWin:
         
         logger.info('network {0} online'.format(net.name))
 
-    
     def _network_off(self, net):
         self._net_page[net.id].clear()
         self._net_page[net.id].update_label()
