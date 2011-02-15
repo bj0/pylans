@@ -96,10 +96,11 @@ class Network(object):
  
     @name.setter
     def name(self, value):
-        settings.MANAGER.rename_section(self._name, value)
-            
-        
-        self._name = value
+        if self._name != value:
+            settings.MANAGER.rename_section(self._name, value)
+            self._name = value
+            event.emit('network-changed', self)
+            settings.save()
         
     def start(self):
         if self.enabled:
@@ -140,6 +141,7 @@ class Network(object):
     def enabled(self, value):
         if isinstance(value, bool):
             self._set('enabled',value)
+            event.emit('network-changed', self)
         else:
             raise TypeError('enabled must be True or False')
         settings.save()
@@ -155,6 +157,7 @@ class Network(object):
     def key(self, value):
         self._set('key', value.encode('base64').replace('\n',''))
         #TODO impliment key change
+        event.emit('network-changed', self)
         settings.save()
         
     @property
@@ -164,6 +167,7 @@ class Network(object):
     @username.setter
     def username(self, value):
         self._set('name', value)
+        event.emit('network-changed', self)
         settings.save()
         
     @property
@@ -173,6 +177,7 @@ class Network(object):
     @virtual_address.setter
     def virtual_address(self, value):
         self._set('virtual_address', value)
+        event.emit('network-changed', self)
         settings.save()
         
 #        self.address_changed(value)
@@ -192,6 +197,7 @@ class Network(object):
         else:
             mask = self.virtual_address.split('/')[1]
         self.virtual_address = '%s/%s'%(value, mask)
+        event.emit('network-changed', self)
         settings.save()
         
     ip = virtual_ip
@@ -203,6 +209,7 @@ class Network(object):
     @port.setter
     def port(self, value):
         self._set('port', value)
+        event.emit('network-changed', self)
         settings.save()
         
     @property
@@ -228,6 +235,7 @@ class Network(object):
     @known_addresses.setter
     def known_addresses(self, value):
         self._set('known_addresses', value)
+        event.emit('network-changed', self)
         settings.save()
         
         

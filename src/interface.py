@@ -54,6 +54,7 @@ class Interface(object):
         self.network_disabled = Event()
         self.network_created = Event()
         self.network_removed = Event()
+        self.network_changed = Event()
         self.peer_added = Event()
         self.peer_removed = Event()
         self.peer_changed = Event()
@@ -67,6 +68,7 @@ class Interface(object):
         event.register_handler('network-disabled', None, self.network_disabled)
         event.register_handler('network-created', None, self.network_created)
         event.register_handler('network-removed', None, self.network_removed)
+        event.register_handler('network-changed', None, self.network_changed)
         event.register_handler('peer-added', None, self._peer_added)
         event.register_handler('peer-removed', None, self._peer_removed)
         event.register_handler('peer-changed', None, self._peer_changed)
@@ -172,7 +174,7 @@ class Interface(object):
 
     def set_network_name(self, newname, network=None):
         if self.get_network(network) is not None:
-            pass #rename
+            self._current.name = newname
     
     def set_network_key(self, key, network=None):
         if self.get_network(network) is not None:

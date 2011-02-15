@@ -158,6 +158,7 @@ class MainWin:
         iface.network_disabled += self._network_disabled
         iface.network_created += self._add_network
         iface.network_removed += self._remove_network
+        iface.network_changed += lambda nw: self._net_page[nw.id].update_label() 
         iface.message_received += self._message
         
         nws = iface.get_network_list()
@@ -218,7 +219,7 @@ class MainWin:
             
             def response(dialog, rid):
                 if rid == gtk.RESPONSE_OK:
-                    print 'rename',entry.get_text()
+                    self.iface.set_network_name(entry.get_text(), net)
                 dialog.destroy()
             
             dlg.connect('response',response)
@@ -381,7 +382,10 @@ class MainWin:
             eb.show_all()
             
     def _remove_network(self, nw):
-        print 'remove'
+        if nw.id in self._net_page:
+            np = self._net_page[nw.id]
+            self._netbook.remove_page(self._netbook.page_num(np.widget))
+            del self._net_page[nw.id]
 
     def _add_peer(self, net, peer):
         self._net_page[net.id].add_peer(peer)
