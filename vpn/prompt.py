@@ -102,7 +102,7 @@ class Prompt(Cmd):
                 network = None
             print 'Trying to connect to %s @ %d' % (ip, port)
             
-            reactor.callFromThread(iface.connect_to_address, (ip, port), network)
+            reactor.callFromThread(self.iface.connect_to_address, (ip, port), network)
             
         except ValueError:
             print 'Invalid arguments.'
@@ -112,9 +112,9 @@ class Prompt(Cmd):
         line = line.split()
         if len(line) > 0:
             nets = line
-            nets = [ iface.get_network(net) for net in nets if net is not None ]
+            nets = [ self.iface.get_network(net) for net in nets if net is not None ]
         else:
-            nets = iface.get_network_list()
+            nets = self.iface.get_network_list()
             
         for net in nets:
 #            net = iface.get_network(net)
@@ -132,7 +132,7 @@ class Prompt(Cmd):
                 print 'network offline'
             
     def complete_status(self, text, line, begidx, endidx):
-        nets = iface.get_network_names()
+        nets = self.iface.get_network_names()
         if not text:
             return nets
             
@@ -143,13 +143,13 @@ class Prompt(Cmd):
         line = line.strip()
         if len(line) > 0:
             nets = line.split()
-            nets = [ iface.get_network(net) for net in nets if net is not None ]
+            nets = [ self.iface.get_network(net) for net in nets if net is not None ]
         else:
-            nets = iface.get_network_list()
+            nets = self.iface.get_network_list()
         
         for net in nets:
             print '========= Peers (%s) =========' % net.name
-            for p in iface.get_peer_list(net):
+            for p in self.iface.get_peer_list(net):
                 print 'name:      {0}'.format(p.name)
                 print 'id:        {0}'.format(p.id)
                 print 'vip:       {0}'.format(p.vip_str)
@@ -162,7 +162,7 @@ class Prompt(Cmd):
                 print 'timeouts:  {0}'.format(p.timeouts)
             
     def complete_list(self, text, line, begidx, endidx):
-        nets = iface.get_network_names()
+        nets = self.iface.get_network_names()
         if not text:
             return nets
             
@@ -177,10 +177,10 @@ class Prompt(Cmd):
         else:
             name, net = name[0], None
         msg = ' '.join(line.split()[1:])
-        peer = iface.get_peer_info(name, net)
-        net = iface.get_network()
+        peer = self.iface.get_peer_info(name, net)
+        net = self.iface.get_network()
         if peer is not None and net is not None:
-            reactor.callFromThread(iface.send_message, net.id, peer.id, msg)
+            reactor.callFromThread(self.iface.send_message, net.id, peer.id, msg)
         else:
             print 'peer or network is not specified'
             
@@ -196,11 +196,10 @@ class Prompt(Cmd):
         
 
 
-if __name__ == '__main__':
-
+def main():
     iface = Interface()
-    if len(iface.get_network_dict()) < 1:
-        iface.create_new_network('newnetwork')
+#    if len(iface.get_network_dict()) < 1:
+#        iface.create_new_network('newnetwork')
 
     iface.start_all_networks()
 #    cbox = ChatterBox(iface)
@@ -214,3 +213,6 @@ if __name__ == '__main__':
 #    print 'run'
     reactor.run()    
     
+
+if __name__ == '__main__':
+    main()

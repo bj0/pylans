@@ -1,0 +1,3 @@
+#!/bin/bash
+
+python -c "from vpn import settings, prompt; prompt.main()"

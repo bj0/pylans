@@ -30,9 +30,9 @@ from twisted.spread import pb
 from twisted.cred.credentials import UsernamePassword
 from twisted.internet import error as netError
 
-import util
-from interface import Interface
-from chatter import ChatterBox
+from vpn import util
+from vpn.interface import Interface
+from vpn.chatter import ChatterBox
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +129,7 @@ class MainWin:
     def __init__(self, iface):
 
         self.builder = gtk.Builder()
-        self.builder.add_from_file('../gui/main.ui')
+        self.builder.add_from_file('gui/main.ui')
 
         # get objects from xml
         self.get_objects()
@@ -422,15 +422,16 @@ class MainWin:
     
 
 
-
-if __name__ == '__main__':
+def main():
     iface = Interface()
-    if len(iface.get_network_dict()) < 1:
-        iface.create_new_network('newnetwork')
+#    if len(iface.get_network_dict()) < 1:
+#        iface.create_new_network('newnetwork')
 
     mw = MainWin(iface)
     iface.start_all_networks()
 
-    # give it time to bring up teh interface, then open tcp port
 
     reactor.run()
+
+if __name__ == '__main__':
+    main()

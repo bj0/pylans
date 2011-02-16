@@ -62,9 +62,9 @@ class Network(object):
             self.port = 8015
             
         if id is not None:
-            self.id = id
+            self._id = id
         elif self.id is None:
-            self.id = uuid.uuid4()
+            self._id = uuid.uuid4()
         
         settings.save()        
         
