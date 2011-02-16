@@ -49,6 +49,17 @@ def show_message(text):
     dlg = gtk.MessageDialog(type=gtk.MESSAGE_INFO, buttons=gtk.BUTTONS_OK, message_format=text)
     dlg.connect('response', lambda *x: dlg.destroy())
     dlg.show_all()
+    
+class TextBufferHandler(logging.Handler):
+    def __init__(self, buffer):
+        self.buf = buffer
+        logging.Handler.__init__(self)
+        
+    def emit(self, record):
+#        print dir(record)
+        self.buf.insert(self.buf.get_end_iter(), '{1} : {0} : {2}\n'.format(record.name,
+                                                                       record.levelname,
+                                                                       record.message))
 
 class NetPage:
     def __init__(self, net, nb_label=None):
@@ -152,6 +163,9 @@ class MainWin:
 #        nw = iface.get_network_list()[0]
 #        self._name_label.set_text('%s - %s' % (nw.username, nw.virtual_ip))
         
+        handler = TextBufferHandler(gtk.TextBuffer())
+        logging.getLogger().addHandler(handler)
+        self._log_buffer = handler.buf
         
         #Events
         iface.peer_added += self._add_peer
@@ -205,7 +219,16 @@ class MainWin:
         reactor.callFromThread(reactor.stop)
 
     def on_view_log(self, widget):
-        print 'view log'
+        win = gtk.Window()
+        sw = gtk.ScrolledWindow()
+        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        tv = gtk.TextView()
+        tv.set_editable(False)
+        tv.set_buffer(self._log_buffer)
+        sw.add(tv)
+        win.add(sw)
+        win.resize(450,300)
+        win.show_all()
         
     def on_rename(self, *x):
         n = self._netbook.get_current_page()
@@ -265,7 +288,6 @@ class MainWin:
         
         
         def response(dialog, rid):
-#            print 'rid',rid, int(gtk.RESPONSE_CANCEL)
             if rid == gtk.RESPONSE_OK:
                 name = name_entry.get_text()
                 if name in self.iface.get_network_names():

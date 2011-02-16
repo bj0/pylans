@@ -97,7 +97,7 @@
     <child>
       <object class="GtkMenuItem" id="info_menitem">
         <property name="visible">True</property>
-        <property name="label" translatable="yes">Network Info</property>
+        <property name="label" translatable="yes">Network Properties</property>
         <property name="use_underline">True</property>
         <signal name="activate" handler="on_network_get_info"/>
       </object>
