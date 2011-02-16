@@ -307,6 +307,7 @@ class NetworkManager(object):
         if self.network_exists(name):
             net = self[name]
             settings.MANAGER.remove_section(name)
+            settings.save()
             event.emit('network-removed', self, net)
             logger.info('network {0} removed from settings'.format(name))
         

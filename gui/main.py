@@ -19,6 +19,7 @@
 from twisted.internet import gtk2reactor
 gtk2reactor.install()
 
+import os
 import gtk
 import gobject
 import uuid
@@ -44,6 +45,10 @@ def find_iter(model, obj, col):
         
     return None
 
+def show_message(text):
+    dlg = gtk.MessageDialog(type=gtk.MESSAGE_INFO, buttons=gtk.BUTTONS_OK, message_format=text)
+    dlg.connect('response', lambda *x: dlg.destroy())
+    dlg.show_all()
 
 class NetPage:
     def __init__(self, net, nb_label=None):
@@ -158,7 +163,7 @@ class MainWin:
         iface.network_disabled += self._network_disabled
         iface.network_created += self._add_network
         iface.network_removed += self._remove_network
-        iface.network_changed += lambda nw: self._net_page[nw.id].update_label() 
+        iface.network_changed += lambda nw: (nw in self._net_page) and self._net_page[nw.id].update_label() 
         iface.message_received += self._message
         
         nws = iface.get_network_list()
@@ -172,7 +177,7 @@ class MainWin:
             else:
                 dn.append(nw)
         for nw in (en+dn):
-            self._add_network(nw)
+            self._add_network(None, nw)
         
         self.iface = iface
 
@@ -237,17 +242,45 @@ class MainWin:
             def response(dialog, rid):
                 dialog.destroy()
                 if rid == gtk.RESPONSE_YES:
-                    print 'delete'
+                    self.iface.delete_network(net)
             
             dlg.connect('response',response)
             dlg.show_all()
         
     def on_create(self, *x):
+        builder = gtk.Builder()
+        builder.add_from_file('gui/main.ui')
 
+        dlg = builder.get_object('new_dialog')
+        dlg.resize(400,dlg.get_size()[1])
+        name_entry = builder.get_object('name_entry')
+        alias_entry = builder.get_object('alias_entry')
+        key_entry = builder.get_object('key_entry')
+        port_spinbox = builder.get_object('port_spinbox')
+        
+        name_entry.set_text('new_network')
+        alias_entry.set_text('user')
+        key_entry.set_text(os.urandom(128).encode('hex'))
+        port_spinbox.set_value(8500)
+        
         
         def response(dialog, rid):
+#            print 'rid',rid, int(gtk.RESPONSE_CANCEL)
             if rid == gtk.RESPONSE_OK:
-                print 'create',entry.get_text()
+                name = name_entry.get_text()
+                if name in self.iface.get_network_names():
+                    show_message('A network with that name already exists')
+                    return
+                
+                alias = alias_entry.get_text()
+                key = key_entry.get_text()
+                if key == '':
+                    key = os.urandom(128)
+                port = int(port_spinbox.get_value())
+                
+                self.iface.create_new_network(name, username=alias, key=key, port=port)
+                #print 'create',name,alias,key,port
+                
             dialog.destroy()
         
         dlg.connect('response',response)
@@ -362,7 +395,7 @@ class MainWin:
 
                 logger.info('enabling network {0}'.format(net.name))
 
-    def _add_network(self, nw):
+    def _add_network(self, mgr, nw):
         if nw.id not in self._net_page:
         
             lab = gtk.Label(nw.name)
@@ -381,7 +414,7 @@ class MainWin:
             np.widget.show_all()
             eb.show_all()
             
-    def _remove_network(self, nw):
+    def _remove_network(self, mgr, nw):
         if nw.id in self._net_page:
             np = self._net_page[nw.id]
             self._netbook.remove_page(self._netbook.page_num(np.widget))
@@ -395,7 +428,7 @@ class MainWin:
         self._net_page[net.id].remove_peer(peer)
     
     def _network_on(self, net):
-        self._add_network(net)
+        self._add_network(None, net)
         self._net_page[net.id].update_label()
         
         logger.info('network {0} online'.format(net.name))
