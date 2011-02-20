@@ -34,7 +34,7 @@ class Network(object):
         
         self._name = name
 #        self.name = self._name
-        self._id = id
+        self._id = None
         self.router = None
         self._running = False
         
@@ -62,9 +62,9 @@ class Network(object):
             self.port = 8015
             
         if id is not None:
-            self._id = id
+            self.id = id
         elif self.id is None:
-            self._id = uuid.uuid4()
+            self.id = uuid.uuid4()
         
         settings.save()        
         
@@ -217,16 +217,17 @@ class Network(object):
         if self._id is None and self._get('id') is not None:
             self._id = uuid.UUID(hex=self._get('id'))
         return self._id
+            
         
-#    @id.setter
-#    def id(self, value):
-#        if isinstance(value, uuid.UUID):
-#            self._set('id', value.hex)
-#            self._id = value
-#        else:
-#            self._set('id', value)
-#            self._id = uuid.UUID(hex=value)
-#        settings.save()
+    @id.setter
+    def id(self, value):
+        if isinstance(value, uuid.UUID):
+            self._set('id', value.hex)
+            self._id = value
+        else:
+            self._set('id', value)
+            self._id = uuid.UUID(hex=value)
+        settings.save()
         
     @property
     def known_addresses(self):
@@ -298,7 +299,7 @@ class NetworkManager(object):
             
             
         net = Network(name, key, username, address, port, id)
-        self.network_list[id] = net
+        self.network_list[net.id] = net
         event.emit('network-created',self, net)
         logger.debug('network {0} created'.format(net.name))
         return net
