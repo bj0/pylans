@@ -185,8 +185,8 @@ class Prompt(Cmd):
             print 'peer or network is not specified'
             
             
-    def emptyline(self, *args):
-        self.do_status('')
+#    def emptyline(self, *args):
+#        self.do_status('')
             
     def do_EOF(self, line):
         print

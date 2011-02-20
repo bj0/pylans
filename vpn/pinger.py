@@ -52,7 +52,7 @@ class Pinger(object):
 
     def __init__(self, router, interval=None):
         if interval is None:
-            interval = settings.get_option(router.network.name+'/interval',5.0)
+            interval = settings.get_option(router.network.name+'/ping_interval',5.0)
         self.interval = interval
         self.router = util.get_weakref_proxy(router)
         self.active_pings = {}
