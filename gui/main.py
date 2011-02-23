@@ -219,16 +219,39 @@ class MainWin:
         reactor.callFromThread(reactor.stop)
 
     def on_view_log(self, widget):
-        win = gtk.Window()
-        sw = gtk.ScrolledWindow()
-        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-        tv = gtk.TextView()
-        tv.set_editable(False)
+        builder = gtk.Builder()
+        builder.add_from_file('gui/main.ui')
+        
+        win = builder.get_object('log_window')
+        leb = builder.get_object('log_level_eb')
+        tv = builder.get_object('log_view')
+        bclose = builder.get_object('close_button')
+        bclear = builder.get_object('clear_button')
+
         tv.set_buffer(self._log_buffer)
-        sw.add(tv)
-        win.add(sw)
-        win.resize(450,300)
+        
+        cb = gtk.combo_box_new_text()
+        leb.add(cb)
+        cb.append_text('DEBUG')
+        cb.append_text('INFO')
+        cb.append_text('WARNING')
+        cb.append_text('ERROR')
+        cb.append_text('CRITICAL')
+        
+        cb.set_active(self.iface.log_level/10 - 1)
+        
+        def do_changed(*args):
+            idx = cb.get_active()
+            self.iface.log_level = (idx + 1)*10
+        
+        cb.connect('changed', do_changed)
+        
+        bclear.connect('clicked', lambda *x: self._log_buffer.delete(self._log_buffer.get_start_iter(),self._log_buffer.get_end_iter()))
+        bclose.connect('clicked', lambda *x: win.destroy())
+        
+        win.resize(500,400)
         win.show_all()
+
         
     def on_rename(self, *x):
         n = self._netbook.get_current_page()

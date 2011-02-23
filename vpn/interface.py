@@ -27,14 +27,9 @@ import networks
 import settings
 
 
-# levels: DEBUG, INFO, WARNING, ERROR
-__levels = { 0 : logging.CRITICAL,
-             1 : logging.ERROR,
-             2 : logging.WARNING,
-             3 : logging.INFO,
-             4 : logging.DEBUG }
-logging.basicConfig(level=__levels.get(settings.get_option('settings/loglevel', 0), 0))
+logging.basicConfig(level=settings.get_option('settings/loglevel', 40))
 logger = logging.getLogger(__name__)
+global_logger = logging.getLogger()
 
 class Interface(object):
 
@@ -73,6 +68,17 @@ class Interface(object):
         event.register_handler('peer-removed', None, self._peer_removed)
         event.register_handler('peer-changed', None, self._peer_changed)
         event.register_handler('message-received', None, self._message_received)
+
+    @property
+    def log_level(self):
+        return settings.get_option('settings/loglevel', 40)
+        
+    @log_level.setter
+    def log_level(self, value):
+        if self.log_level != value:
+            settings.set_option('settings/loglevel', value)
+            global_logger.setLevel(value)     
+            settings.save()       
 
     def _peer_added(self, pm, peer):
         self.peer_added(pm.router.network, peer)

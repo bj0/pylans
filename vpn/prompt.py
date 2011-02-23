@@ -28,19 +28,6 @@ import settings
 
 
 
-#import settings
-#import router
-#from networks import NetworkManager
-#from router import PeerInfo # for pickle
-
-logger = logging.getLogger()
-_levels = { 0 : logging.CRITICAL,
-             1 : logging.ERROR,
-             2 : logging.WARNING,
-             3 : logging.INFO,
-             4 : logging.DEBUG }
-#logging.basicConfig(level=__levels.get(settings.get_option('settings/loglevel',0),0))
-
 class Prompt(Cmd):
 
     #completekey = None
@@ -54,39 +41,36 @@ class Prompt(Cmd):
         iface.network_stopped += lambda net: logger.info('network {0} stopped'.format(net))
         iface.message_received += lambda net, peer, msg: logger.critical('{0}@{1}: {2}'.format(peer.name, net.name, msg))
         
+        self.previous_et = None
+        
         Cmd.__init__(self)
         
         
     def do_log(self, line):
         line = line.lower()
         
-        if line == 'debug':
-            logger.setLevel(logging.DEBUG)
-            settings.set_option('settings/loglevel', 4)
+        if line.startswith('deb'):
+            self.iface.log_level = logging.DEBUG
             print 'Logging threshold set to DEBUG'
 
         elif line == 'info':
-            logger.setLevel(logging.INFO)
-            settings.set_option('settings/loglevel', 3)
+            self.iface.log_level = logging.INFO
             print 'Logging threshold set to INFO'
         
         elif line.startswith('warn'):
-            logger.setLevel(logging.WARNING)
-            settings.set_option('settings/loglevel', 2)
+            self.iface.log_level = logging.WARNING
             print 'Logging threshold set to WARNING'
         
-        elif line == 'error':
-            logger.setLevel(logging.ERROR)
-            settings.set_option('settings/loglevel', 1)
+        elif line.startswith('err'):
+            self.iface.log_level = logging.ERROR
             print 'Logging threshold set to ERROR'
         
         elif line.startswith('crit'):
-            logger.setLevel(logging.CRITICAL)
-            settings.set_option('settings/loglevel', 0)
+            self.iface.log_level = logging.CRITICAL        
             print 'Logging threshold set to CRITICAL'
         
         else:
-            print 'Logging threshold is currently {0}'.format(logging.getLevelName(_levels.get(settings.get_option('settings/loglevel', 0), 0)))
+            print 'Logging threshold is currently {0}'.format(logging.getLevelName(self.iface.log_level))
         
         settings.save()        
         
@@ -100,9 +84,13 @@ class Prompt(Cmd):
                 network = line[2]
             else:
                 network = None
-            print 'Trying to connect to %s @ %d' % (ip, port)
-            
-            reactor.callFromThread(self.iface.connect_to_address, (ip, port), network)
+
+            net = self.iface.get_network(network)
+            if net is None:
+                print 'No network specified.'
+            else:
+                print 'Trying to connect to %s @ %d' % (ip, port)
+                reactor.callFromThread(self.iface.connect_to_address, (ip, port), network)
             
         except ValueError:
             print 'Invalid arguments.'
@@ -178,12 +166,44 @@ class Prompt(Cmd):
             name, net = name[0], None
         msg = ' '.join(line.split()[1:])
         peer = self.iface.get_peer_info(name, net)
-        net = self.iface.get_network()
+        net = self.iface.get_network(net)
         if peer is not None and net is not None:
             reactor.callFromThread(self.iface.send_message, net.id, peer.id, msg)
         else:
             print 'peer or network is not specified'
             
+#    def do_set(self, line): 
+#        if line == '':
+#            return
+#        line = line.split()       
+#        settings.set_option(line[0], ' '.join(line[1:]))
+#        settings.save()
+#        
+#    def do_get(self, line):
+#        if line == '':
+#            return
+#        line = line.split()
+#        print settings.get_option(line[0], ' '.join(line[1:]))
+        
+#    def complete_get(self, text, line, bidx, eidx):
+#        text = line[4:eidx]
+#        lst = []
+#        for sec in settings.MANAGER.sections():
+#            for opt in settings.MANAGER.options(sec):
+#                lst.append('{0}/{1}'.format(sec,opt))
+#        
+#        print '>{0},{1},{2},{3}<'.format(text,line,bidx,eidx)
+#        return [ x for x in lst if x.startswith(text) ]
+        
+#    def do_remove(self, line):
+#        if line == '':
+#            return
+#        line = line.split()
+#        settings.MANAGER.remove_option(line[0])
+#        settings.save()
+
+    def do_py(self, line):
+        exec line
             
 #    def emptyline(self, *args):
 #        self.do_status('')
