@@ -27,6 +27,7 @@ import logging
 import settings
 
 
+logger = logging.getLogger()
 
 class Prompt(Cmd):
 
