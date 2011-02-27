@@ -28,7 +28,7 @@ import os
 class Crypter(object):
     def __init__(self, key, mode=Blowfish.MODE_ECB):
         # hash key to Blowfish's max key size 448 bits
-        key = hashlib.sha512(key).digest[:56]
+        key = hashlib.sha512(key).digest()[:56]
         self._obj = Blowfish.new(key, mode)
         self.BLOCK_SIZE = self._obj.block_size
 
