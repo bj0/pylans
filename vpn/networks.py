@@ -30,7 +30,8 @@ logger = logging.getLogger(__name__)
 
 class Network(object):
     
-    def __init__(self, name, key=None, username=None, address=None, port=None, id=None, enabled=None):
+    def __init__(self, name, key=None, username=None, address=None, port=None,
+                 id=None, enabled=None, mode=None):
         
         self._name = name
 #        self.name = self._name
@@ -43,8 +44,8 @@ class Network(object):
 
         if key is not None:
             self.key = key
-        elif self.key == '':
-            self.key = os.urandom(16)
+        elif (self.key is None) or self.key == '':
+            self.key = os.urandom(56)
             
         if username is not None:
             self.username = username
@@ -65,6 +66,11 @@ class Network(object):
             self.id = id
         elif self.id is None:
             self.id = uuid.uuid4()
+            
+        if mode is not None:
+            self.adapter_mode = mode
+        elif self.adapter_mode is None:
+            self.adapter_mode = 'TAP'
         
         settings.save()        
         
@@ -213,6 +219,15 @@ class Network(object):
         settings.save()
         
     @property
+    def adapter_mode(self):
+        return self._get('adapter_mode')
+        
+    @adapter_mode.setter
+    def adapter_mode(self, value):
+        if value != self.adapter_mode:
+            self._set('adapter_mode', value)
+        
+    @property
     def id(self):
         if self._id is None and self._get('id') is not None:
             self._id = uuid.UUID(hex=self._get('id'))
@@ -289,7 +304,8 @@ class NetworkManager(object):
         for nw in self._saved_networks():
             self.load(nw)
         
-    def create(self, name, key=None, username=None, address=None, port=None, id=None):    
+    def create(self, name, key=None, username=None, address=None, port=None,
+                 id=None, enabled=None, mode=None):
         if self.network_exists(name):
             logger.warning('A network by that name already exists') #TODO throw exception?
             if name in self:
@@ -298,7 +314,8 @@ class NetworkManager(object):
                 return Network(name)
             
             
-        net = Network(name, key, username, address, port, id)
+        net = Network(name, key=key, username=username, address=address, port=port, 
+                        id=id, enabled=enabled, mode=mode)
         self.network_list[net.id] = net
         event.emit('network-created',self, net)
         logger.debug('network {0} created'.format(net.name))

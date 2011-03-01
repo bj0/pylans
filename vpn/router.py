@@ -81,7 +81,10 @@ class Router(object):
 
     def __init__(self, network, proto=None, tuntap=None):
         if tuntap is None:
-            mode = settings.get_option('settings/mode', TunTap.TAPMODE)
+#            mode = settings.get_option('settings/mode', TunTap.TAPMODE)
+            mode = network.adapter_mode
+            if mode == 'TAP': mode = TunTap.TAPMODE
+            if mode == 'TUN': mode = TunTap.TUNMODE
             tuntap = TunTap(self, mode)
         if proto is None:
             proto = UDPPeerProtocol()
