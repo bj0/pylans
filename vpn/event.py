@@ -33,7 +33,7 @@ class Event:
     def unhandle(self, handler):
         try:
             self.handlers.remove(util.get_weakref_proxy(handler))
-        except:
+        except IndexError:
             raise ValueError("Handler is not handling this event, so cannot unhandle it.")
         return self
 
