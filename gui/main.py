@@ -298,16 +298,38 @@ class MainWin:
         builder.add_from_file('gui/main.ui')
 
         dlg = builder.get_object('new_dialog')
-        dlg.resize(400,dlg.get_size()[1])
+#        dlg.resize(400,dlg.get_size()[1])
+        # Basic
         name_entry = builder.get_object('name_entry')
         alias_entry = builder.get_object('alias_entry')
         key_entry = builder.get_object('key_entry')
+        address_entry = builder.get_object('address_entry')
         port_spinbox = builder.get_object('port_spinbox')
+        # Advanced
+        enabled = builder.get_object('enabled_cb')
+        use_bt = builder.get_object('use_bt_cb')
+        bt_url = builder.get_object('bt_url_entry')
+        ping_interval = builder.get_object('ping_spinbox')
+        meb = builder.get_object('mode_eb')
         
+        mcb = gtk.combo_box_new_text()
+        meb.add(mcb)
+        mcb.append_text('TAP')
+        mcb.append_text('TUN')
+        
+
+        # Default values
         name_entry.set_text('new_network')
         alias_entry.set_text('user')
-        key_entry.set_text(os.urandom(128).encode('hex'))
+        key_entry.set_text(os.urandom(56).encode('hex'))
+        address_entry.set_text('10.1.1.1/24')
         port_spinbox.set_value(8500)
+        
+        enabled.set_active(True)
+        use_bt.set_active(False)
+        bt_url.set_text('')
+        ping_interval.set_value(5)
+        mcb.set_active(0)
         
         
         def response(dialog, rid):
@@ -320,11 +342,15 @@ class MainWin:
                 alias = alias_entry.get_text()
                 key = key_entry.get_text()
                 if key == '':
-                    key = os.urandom(128)
+                    key = os.urandom(56)
+                address = address_entry.get_text()
                 port = int(port_spinbox.get_value())
+                mode = 'TAP' if mcb.get_active() == 0 else 'TUN'
                 
-                self.iface.create_new_network(name, username=alias, key=key, port=port)
+                self.iface.create_new_network(name, username=alias, key=key, port=port, 
+                                    address=address, enabled=enabled, mode=mode)
                 #print 'create',name,alias,key,port
+                # do BT and ping stuff?
                 
             dialog.destroy()
         
@@ -501,13 +527,17 @@ class MainWin:
 
 
 def main():
+#    import signal, traceback
+#    def do_sigup(*x):
+#        traceback.print_stack()
+#    signal.signal(signal.SIGHUP, do_sigup)
+
     iface = Interface()
 #    if len(iface.get_network_dict()) < 1:
 #        iface.create_new_network('newnetwork')
 
     mw = MainWin(iface)
     iface.start_all_networks()
-
 
     reactor.run()
 
