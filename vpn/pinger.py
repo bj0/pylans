@@ -51,16 +51,23 @@ class Pinger(object):
     PONG = 0x20 - 2   
 
     def __init__(self, router, interval=None):
-        if interval is None:
-            interval = settings.get_option(router.network.name+'/ping_interval',5.0)
-        self.interval = interval
         self.router = util.get_weakref_proxy(router)
         self.active_pings = {}
         self._lp = LoopingCall(self.do_pings)
+        if interval is not None:
+            self.interval = interval
         
         router.register_handler(self.PING, self.handle_ping)
         router.register_handler(self.PONG, self.handle_pong)
         
+    def _get(self, prop, default):
+        return settings.get_option(self.router.network.name+'/'+prop, default)
+        
+    def _set(self, prop, value):
+        settings.set_option(self.router.network.name+'/'+prop, value)
+        
+    interval = property(lambda s: s._get('ping_interval',5.0), lambda s,v: s._set('ping_interval',v))
+
     def send_ping(self, peer):
         pi = PingInfo(peer.id)
         timeout_call = reactor.callLater(self.MAX_PING_TIME, self._ping_timeout, pi.id)
