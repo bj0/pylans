@@ -15,6 +15,8 @@
 #
 #
 # tracker bootstrap
+# todo: change self.tracker into property that dynamically reads/writes
+#          settings file, does this mean an independent tracker object can't be created?
 
 from hashlib import sha1
 from struct import unpack
@@ -32,18 +34,28 @@ logger = logging.getLogger(__name__)
 
 class TrackerBootstrap(object):
 
-    def __init__(self, net, tracker=None):
+    def __init__(self, net, tracker=None, use_tracker=None, interval=None):
         self.net = util.get_weakref_proxy(net)
         
-        if tracker is None:
-            tracker = settings.get_option(net.name+'/tracker','http://tracker.openbittorrent.com/announce')
-        
-        self.use_tracker = settings.get_option(net.name+'/use_tracker',False)
-        self.tracker = tracker
-        self.interval = settings.get_option(net.name+'/tracker_interval',10*60)
+        if tracker is not None:
+            self.tracker = tracker
+        if use_tracker is not None:
+            self.use_tracker = use_tracker
+        if interval is not None:
+            self.interval = interval
         
         if self.use_tracker:
             logger.info('tracker use is enabled')
+        
+    def _get(self, prop, default):
+        return settings.get_option(self.net.name+'/'+prop, default)
+        
+    def _set(self, prop, value):
+        settings.set_option(self.net.name+'/'+prop, value)
+        
+    tracker = property(lambda s: s._get('tracker','http://tracker.openbittorrent.com/announce'), lambda s,v: s._set('tracker',v))
+    interval = property(lambda s: s._get('tracker_interval', 10*60), lambda s,v: s._set('tracker_interval',v))
+    use_tracker = property(lambda s: s._get('use_tracker', False), lambda s,v: s._set('use_tracker',v))
         
     def tracker_request(self):
         id = self.net.router.pm._self.id.bytes*2
