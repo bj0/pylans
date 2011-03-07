@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 class Network(object):
     
     def __init__(self, name, key=None, username=None, address=None, port=None,
-                 id=None, enabled=None, mode=None):
+                 id=None, enabled=None, mode=None, key_str=None):
         
         self._name = name
 #        self.name = self._name
@@ -44,6 +44,8 @@ class Network(object):
 
         if key is not None:
             self.key = key
+        elif key_str is not None:
+            self.key_str = key_str
         elif (self.key is None) or self.key == '':
             self.key = os.urandom(56)
             
@@ -163,6 +165,16 @@ class Network(object):
     def key(self, value):
         self._set('key', value.encode('base64').replace('\n',''))
         #TODO impliment key change
+        event.emit('network-changed', self)
+        settings.save()
+        
+    @property
+    def key_str(self):
+        return self._get('key','')
+    
+    @key_str.setter
+    def key_str(self, value):
+        self._set('key', value)
         event.emit('network-changed', self)
         settings.save()
         
@@ -305,7 +317,7 @@ class NetworkManager(object):
             self.load(nw)
         
     def create(self, name, key=None, username=None, address=None, port=None,
-                 id=None, enabled=None, mode=None):
+                 id=None, enabled=None, mode=None, key_str=None):
         if self.network_exists(name):
             logger.warning('A network by that name already exists') #TODO throw exception?
             if name in self:
@@ -315,7 +327,7 @@ class NetworkManager(object):
             
             
         net = Network(name, key=key, username=username, address=address, port=port, 
-                        id=id, enabled=enabled, mode=mode)
+                        id=id, enabled=enabled, mode=mode, key_str=key_str)
         self.network_list[net.id] = net
         event.emit('network-created',self, net)
         logger.debug('network {0} created'.format(net.name))

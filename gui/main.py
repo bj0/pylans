@@ -306,7 +306,7 @@ class MainWin:
         address_entry = builder.get_object('address_entry')
         port_spinbox = builder.get_object('port_spinbox')
         # Advanced
-        enabled = builder.get_object('enabled_cb')
+        enabled_cb = builder.get_object('enabled_cb')
         use_bt = builder.get_object('use_bt_cb')
         bt_url = builder.get_object('bt_url_entry')
         ping_interval = builder.get_object('ping_spinbox')
@@ -321,11 +321,11 @@ class MainWin:
         # Default values
         name_entry.set_text('new_network')
         alias_entry.set_text('user')
-        key_entry.set_text(os.urandom(56).encode('hex'))
+        key_entry.set_text(os.urandom(56).encode('base64'))
         address_entry.set_text('10.1.1.1/24')
         port_spinbox.set_value(8500)
         
-        enabled.set_active(True)
+        enabled_cb.set_active(True)
         use_bt.set_active(False)
         bt_url.set_text('')
         ping_interval.set_value(5)
@@ -346,8 +346,9 @@ class MainWin:
                 address = address_entry.get_text()
                 port = int(port_spinbox.get_value())
                 mode = 'TAP' if mcb.get_active() == 0 else 'TUN'
+                enabled = enabled_cb.get_active()
                 
-                self.iface.create_new_network(name, username=alias, key=key, port=port, 
+                self.iface.create_new_network(name, username=alias, key_str=key, port=port, 
                                     address=address, enabled=enabled, mode=mode)
                 #print 'create',name,alias,key,port
                 # do BT and ping stuff?

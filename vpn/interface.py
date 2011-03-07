@@ -143,10 +143,10 @@ class Interface(object):
             
 
     def create_new_network(self, name, key=None, username=None, address=None, port=None,
-                id=None, enabled=None, mode=None):
+                id=None, enabled=None, mode=None, key_str=None):
         if name not in self._mgr:
             self._current = self._mgr.create(name=name, key=key, username=username, 
-                    address=address, port=port, id=id, enabled=enabled, mode=mode)
+                    address=address, port=port, id=id, enabled=enabled, mode=mode, key_str=key_str)
         return self._current
     
     def delete_network(self, network):

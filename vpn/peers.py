@@ -329,7 +329,7 @@ class PeerManager(object):
         with own peer info.  Will continue to send this packet until an 
         ack is received or MAX_REG_TRIES packets have been sent.'''
         
-        if isinstance(addrs, tuple):
+        if isinstance(addrs, tuple): # It's an (address,port) pair
             addrs = [addrs]
         elif isinstance(addrs, PeerInfo):
             addrs = addrs.direct_addresses
