@@ -405,7 +405,7 @@ class MainWin:
 #            use_bt.set_active()
 #            bt_url.set_text('')
 #            ping_interval.set_value(5)
-#            mcb.set_active(0)
+            mcb.set_active(net.adapter_mode == 'TUN')
 
             # add new tabs
             da = gtk.DrawingArea()
@@ -422,11 +422,13 @@ class MainWin:
                     net.adapter_mode = 'TAP' if mcb.get_active() == 0 else 'TUN'
                     net.enabled = enabled_cb.get_active()
 
+                    bt_url = bt_url.get_text()
                     # do BT and ping stuff?
-#                    self.iface.set_network_ping_interval(ping_interval.get_value(), nw)
-#                    self.iface.set_network_use_tracker(use_bt, nw)
-#                    if bt_url != '':
-#                        self.iface.set_network_tracker(bt_url, nw)
+                    self.iface.set_network_setting('ping_interval', ping_interval.get_value(), nw)
+                    self.iface.set_network_setting('use_tracker', use_bt.get_active(), nw)
+                    
+                    if bt_url != '':
+                        self.iface.set_network_setting('tracker', bt_url, nw)
                     
                     
                 dialog.destroy()
