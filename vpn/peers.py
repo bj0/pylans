@@ -124,13 +124,12 @@ class PeerManager(object):
                     peer.direct_addresses.append(peer.address)
 
             self.peer_list[peer.id] = peer
-#            self.ip_map[peer.vip] = peer.address
             self.addr_map[peer.addr] = peer.address
             
             # fire event
             event.emit('peer-added', self, peer)
             self.send_announce(peer)
-#            self.peer_added(peer)
+            self.try_px(peer)
                         
     def remove_peer(self, peer):
         '''Remove a peer connection'''
@@ -149,6 +148,8 @@ class PeerManager(object):
             
     def get_by_name(self, name):
         '''Get a peer connection by peer name'''
+        if name == self._self.name:
+            return self._self
         for p in self.peer_list.values():
             if p.name == name:
                 return p
@@ -156,6 +157,8 @@ class PeerManager(object):
 
     def get_by_vip(self, vip):
         '''Get a peer connection by virtual ip'''
+        if vip == self._self.vip:
+            return self._self
         for p in self.peer_list.values():
             if p.vip == vip:
                 return p
@@ -163,6 +166,8 @@ class PeerManager(object):
  
     def get_by_addr(self, addr):
         '''Get a peer connection by mac or vip address'''
+        if addr == self._self.addr:
+            return self._self
         for p in self.peer_list.values():
             if p.addr == addr:
                 return p
@@ -170,6 +175,8 @@ class PeerManager(object):
             
     def get_by_address(self, address):
         '''Get a peer connection by real (ip,port)'''
+        if address == self._self.address:
+            return self._self
         for p in self.peer_list.values():
             if p.address == address and p.is_direct:
                 return p
@@ -393,7 +400,7 @@ class PeerManager(object):
             logger.info('received a register from a new peer {0}'.format(pi.name))
             pi.address = address
             self.add_peer(pi)
-            self.try_px(pi)
+#            self.try_px(pi)
         else:
             pi.address = address
 #            pi.is_direct = (pi.relays == 0)
@@ -417,7 +424,7 @@ class PeerManager(object):
             pi.address = address
 #            pi.is_direct = (pi.relays == 0)
             self.add_peer(pi)
-            self.try_px(pi)
+#            self.try_px(pi)
         else:
             pi.address = address
 #            pi.is_direct = (pi.relays == 0)
@@ -444,7 +451,10 @@ class PeerManager(object):
             peer = self.get_by_address(item)
                 
         elif isinstance(item, uuid.UUID):               # peer id
-            peer = self.peer_list[item]
+            if item == self._self.id:
+                peer = self._self
+            else:
+                peer = self.peer_list[item]
             
         elif isinstance(item, str):  # name
             peer = self.get_by_name(item)
@@ -472,11 +482,13 @@ class PeerManager(object):
     
     def __contains__(self, item):
         if isinstance(item, PeerInfo):
-            return item.id in self.peer_list        
+            return (item.id in self.peer_list or
+                        item.id == self._self.id)
         if isinstance(item, tuple):                     # address
             return self.get_by_address(item) is not None
         elif isinstance(item, uuid.UUID):               # peer id
-            return (item in self.peer_list)
+            return (item in self.peer_list or
+                        item == self._self.id)
         elif isinstance(item, str):  # name or vip
             return (self.get(item) != None)
     

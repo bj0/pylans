@@ -15,6 +15,7 @@
 #
 #
 # pinger.py
+# todo: make interval dynamically change running pinger?
 
 from platform import system
 from random import randint

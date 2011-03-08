@@ -199,3 +199,18 @@ class Interface(object):
             else:
                 self._current.ip = address
 
+    def set_network_ping_interval(self, interval, network=None):
+        if self.get_network(network) is not None:
+            settings.set_option(network.name+'/ping_interval', interval)
+            
+    def set_network_tracker_url(self, url, network=None):
+        if self.get_network(network) is not None:
+            settings.set_option(network.name+'/tracker', url)
+            
+    def set_network_use_tracker(self, use_tracker, network=None):
+        if self.get_network(network) is not None:
+            settings.set_option(network.name+'/use_tracker', use_tracker)
+            
+    def set_network_tracker_interval(self, interval, network=None):
+        if self.get_network(network) is not None:
+            settings.set_option(network.name+'/tracker_interval', interval)        
