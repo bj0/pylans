@@ -203,13 +203,13 @@ class TunTapLinux(TunTapBase):
         '''
             Write some data out to the tun/tap 'wire'.
         '''
-        try:
-            os.write(self.f, data)
-        except:
-            import traceback
-            traceback.print_exc()
-            logger.warning('Got Exception trying to os.write()\nself.f: {0}\ndata: {1} ({2})'.format(
-                        self.f, data.encode('hex'), len(data)))
+#        try:
+        os.write(self.f, data)
+#        except:
+#            import traceback
+#            traceback.print_exc()
+#            logger.warning('Got Exception trying to os.write()\nself.f: {0}\ndata: {1} ({2})'.format(
+#                        self.f, data.encode('hex'), len(data)))
         
     def fileno(self):
         '''Return the file identifier from os.open'''
