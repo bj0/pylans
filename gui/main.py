@@ -402,9 +402,8 @@ class MainWin:
             port_spinbox.set_value(net.port)
             
             enabled_cb.set_active(net.enabled)
-#            use_bt.set_active()
-#            bt_url.set_text('')
-#            ping_interval.set_value(5)
+            bt_url.set_text(self.iface.get_network_setting('tracker', nw))
+            ping_interval.set_value(self.iface.get_network_setting('ping_interval', nw))
             mcb.set_active(net.adapter_mode == 'TUN')
 
             # add new tabs

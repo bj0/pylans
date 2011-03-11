@@ -81,7 +81,6 @@ class Router(object):
 
     def __init__(self, network, proto=None, tuntap=None):
         if tuntap is None:
-#            mode = settings.get_option('settings/mode', TunTap.TAPMODE)
             mode = network.adapter_mode
             if mode == 'TAP': mode = TunTap.TAPMODE
             if mode == 'TUN': mode = TunTap.TUNMODE
@@ -265,7 +264,7 @@ class Router(object):
 
             else: 
                 self.relay(data, uuid.UUID(bytes=dst))
-                logger.debug('relaying {0} packet to {1}'.format(dt, dst.encode('hex')))
+#                logger.debug('relaying {0} packet to {1}'.format(dt, dst.encode('hex')))
     
         
     def recv_packet(self, packet):

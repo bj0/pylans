@@ -90,6 +90,11 @@ class Network(object):
                 self.known_addresses = peers
                 
             elif peer.address not in peers[peer.id]:
+                #TODO will an IP need to have multiple ports? this eliminates clutter
+                for addr in peers[peer.id]:
+                    if addr[0] == peer.address[0]:
+                        peers[peer.id].remove(addr)
+#                     
                 peers[peer.id].append(peer.address)
                 self.known_addresses = peers
             
