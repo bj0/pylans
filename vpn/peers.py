@@ -217,10 +217,11 @@ class PeerManager(object):
             changed = True            
             logger.info('peer {0} name changed.'.format(opi.id))
 
-        if opi.direct_addresses != npi.direct_addresses:
-            opi.direct_addresses = npi.direct_addresses
+        if sorted(opi.direct_addresses) != sorted(npi.direct_addresses):
+            # combine direct_addresses
+            opi.direct_addresses = list(set(opi.direct_addresses).union(set(npi.direct_addresses)))
             changed = True
-            logger.info('peer {0} good addresses changed.'.format(opi.id))
+            logger.info('peer {0} good addresses changed. ({1})'.format(opi.id, opi.direct_addresses))
 
         if changed:
             # fire event
