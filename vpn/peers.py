@@ -343,12 +343,13 @@ class PeerManager(object):
             # if a NAT scrambled the port, re-add it to the list for each IP
             # list(set()) to eliminate duplicates
             try:
-                addrs = addrs.direct_address + \
-                    list(set([ (x[0], addrs.port) for x in addrs.direct_address 
-                                                        if x[1] != addrs.port]))
-            except AttributeError: # if .port undefined
+                addrs = \
+                    list(set([ (x[0], addrs.port) for x in addrs.direct_addresses
+                                                        if x[1] != addrs.port])) \
+                        + addrs.direct_addresses
+            except AttributeError: # if .port undefined (pre bzr rev 61)
                 addrs = addrs.direct_addresses
-                
+
         elif not isinstance(addrs, list):
             logger.error('try_register called with incorrect parameter: {0}'.format(addrs))
             return
