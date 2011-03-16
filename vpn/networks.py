@@ -243,6 +243,15 @@ class Network(object):
             settings.save()
         
     @property
+    def wan_port(self):
+        return self._get('wan_port', self.port)
+        
+    @wan_port.setter
+    def wan_port(self, value):
+        if self.wan_port != value:
+            self._set('wan_port', value)
+        
+    @property
     def adapter_mode(self):
         return self._get('adapter_mode')
         

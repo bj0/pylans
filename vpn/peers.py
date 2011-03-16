@@ -18,7 +18,7 @@
 # TODO rsa key exchange - new 'packet format'
 # TODO local clients behind a firewall that use an external intermediary need a way to 
 #     realize that they can DC using local addresses
-# TODO introducer (bittorrent?)
+# TODO NAT port re-write not taken into account
 
 from twisted.internet import reactor, defer
 import cPickle as pickle
@@ -38,6 +38,7 @@ class PeerInfo(object):
         self.alias = None
         self.address = ('ip','port')
         self.direct_addresses = []
+        self.port = 0                   # listening port
         self.addr = 0                   # can be vip or mac
         self.vip = 0                    # virtual ip
         self.is_direct = False          # is this peer direct connected?
@@ -85,6 +86,7 @@ class PeerManager(object):
         self._self.name = router.network.username
         self._self.vip = util.encode_ip(router.network.ip)
         self._self.addr = '\x00'*router.addr_size # temp fake mac?
+        self._self.port = router.network.wan_port
         self._my_pickle = pickle.dumps(self._self,-1)
 
         self.router = util.get_weakref_proxy(router)
@@ -116,7 +118,7 @@ class PeerManager(object):
             if peer.relays > 0:
                 peer.is_direct = False
                 peer.relay_id = self[peer.address].id
-                self.try_register(peer.direct_addresses)
+                self.try_register(peer)
             else:
                 peer.is_direct = True
                 peer.relay_id = None
@@ -218,7 +220,7 @@ class PeerManager(object):
             logger.info('peer {0} name changed.'.format(opi.id))
 
         if sorted(opi.direct_addresses) != sorted(npi.direct_addresses):
-            # combine direct_addresses
+            # combine direct_addresses (w/out dupes)
             opi.direct_addresses = list(set(opi.direct_addresses).union(set(npi.direct_addresses)))
             changed = True
             logger.info('peer {0} good addresses changed. ({1})'.format(opi.id, opi.direct_addresses))
@@ -264,7 +266,6 @@ class PeerManager(object):
                     pi.address = address
                     self.add_peer(pi)
                     logger.info('announce for unknown peer {0}, trying to connect'.format(pi.name))
-#                    self.try_register(pi)
             else:
                 pi.address = address
                 self.update_peer(self.peer_list[pi.id], pi)
@@ -323,7 +324,6 @@ class PeerManager(object):
                 if peer.id in self.peer_list:
                     self.update_peer(self.peer_list[peer.id],peer)
                 else:
-#TODO                    self.try_register(peer.address)
                     self.add_peer(peer)
                 
             # generate map?
@@ -340,7 +340,15 @@ class PeerManager(object):
         if isinstance(addrs, tuple): # It's an (address,port) pair
             addrs = [addrs]
         elif isinstance(addrs, PeerInfo):
-            addrs = addrs.direct_addresses
+            # if a NAT scrambled the port, re-add it to the list for each IP
+            # list(set()) to eliminate duplicates
+            try:
+                addrs = addrs.direct_address + \
+                    list(set([ (x[0], addrs.port) for x in addrs.direct_address 
+                                                        if x[1] != addrs.port]))
+            except AttributeError: # if .port undefined
+                addrs = addrs.direct_addresses
+                
         elif not isinstance(addrs, list):
             logger.error('try_register called with incorrect parameter: {0}'.format(addrs))
             return
