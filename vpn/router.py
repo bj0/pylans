@@ -46,8 +46,8 @@ class UDPPeerProtocol(DatagramProtocol):
     def send(self, data, address):
         '''Send data to address'''
         try:
-#            logger.debug('sending data on UDP port to {0}'.format(address))
             self.transport.write(data, address)
+            logger.debug('sending {1} bytes on UDP port to {0}'.format(address, len(data)))
         except Exception, e:
             logger.warning('UDP send threw exception:\n  {0}'.format(e))
             ##TODO this is here because UDP socket fills up and just dies
@@ -56,7 +56,7 @@ class UDPPeerProtocol(DatagramProtocol):
     def datagramReceived(self, data, address):
         '''Called by twisted when data is received from address'''
         self.router.recv_udp(data, address)
-        logger.debug('received data on UDP port from {0}'.format(address))
+        logger.debug('received {1} bytes on UDP port from {0}'.format(address, len(data)))
                 
     def connectionRefused(self):
         logger.debug('connectionRefused on UDP port')
@@ -240,7 +240,7 @@ class Router(object):
 
         # should only be this on TAP
         elif dt == self.DATA_BROADCAST:
-            logger.debug('got broadcast from {0}'.format(util.decode_mac(data[2:8])))
+            logger.debug('got broadcast from {0}'.format(address))
             if data[2:8] == self.pm._self.addr:
                 self.recv_packet(data[8:])
             else:
@@ -351,7 +351,7 @@ class TapRouter(Router):
 
         if dst == self.pm._self.addr or self._tuntap.is_broadcast(dst):
             self._tuntap.doWrite(packet)
-
+            logger.debug('writing packet to TAP device')
         else:
             self.send_packet(packet)
             logger.debug('got packet with different dest ip, relay packet?')

@@ -1,3 +1,4 @@
 #!/bin/bash
 
+#/home/bjp/bin/pypy-c -c "from vpn import settings, prompt; prompt.main()"
 python -c "from vpn import settings, prompt; prompt.main()"

@@ -1,20 +1,21 @@
 HOW to do multiple networks???
-
-relay causes peers to time out for some reason, also the relayed ping was always lower than the normal ping, why?  routing probably scrweed up
+ - currently creating an adapter for each network
 
 k, addresses weren't tracking true addresses, they were being overwritten by relay stuff.  3 options:
 1) keep separate list of relays.  seems like a lot of extra checks
-2) keep peer.address as the relay address, and add a new field for DC addresses
+*->2) keep peer.address as the relay address, and add a new field for DC addresses
 3) keep peer.address unchanged unless we have a DC
 we need to know the DC addresses to try and establish a DC on a relay peer.
 
 drop uuids and just generate byte string ids of desired size?
 
 TODO:
-
 periodically try to DC relay peers?
+should we try hole punching NATs?
 
 convert to TAP: ethernet packets, with mac addresses?
+* Done
+
 TAP:
  iperf from dev to naz: 17.8
  iperf from naz to dev: 33.7
@@ -27,6 +28,15 @@ TAP: iperf -t 30
  iperf from naz to dev: 22.7 (second try: 32.7)
  iperf from dev to naz: 22.5-9
  bi: 8.51
+revno: 62
+ naz > dev 30.4
+ dev > naz 19.6
+with AESCrypterPP (revno 62):
+ naz > dev 30.5
+ dev > naz 21.7
+with AESCrypter (revno 62):
+ naz > dev 30
+ dev > naz 21
 
 announces are kinda numerous when a new peer gets added.  there is an announce when a new peer is added as a relay from an announce and then a second announce if we can direct-connect to them.  This could end up causing a lot of unnecessary announces.
   Instead, I could make an incoming announce cause a direct connect attempt, and only add the peer as a relay if that fails (via deferred).  The downside of this is that it could take longer for a peer's presence to propagate through the net.
