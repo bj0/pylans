@@ -225,11 +225,12 @@ class TunTapLinux(TunTapBase):
         
         # set mtu
         mtu = settings.get_option(self.router.network.name+'/set_mtu', None)
-        if mtu is not None:
+        if mtu is None:
             mtu = settings.get_option('settings/set_mtu', None)
-            if mtu is not None:
-                mtu = self.set_mtu(mtu)
-                logger.info('setting {0} mtu to: {1}'.format(self.ifname, mtu))
+
+        if mtu is not None:
+            mtu = self.set_mtu(mtu)
+            logger.info('setting {0} mtu to: {1}'.format(self.ifname, mtu))
         
         logger.info('configuring interface {1} to: {0}'.format(address, self.ifname))
         
