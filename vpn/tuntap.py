@@ -66,6 +66,8 @@ class TunTapBase(object):
     # modes for settings
     TUNMODE = IFF_TUN
     TAPMODE = IFF_TAP
+    
+    #
 
 #    @classmethod
 #    def is_ip6_discovery(mac):
@@ -125,6 +127,8 @@ class TunTapLinux(TunTapBase):
     implements(IReadDescriptor)
 
     SIOCGIFHWADDR = 0x8927
+    SIOCGIFMTU = 0x8921
+    SIOCSIFMTU = 0x8922
     TUNSETIFF = 0x400454ca
 
     def __init__(self, router, mode):
@@ -161,7 +165,7 @@ class TunTapLinux(TunTapBase):
             ifs = ioctl(s, self.SIOCGIFMTU, ifr)
             mtu = struct.unpack('<H',ifs[16:18])[0]
         except Exception, s:
-            log.error('socket ioctl call failed: {0}'.format(s))
+            logger.error('socket ioctl call failed: {0}'.format(s))
             # re-throw?
         
         logger.debug('get_mtu: got mtu: {0}'.format(mtu))
@@ -176,7 +180,7 @@ class TunTapLinux(TunTapBase):
             ifs = ioctl(s, self.SIOCSIFMTU, ifr)
             mtu = struct.unpack('<H',ifs[16:18])[0]
         except Exception, s:
-            log.error('socket ioctl call failed: {0}'.format(s))
+            logger.error('socket ioctl call failed: {0}'.format(s))
             # re-throw?
         
         logger.debug('set_mtu: new mtu value: {0}'.format(mtu))
@@ -222,7 +226,7 @@ class TunTapLinux(TunTapBase):
         # set mtu
         mtu = settings.get_option(self.router.network.name+'/set_mtu', None)
         if mtu is not None:
-            mtu self.set_mtu(mtu)
+            mtu = self.set_mtu(mtu)
             logger.info('setting {0} mtu to: {1}'.format(self.ifname, mtu))
         
         logger.info('configuring interface {1} to: {0}'.format(address, self.ifname))
