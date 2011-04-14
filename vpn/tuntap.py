@@ -41,6 +41,7 @@ from twisted.internet import reactor, utils
 from twisted.internet.interfaces import IReadDescriptor
 from twisted.internet.threads import deferToThread
 from zope.interface import implements
+import settings
 import logging
 import os
 import platform
@@ -217,6 +218,12 @@ class TunTapLinux(TunTapBase):
         utils.getProcessValue('/sbin/ip',('addr','add',address,'dev',self.ifname)).addCallback(response)
         d = utils.getProcessValue('/sbin/ip',('link','set',self.ifname,'up'))
         d.addCallback(response)
+        
+        # set mtu
+        mtu = settings.get_option(self.router.network.name+'/set_mtu', None)
+        if mtu is not None:
+            mtu self.set_mtu(mtu)
+            logger.info('setting {0} mtu to: {1}'.format(self.ifname, mtu))
         
         logger.info('configuring interface {1} to: {0}'.format(address, self.ifname))
         

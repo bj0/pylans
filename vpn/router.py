@@ -401,9 +401,8 @@ class TunRouter(Router):
             self.send_packet(packet)
             logger.debug('got packet with different dest ip, relay packet?')
 
-def get_router(*args, **kw):
-    mode = settings.get_option('settings/mode', TunTap.TAPMODE)
-    if mode == TunTap.TAPMODE:
+def get_router(net):
+    if net.adapter_mode == 'TAP':
         return TapRouter(*args, **kw)
     else:
         return TunRouter(*args, **kw)
