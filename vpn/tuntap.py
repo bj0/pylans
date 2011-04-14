@@ -152,6 +152,36 @@ class TunTapLinux(TunTapBase):
         reactor.removeReader(self)
         logger.info('linux tun/tap stopped')
 
+    def get_mtu(self):
+        '''Use socket ioctl call to get MTU size'''
+        s = socket.socket(type=socket.SOCK_DGRAM)
+        ifr = self.ifname + '\x00'*(32-len(self.ifname))
+        try:
+            ifs = ioctl(s, self.SIOCGIFMTU, ifr)
+            mtu = struct.unpack('<H',ifs[16:18])[0]
+        except Exception, s:
+            log.error('socket ioctl call failed: {0}'.format(s))
+            # re-throw?
+        
+        logger.debug('get_mtu: got mtu: {0}'.format(mtu))
+        
+        return mtu
+        
+    def set_mtu(self, mtu):
+        '''Use socket ioctl call to set MTU size'''
+        s = socket.socket(type=socket.SOCK_DGRAM)
+        ifr = struct.pack('<16sH', self.ifname, mtu) + '\x00'*14
+        try:
+            ifs = ioctl(s, self.SIOCSIFMTU, ifr)
+            mtu = struct.unpack('<H',ifs[16:18])[0]
+        except Exception, s:
+            log.error('socket ioctl call failed: {0}'.format(s))
+            # re-throw?
+        
+        logger.debug('set_mtu: new mtu value: {0}'.format(mtu))
+        
+        return mtu
+
     def get_mac(self):
         '''Use socket ioctl call to get MAC address'''
         s = socket.socket(type=socket.SOCK_DGRAM)   
