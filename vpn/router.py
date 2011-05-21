@@ -24,18 +24,18 @@
 #     * clear peer list when going offline, if we go back online other peer things we are still connected
 #     * should we keep the peer list and just refresh/let it timeout, or clear it?
 
-from crypto import Crypter
-from event import Event
-from peers import PeerManager
-from pinger import Pinger
+import logging
+import random
+import uuid
 from struct import pack, unpack
 from tuntap import TunTap
 from twisted.internet import reactor, defer
 from twisted.internet.protocol import DatagramProtocol
-import logging
-import random
-import settings
-import uuid
+from vpn import settings
+from vpn.crypto import Crypter
+from util.event import Event
+from vpn.peers import PeerManager
+from vpn.pinger import Pinger
 import util
 
 logger = logging.getLogger(__name__)
@@ -122,9 +122,9 @@ class Router(object):
         '''Start the router.  Starts the tun/tap device and begins listening on
         the UDP port.'''
         self._tuntap.start()
-        self._tuntap.configure_iface(self.network.virtual_address)
+        d = self._tuntap.configure_iface(self.network.virtual_address)
         self._port = reactor.listenUDP(self.network.port, self._proto)
-        d = self.get_my_address()
+        d.addCallback(self.get_my_address)
 
         logger.info('router started, listening on UDP port {0}'.format(self._port))
         def start_connections(*x):
@@ -297,23 +297,22 @@ class TapRouter(Router):
     
     SIGNATURE = 'PVA'+Router.VERSION
 
-    def get_my_address(self):
+    def get_my_address(self, *x):
         '''Get interface address (MAC)'''
-        # get mac addr
-        self.pm._self.addr = self._tuntap.get_mac()
 
         d = defer.Deferred()
         def do_ips(ips=None):
             if ips is None:
                 ips = self._tuntap.get_ips()
             if len(ips) > 0:
-    #            ips = [x[0] for x in ips]
                 if self.pm._self.vip_str not in ips:
                     logger.critical('TAP addresses ({0}) don\'t contain configured address ({1}), taking address from adapter ({2})'.format(ips,self.pm._self.vip_str, ips[0]))
                     self.pm._self.vip = util.encode_ip(ips[0])
             else:
                 logger.critical('TAP adapater has no addresses')
 
+            # get mac addr
+            self.pm._self.addr = self._tuntap.get_mac()
             self.pm._update_pickle()
             
             reactor.callLater(0, d.callback, ips)
