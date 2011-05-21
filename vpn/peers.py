@@ -20,12 +20,12 @@
 #     realize that they can DC using local addresses
 # TODO NAT port re-write not taken into account
 
-from twisted.internet import reactor, defer
 import cPickle as pickle
-import event
 import logging
-import util
 import uuid
+from twisted.internet import reactor, defer
+import util
+from util import event
 
 
 logger = logging.getLogger(__name__)

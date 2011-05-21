@@ -17,12 +17,12 @@
 # networks.py
 
 import binascii
-import event
 import logging
 import os
-import router
-import settings
 import uuid
+from util import event
+from vpn import router
+from vpn import settings
 
 #from router import Router
 

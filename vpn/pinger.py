@@ -20,10 +20,10 @@
 from platform import system
 from random import randint
 from struct import pack
+import logging
 from twisted.internet import reactor
 from twisted.internet.task import LoopingCall
-import logging
-import settings
+from vpn import settings
 import util
 
 if system() == 'Windows':   # On Windows, time() has low resolution(~1ms)

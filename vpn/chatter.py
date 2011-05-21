@@ -16,9 +16,9 @@
 #
 # chatter.py
 
-import event
 import logging
 import util
+from util import event
 
 logger = logging.getLogger(__name__)
 

@@ -20,13 +20,13 @@
 
 from hashlib import sha1
 from struct import unpack
-from twisted.internet import reactor
-from twisted.web import client
-import bencode
 import logging
-import settings
 import urllib2
 import util
+from twisted.internet import reactor
+from twisted.web import client
+from util import bencode
+from vpn import settings
 
 
 
