@@ -32,7 +32,7 @@ from twisted.spread import pb
 from twisted.cred.credentials import UsernamePassword
 from twisted.internet import error as netError
 
-from vpn import util
+import util
 from vpn.interface import Interface
 from vpn.chatter import ChatterBox
 
