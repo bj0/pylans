@@ -109,71 +109,16 @@ def iter_list(node):
         node = node.Next
 
 
-#    buflen = c_ulong(0) #sizeof(adapter_list)
-#    rc = GetAdaptersInfo(None, byref(buflen))
-#    
-#    # Make the API call
-#    while rc == ERROR_BUFFER_OVERFLOW:
-#        sz = buflen.value / sizeof(IP_ADAPTER_INFO)
-#        adapter_list = (IP_ADAPTER_INFO * sz)()
-#        rc = GetAdaptersInfo(byref(adapter_list[0]), byref(buflen))
-
-#    if rc != ERROR_SUCCESS and rc != ERROR_NO_DATA:
-#        raise OSError, "Unable to obtain adapter information."
-#    
-#    result = {}
-#    hwaddr = []
-#    for pinfo in adapter_list:
-#        if pinfo.AdapterName == '':
-#            continue
-#        
-#        # filter based on ifname
-#        if ifname is not None and ifname != pinfo.AdapterName:
-#            continue
-#        #TODO test this on windows
-#        # hw address AF_LINK
-#        if ifname is None:
-#            hwaddr = result.get(AF_LINK, {})
-#            hwaddr[ifname] = ':'.join('{0:02x}'.format(i) for i in pinfo.Address[:pinfo.AddressLength])
-#            result[AF_LINK] = hwaddr
-#        else:
-#            result[AF_LINK]={'addr':':'.join('{0:02x}'.format(i) for i in pinfo.Address[:pinfo.AddressLength])}
-#        
-#        # other addrs AF_INET
-#        for ip_addr in iter_list(pinfo.IpAddressList):
-#            addr = {'address':ip_addr.IpAddress,
-#                    'netmask':ip_addr.IpMask,
-#                    'broadcast':None}
-#                    
-#            if pinfo.Type != MIB_IF_TYPE_LOOPBACK:
-#                # get broadcast
-#                from socket import inet_ntoa, inet_aton
-#                add = struct.unpack('!L',inet_aton(ip_addr.IpAddress))[0]
-#                mask = struct.unpack('!L',inet_aton(ip_addr.IpMask))[0]
-#                bcast = inet_ntoa(struct.pack('!L',(add | ~mask) & 0xffffffff))
-#                addr['broadcast'] = bcast
-#                
-#            # if we're collecting them all...
-#            if ifname is None: 
-##                addr['interface'] = pinfo.AdapterName
-#                addr = (pinfo.AdapterName, addr)
-#                
-#            x = result.get(AF_INET,[])
-#            x.append(addr)
-#            result[AF_INET] = x
-#    
-#    if len(result) == 0:
-#        raise ValueError, 'You must specify a valid interface name.'
-#        
-#    return result
 
 class DictObject(dict):
+    '''A dict whos keys can be accessed as attributes'''
     def __setattr__(self, attr, value):
         self[attr] = value
     def __getattr__(self, attr):
         return self[attr]
 
 def GetAdaptersInfo(full=True, return_dict=False, ifname=None):
+    '''Wrapper for the GetAdaptersInfo windows call'''
     buflen = c_ulong(0) #sizeof(adapter_list)
     rc = _GetAdaptersInfo(None, byref(buflen))
     
