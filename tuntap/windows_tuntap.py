@@ -28,7 +28,7 @@ import win32event as w32e
 import win32file as w32f
 import winerror
 import util
-
+from network.getadaptersinfo import GetAdaptersInfo
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +83,7 @@ class TunTapDevice(object):
         logger.debug('got tap handle: {0}'.format(handle))
         self._handle = handle
         self.ifname = devid
+        self.__idx = GetAdaptersInfo(ifname=devid)[0]['Index']
         self.overlapped_read = pywintypes.OVERLAPPED()
         self.overlapped_write = pywintypes.OVERLAPPED()
         
@@ -108,7 +109,7 @@ class TunTapDevice(object):
         if ver == 'XP':
             return utils.getProcessOutputAndValue(cmd,('interface','ip','set','address',self.ifname,'static',address,netmask))
         elif ver == '7':
-            return utils.getProcessOutputAndValue(cmd,('interface','ipv4','set','address',self.ifname,'static',address,netmask))
+            return utils.getProcessOutputAndValue(cmd,('interface','ipv4','set','address',self.__idx,'static',address,netmask))
         else:
             raise OSError, 'Unsupported version of Windows: {0}.'.format(ver)
         
