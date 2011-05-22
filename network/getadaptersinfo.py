@@ -117,7 +117,7 @@ class DictObject(dict):
     def __getattr__(self, attr):
         return self[attr]
 
-def GetAdaptersInfo(full=True, return_dict=False, ifname=None):
+def GetAdaptersInfo(ifname=None, full=True, return_dict=False):
     '''Wrapper for the GetAdaptersInfo windows call'''
     buflen = c_ulong(0) #sizeof(adapter_list)
     rc = _GetAdaptersInfo(None, byref(buflen))
