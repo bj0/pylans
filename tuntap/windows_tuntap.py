@@ -109,7 +109,7 @@ class TunTapDevice(object):
         if ver == 'XP':
             return utils.getProcessOutputAndValue(cmd,('interface','ip','set','address',self.ifname,'static',address,netmask))
         elif ver == '7':
-            return utils.getProcessOutputAndValue(cmd,('interface','ipv4','set','address',self.__idx,'static',address,netmask))
+            return utils.getProcessOutputAndValue(cmd,('interface','ipv4','set','address',str(self.__idx),'static',address,netmask))
         else:
             raise OSError, 'Unsupported version of Windows: {0}.'.format(ver)
         
