@@ -110,7 +110,7 @@ class TunTapDevice(object):
         elif ver == '7':
             return utils.getProcessOutputAndValue(cmd,('interface','ipv4','set','address',self.ifname,'static',address,netmask))
         else:
-            raise OSError, 'Unsupported version of Windows.'
+            raise OSError, 'Unsupported version of Windows: {0}.'.format(ver)
         
     def configure_iface(self, addr):
         ip = addr.split('/')[0]
