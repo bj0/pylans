@@ -5,3 +5,6 @@ _build
 Makefile
 .project
 .pydevproject
+_diff.diff
+.komodotools
+pylans.komodoproject

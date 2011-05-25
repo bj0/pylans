@@ -34,22 +34,12 @@ else:
 
 logger = logging.getLogger(__name__)
 
-class PingInfo(object):
-    def __init__(self, peer_id):
-        self.id = pack('H',randint(0, 0xFFFF))
-        self.peer_id = peer_id
-        self.ping_time = time()
-        self.running = False
-        
-    def duration(self):
-        return time()-self.ping_time
-
 class Pinger(object):
 
-    MAX_PING_TIME = 10.0 
+    MAX_PING_TIME = 10.0
     MAX_TIMEOUTS = 10
     PING = 0x20 - 1
-    PONG = 0x20 - 2   
+#    PONG = 0x20 - 2
 
     def __init__(self, router, interval=None):
         self.router = util.get_weakref_proxy(router)
@@ -57,67 +47,53 @@ class Pinger(object):
         self._lp = LoopingCall(self.do_pings)
         if interval is not None:
             self.interval = interval
-        
-        router.register_handler(self.PING, self.handle_ping)
-        router.register_handler(self.PONG, self.handle_pong)
-        
+
+#        router.register_handler(self.PING, self.handle_ping)
+#        router.register_handler(self.PONG, self.handle_pong)
+
     def _get(self, prop, default):
         return settings.get_option(self.router.network.name+'/'+prop, default)
-        
+
     def _set(self, prop, value):
         settings.set_option(self.router.network.name+'/'+prop, value)
-        
+
     interval = property(lambda s: s._get('ping_interval',5.0), lambda s,v: s._set('ping_interval',v))
 
     def send_ping(self, peer):
-        pi = PingInfo(peer.id)
-        timeout_call = reactor.callLater(self.MAX_PING_TIME, self._ping_timeout, pi.id)
-        self.active_pings[pi.id] = (pi, timeout_call)
-        self.router.send(self.PING, pi.id, peer)
+        d = self.router.send(self.PING, '', peer, ack=True, ack_timeout=self.MAX_PING_TIME)
+        d.addCallback(self.ping_ack, peer, time())
+        d.addErrback(self._ping_timeout, peer)
         logger.debug('sending ping to {0}'.format(peer.name))
-        
-    def handle_ping(self, type, data, address, src_id):
 
-        logger.debug('received ping, sending pong')
-        
-        self.router.send(self.PONG, data, src_id)
+    def ping_ack(self, id, peer, ping_time):
+        dt = time() - ping_time
+        self.router.pm.peer_list[pi.peer_id].ping_time = dt
+        self.router.pm.peer_list[pi.peer_id].timeouts = 0
 
-    def handle_pong(self, type, data, address, src_id):
-        if data in self.active_pings:
-            pi, timeout_call = self.active_pings[data]
-            dt = pi.duration()
-            timeout_call.cancel()
-            self.router.pm.peer_list[pi.peer_id].ping_time = dt
-            self.router.pm.peer_list[pi.peer_id].timeouts = 0
-            del self.active_pings[data]
-            logger.debug('received pong response from {0} with time {1}'.format(self.router.pm.peer_list[pi.peer_id].name, dt))
-            
-            
+        logger.debug('received ping response from {0} with time {1}'.format(self.router.pm.peer_list[pi.peer_id].name, dt))
+
+
     def do_pings(self):
         if self.running:
             for peer in self.router.pm.peer_list.values():
-                self.send_ping(peer)        
-            
+                self.send_ping(peer)
 
-    def _ping_timeout(self, id):
-        if id in self.active_pings:
-            pi = self.active_pings[id][0]
-            del self.active_pings[id]
-                
-            if pi.peer_id in self.router.pm.peer_list:
-                peer = self.router.pm.peer_list[pi.peer_id]
-                peer.timeouts += 1
-                if peer.timeouts > self.MAX_TIMEOUTS:
-                    self.router.pm._timeout(peer)
 
-        
+    def _ping_timeout(self, id, peer):
+
+        if peer.id in self.router.pm.peer_list:
+#            peer = self.router.pm.peer_list[peer.id]
+            peer.timeouts += 1
+            if peer.timeouts > self.MAX_TIMEOUTS:
+                self.router.pm._timeout(peer)
+
+
     def start(self):
         self.running = True
         self._lp.start(self.interval)
         logger.info('starting pinger on {0} with {1}s interval'.format(self.router.network.name,self.interval))
-        
+
     def stop(self):
         self.running = False
         self._lp.stop()
         logger.info('stopping pinger on {0} with {1}s interval'.format(self.router.network.name,self.interval))
-        

@@ -69,21 +69,22 @@ class Router(object):
     for special packets.
 
     Packet format: TBD'''
-    VERSION = pack('H', 0)
+    VERSION = pack('H', 1)
 
     TIMEOUT = 5 # 5s
     # packet types
+    HANDSHAKE = 0
     DATA = 1
-    DATA_BROADCAST = 2
+#    DATA_BROADCAST = 2
+    DATA_RELAY = 2
     ACK = 3
+    RELAY = 4
 
     USER = 0x80
 
     def __init__(self, network, proto=None, tuntap=None):
         if tuntap is None:
             mode = network.adapter_mode
-            if mode == 'TAP': mode = TunTap.TAPMODE
-            if mode == 'TUN': mode = TunTap.TUNMODE
             tuntap = TunTap(self, mode)
         if proto is None:
             proto = UDPPeerProtocol()
@@ -94,42 +95,67 @@ class Router(object):
         self._requested_acks = {}
 
         self.network = util.get_weakref_proxy(network)
-        self.filter = Crypter(network.key)
+        #self.filter = Crypter(network.key)
         proto.router = util.get_weakref_proxy(self)
         self.pm = PeerManager(self)
-        #self.ip_map = self.pm.ip_map
-        self.addr_map = self.pm.addr_map
 
+        # filterz
+        self._filterator = PacketFilter(self)
+        self.filter = self._filterator.filter
+        self.unfilter = self._filterator.unfilter
+
+        self.addr_map = self.pm.addr_map
+        self.relay_map = self.pm.relay_map
+
+        # move this out of router?
         self.pinger = Pinger(self)
 
         self._proto = proto
         self._tuntap = tuntap
         self._port = None
 
+        # move out of router?
         import bootstrap
         self._bootstrap = bootstrap.TrackerBootstrap(network)
 
+        # add handler for message acks
         self.register_handler(self.ACK, self.handle_ack)
 
     def get_my_address(self):
-        '''Get interface address (IP or MAC), return a deferred'''
+        '''Get interface address (IP or MAC), return a deferred.
+        Override'''
         pass
 
     def start(self):
         '''Start the router.  Starts the tun/tap device and begins listening on
         the UDP port.'''
+        # start tuntap device
         self._tuntap.start()
+
+        # configure tun/tap address
         d = self._tuntap.configure_iface(self.network.virtual_address)
+
+        # set mtu (if possible)
+        mtu = settings.get_option(self.network.name + '/' + 'set_mtu', None)
+        if mtu is None:
+            mtu = settings.get_option(self.network.name + '/' + 'set_mtu', None)
+        if mtu is not None:
+            d.addCallback(self._tuntap.set_mtu, mtu)
+
+        # start UDP listener
         self._port = reactor.listenUDP(self.network.port, self._proto)
+
+        # get addresses
         d.addCallback(self.get_my_address)
 
         logger.info('router started, listening on UDP port {0}'.format(self._port))
 
         def start_connections(*x):
             self._bootstrap.start()
-            self.pinger.start() #TODO shouldn't this be in 'start'
-            reactor.callLater(1, util.get_weakref_proxy(self.try_old_peers))
+            self.pinger.start() #TODO make this more modular
+            #reactor.callLater(1, util.get_weakref_proxy(self.try_old_peers))
 
+        # when the adapter is up, start network tools
         d.addCallback(start_connections)
 
     def stop(self):
@@ -146,18 +172,18 @@ class Router(object):
 
         logger.info('router stopped')
 
-    def try_old_peers(self):
-        '''Try to connect to addresses that were peers in previous sessions.'''
-
-        logger.info('trying to connect to previously known peers')
-
-        for pid in self.network.known_addresses:
-            if pid not in self.pm:
-                addrs = self.network.known_addresses[pid]
-                self.pm.try_register(addrs)
-
-        # re-schedule
-        reactor.callLater(60*5, util.get_weakref_proxy(self.try_old_peers))
+    #def try_old_peers(self):
+    #    '''Try to connect to addresses that were peers in previous sessions.'''
+    #
+    #    logger.info('trying to connect to previously known peers')
+    #
+    #    for pid in self.network.known_addresses:
+    #        if pid not in self.pm:
+    #            addrs = self.network.known_addresses[pid]
+    #            self.pm.try_register(addrs)
+    #
+    #    # re-schedule
+    #    reactor.callLater(60*5, util.get_weakref_proxy(self.try_old_peers))
 
     def relay(self, data, dst):
         if dst in self.pm:
@@ -165,16 +191,17 @@ class Router(object):
             self.send_udp(data, self.pm[dst].address)
 
 
-    def send(self, type, data, dst, ack=False, id=0):
-        '''Send a packet of type with data to address.  Address should be a vip if the peer is known, since address tuples aren't unique with relaying'''
-        if type == self.DATA or type == self.DATA_BROADCAST:
+    def send(self, type, data, dst, ack=False, id=0, ack_timeout=None):
+        '''Send a packet of type with data to address.  Address should be a vip
+        if the peer is known, since address tuples aren't unique with relaying'''
+        if type == self.DATA or type == self.DATA_RELAY:
             data = pack('H', type) + data
             self.send_udp(data, dst)
 
         else:
             if dst in self.pm: # known peer dst
                 peer = self.pm[dst]
-                dst_id = peer.id.bytes
+                dst_id = peer.id
                 dst = peer.address
 
             else: # unknown peer dst (like for reg's) TODO: this should return an erroring deferred?
@@ -187,13 +214,14 @@ class Router(object):
                 if id == 0:
                     id = random.randint(0, 0xFFFF)
                 d = defer.Deferred()
-                timeout_call = reactor.callLater(self.TIMEOUT, util.get_weakref_proxy(self._timeout), id)
+                timeout = ack_timeout if ack_timeout is not None else self.TIMEOUT
+                timeout_call = reactor.callLater(timeout, util.get_weakref_proxy(self._timeout), id)
                 self._requested_acks[id] = (d, timeout_call)
 
             else:
                 d = None
 
-            data = pack('2H', type, id) + dst_id + self.pm._self.id.bytes + data
+            data = pack('2H', type, id) + dst_id + self.pm._self.id + data
 
             #TODO exception handling for bad addresses
             self.send_udp(data, dst)
@@ -202,25 +230,26 @@ class Router(object):
 
     def handle_ack(self, type, data, address, src):
         id = unpack('H', data)[0]
-        logger.info('got ack with id {0}'.format(id))
+        logger.debug('got ack with id {0}'.format(id))
 
         if id in self._requested_acks:
             d, timeout_call = self._requested_acks[id]
             del self._requested_acks[id]
             timeout_call.cancel()
-            d.callback(None)
+            d.callback(id)
 
     def _timeout(self, id):
         if id in self._requested_acks:
             d = self._requested_acks[id][0]
             del self._requested_acks[id]
             d.errback(Exception('call {0} timed out'.format(id)))
+#            d.errback(id)
             logger.info('ack timeout')
         else:
             logger.info('timeout called with bad id??!!?')
 
     def send_udp(self, data, address):
-        data = self.filter.encrypt(data)
+        #data = self.filter.encrypt(data)
         self._proto.send(data, address)
 
     def send_packet(self, packet):
@@ -228,44 +257,63 @@ class Router(object):
         pass
 
     def recv_udp(self, data, address):
-        '''Received a packet from the UDP port.  Parse it and send it on its way.'''
-        data = self.filter.decrypt(data)
-        # check if from known peer
-        dt = unpack('H', data[:2])[0]
+        '''Received a packet from the UDP port.
+        Parse it and send it on its way.
+        Data types get special treatment to reduce overhead.'''
 
-        if dt == self.DATA:
-            self.recv_packet(data[2:])
+        # packet type
+        pt = unpack('!H', data[:1])[0]
+
+        # data packet
+        if pt == self.DATA:
+            self.recv_packet(data[2:], address)
+
+        # relay data packet
+        elif pt == self.DATA_RELAY:
+            if data[4:20] == self.id:
+                # it's ours
+                self.recv_packet(data[20:], address)
+            else:
+                # it's not ours
+                self.relay(data, data[4:20])
+
+
 
         # should only be this on TAP
-        elif dt == self.DATA_BROADCAST:
-            logger.debug('got broadcast from {0}'.format(address))
-            if data[2:8] == self.pm._self.addr:
-                self.recv_packet(data[8:])
-            else:
-                self.relay(data, data[2:8])
+        #elif dt == self.DATA_BROADCAST:
+        #    logger.debug('got broadcast from {0}'.format(address))
+        #    if data[2:8] == self.pm._self.addr:
+        #        self.recv_packet(data[8:])
+        #    else:
+        #        self.relay(data, data[2:8])
 
         else:
-            id = unpack('H', data[2:4])[0]
+            # should i use 1byte type + 3byte id, or 2byte type + 2byte id TODO
+            id = unpack('!H', data[2:4])[0]
 
-            # get dst and src 128-bit UUIDs
+            # get dst and src 128-bit ids
+            # should i mandate this or let handlers decide? how to do routing
+            # otherwise
             dst = data[4:20]
             src = data[20:36]
 
+            # is it ours?
             if dst == self.pm._self.id.bytes or dst == '\x00'*16: #handle
                 if dt in self.handlers:
                     # need to check if this is from a known peer?
-                    self.handlers[dt](dt, data[36:], address, uuid.UUID(bytes=src))
+                    self.handlers[dt](dt, data[36:], address, src)
                 if id > 0: # ACK requested
                     logger.debug('sending ack')
                     self.send(self.ACK, data[2:4], src)
                 logger.debug('handling {0} packet from {1}'.format(dt, src.encode('hex')))
 
+            # nope
             else:
-                self.relay(data, uuid.UUID(bytes=dst))
+                self.relay(data, dst)
 #                logger.debug('relaying {0} packet to {1}'.format(dt, dst.encode('hex')))
 
 
-    def recv_packet(self, packet):
+    def recv_packet(self, packet, address):
         '''Got a data packet from a peer, need to inject it into tun/tap'''
         pass
 
@@ -285,7 +333,8 @@ class Router(object):
     def unregister_handler(self, type, callback):
         '''Remove a registered handler for a specific packet type.'''
 
-        logger.debug('unregistering packet handler for packet type: {0}'.format(type))
+        logger.debug('unregistering packet handler for packet type: \
+                     {0}'.format(type))
 
         if type in self.handlers:
             self.handlers[type] -= callback
@@ -305,7 +354,10 @@ class TapRouter(Router):
                 ips = self._tuntap.get_ips()
             if len(ips) > 0:
                 if self.pm._self.vip_str not in ips:
-                    logger.critical('TAP addresses ({0}) don\'t contain configured address ({1}), taking address from adapter ({2})'.format(ips,self.pm._self.vip_str, ips[0]))
+                    logger.critical('TAP addresses ({0}) don\'t contain \
+                                    configured address ({1}), taking address\
+                                    from adapter ({2})'.format(ips,
+                                            self.pm._self.vip_str, ips[0]))
                     self.pm._self.vip = util.encode_ip(ips[0])
             else:
                 logger.critical('TAP adapater has no addresses')
@@ -328,29 +380,51 @@ class TapRouter(Router):
 
     def send_packet(self, packet):
         '''Got a packet from the tun/tap device that needs to be sent out'''
+
         dst = packet[0:self.addr_size]
 
         # if ip in peer list
         if dst in self.addr_map:
+            # encrypt packet
+            packet = self.filter(packet)
             self.send(self.DATA, packet, self.addr_map[dst])
-        elif self._tuntap.is_broadcast(dst):
-            logger.debug('sending broadcast packet')
-            for mac in self.addr_map.keys():
-                self.send(self.DATA_BROADCAST, mac+packet, self.addr_map[mac])
-        else:
-            logger.debug('got packet on wire to unknown destination: {0}'.format(dst.encode('hex')))
 
-    def recv_packet(self, packet):
+        # or if it's a broadcast
+        elif self._tuntap.is_broadcast(dst):
+            #encrypt packet
+            packet = self.filter(packet)
+            logger.debug('sending broadcast packet')
+            for addr in self.addr_map.values():
+                self.send(self.DATA, packet, addr)
+
+        # if we don't have a direct connection...
+        elif dst in self.relay_map:
+            # encrypt packet
+            packet = self.filter(packet)
+            self.send(self.DATA_RELAY, self.pm[dst].id+packet, self.relay_map[dst])
+        else:
+            logger.debug('got packet on wire to unknown destination: \
+                         {0}'.format(dst.encode('hex')))
+
+    def recv_packet(self, packet, frm):
         '''Got a data packet from a peer, need to inject it into tun/tap'''
-        # check?
+        #decrypt packet
+        try:
+            packet = self.unfilter(packet, frm)
+        except:
+            logger.error('could not decrypt a packet')
+            return
+
         dst = packet[0:self.addr_size]
 
+        # is it ours?
         if dst == self.pm._self.addr or self._tuntap.is_broadcast(dst):
             self._tuntap.doWrite(packet)
             logger.debug('writing packet to TAP device')
         else:
+            # no, odd
             self.send_packet(packet)
-            logger.debug('got packet with different dest ip, relay packet?')
+            logger.debug('got packet (encrypted) with different dest ip, relay packet?')
 
 
 
