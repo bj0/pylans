@@ -402,8 +402,8 @@ class MainWin:
             port_spinbox.set_value(net.port)
             
             enabled_cb.set_active(net.enabled)
-            bt_url.set_text(self.iface.get_network_setting('tracker', nw))
-            ping_interval.set_value(self.iface.get_network_setting('ping_interval', nw))
+            bt_url.set_text(self.iface.get_network_setting('tracker', net))
+            ping_interval.set_value(self.iface.get_network_setting('ping_interval', net))
             mcb.set_active(net.adapter_mode == 'TUN')
 
             # add new tabs
@@ -423,11 +423,11 @@ class MainWin:
 
                     bt_url = bt_url.get_text()
                     # do BT and ping stuff?
-                    self.iface.set_network_setting('ping_interval', ping_interval.get_value(), nw)
-                    self.iface.set_network_setting('use_tracker', use_bt.get_active(), nw)
+                    self.iface.set_network_setting('ping_interval', ping_interval.get_value(), net)
+                    self.iface.set_network_setting('use_tracker', use_bt.get_active(), net)
                     
                     if bt_url != '':
-                        self.iface.set_network_setting('tracker', bt_url, nw)
+                        self.iface.set_network_setting('tracker', bt_url, net)
                     
                     
                 dialog.destroy()
