@@ -58,15 +58,6 @@ class TunTapBase(object):
         Access to the virtual tun/tap device (Base Class).
     '''
 
-    # definitions from linux driver
-    IFF_TUN   = 0x0001
-    IFF_TAP   = 0x0002
-    IFF_NO_PI = 0x1000
-
-    # modes for settings
-    TUNMODE = IFF_TUN
-    TAPMODE = IFF_TAP
-    
     #
 
 #    @classmethod
@@ -150,8 +141,18 @@ class TunTapLinux(TunTapBase):
     '''
         Access to the virtual tun/tap device.
     '''
-        
+
+    # so it can be used in twisted's main loop        
     implements(IReadDescriptor)
+
+    # definitions from linux driver
+    IFF_TUN   = 0x0001
+    IFF_TAP   = 0x0002
+    IFF_NO_PI = 0x1000
+
+    # modes for settings
+    TUNMODE = IFF_TUN
+    TAPMODE = IFF_TAP
 
     SIOCGIFHWADDR = 0x8927
     SIOCGIFMTU = 0x8921
@@ -159,8 +160,17 @@ class TunTapLinux(TunTapBase):
     TUNSETIFF = 0x400454ca
 
     def __init__(self, router, mode):
+        # get file handle
         f = os.open("/dev/net/tun", os.O_RDWR)
+        
+        # check mode, should come in as 'TUN' or 'TAP'
+        if isinstance(mode, str):
+            mode = self.TUNMODE if mode == 'TUN' else self.TAPMODE
+
+        # ioctl call to create adapter, retuns adapter name
         ifs = ioctl(f, self.TUNSETIFF, struct.pack("16sH", "pytun%d", mode|self.IFF_NO_PI))
+        
+        # get iface name
         self.ifname = ifs[:16].strip("\x00")
 
         logger.info('opened tun device as interface {0}'.format(self.ifname))
@@ -168,6 +178,7 @@ class TunTapLinux(TunTapBase):
         self.f = f
         self.router = util.get_weakref_proxy(router)
         self.mode = mode
+        self.mtu = 1500 # default mtu 
 
     def __del__(self):
         '''Make sure device is closed.'''
@@ -176,6 +187,7 @@ class TunTapLinux(TunTapBase):
 
     def start(self):
         '''Start monitoring tun/tap for input'''
+        # add to twisted mainloop
         reactor.addReader(self)
         logger.info('linux tun/tap started')
         
@@ -205,28 +217,16 @@ class TunTapLinux(TunTapBase):
         ifr = struct.pack('<16sH', self.ifname, mtu) + '\x00'*14
         try:
             ifs = ioctl(s, self.SIOCSIFMTU, ifr)
-            mtu = struct.unpack('<H',ifs[16:18])[0]
+            self.mtu = struct.unpack('<H',ifs[16:18])[0]
         except Exception, s:
             logger.error('socket ioctl call failed: {0}'.format(s))
             # re-throw?
         
         logger.debug('set_mtu: new mtu value: {0}'.format(mtu))
         
-        return mtu
+        return self.mtu
           
-#    def get_ips(self):
-#        '''Use subprocess+ifconfig+grep to get ip addresses on the interface'''
-#        import subprocess as sp
-#        
-#        out = sp.Popen(["ifconfig {0} |grep 'inet add'".format(self.ifname)], shell=True, stdout=sp.PIPE).communicate()[0]
-#        out = out.strip().split()
-#        ips = [ x[5:] for x in out if x.startswith('addr:') ]
-#        masks = [ x[5:] for x in out if x.startswith('Mask:') ]
-#                        
-#        logger.debug('got {0} ip addresses: {1}'.format(len(ips),ips))
-#        return ips
-
-    def configure_iface(self, address):
+    def configure_iface(self, address, mtu=None):
         '''
             Configure the tun/tap interface with given address/mask (ie: '10.1.1.1/24')
         '''
@@ -234,19 +234,15 @@ class TunTapLinux(TunTapBase):
             if retval != 0:
                 logger.error('error configuring address {0} on interface {1}'.format(address, self.ifname))
             
-        # re-do this to chain deferreds?TODO
+        # re-do this to chain deferreds?
         utils.getProcessValue('/sbin/ip',('addr','add',address,'dev',self.ifname)).addCallback(response)
         d = utils.getProcessValue('/sbin/ip',('link','set',self.ifname,'up'))
         d.addCallback(response)
         
         # set mtu
-        mtu = settings.get_option(self.router.network.name+'/set_mtu', None)
-        if mtu is None:
-            mtu = settings.get_option('settings/set_mtu', None)
-
-        if mtu is not None:
-            mtu = self.set_mtu(mtu)
-            logger.info('setting {0} mtu to: {1}'.format(self.ifname, mtu))
+#        if mtu is not None:
+#            mtu = self.set_mtu(mtu)
+#            logger.info('setting {0} mtu to: {1}'.format(self.ifname, mtu))
         
         logger.info('configuring interface {1} to: {0}'.format(address, self.ifname))
         
@@ -254,7 +250,7 @@ class TunTapLinux(TunTapBase):
 
     def doRead(self):
         '''
-            New data is coming in on the tun/tap 'wire'.
+            New data is coming in on the tun/tap 'wire'.  Called by twisted.
         '''
         data = os.read(self.f, 2000) # max mtu is 1500
         self.router.send_packet(data)
@@ -272,7 +268,8 @@ class TunTapLinux(TunTapBase):
 #                        self.f, data.encode('hex'), len(data)))
         
     def fileno(self):
-        '''Return the file identifier from os.open'''
+        '''Return the file identifier from os.open.  Required for twisted to
+        select() our stream.'''
         return self.f
 
     def logPrefix(self):
@@ -295,16 +292,6 @@ class TunTapWindows(TunTapBase):
         
     def configure_iface(self, addr):
         return self._tuntap.configure_iface(addr)
-
-#    def get_ips(self):
-#        try:
-#            ips = GetAdaptersInfo(self.ifname)[0].IpAddressList  #ai[did]['ipAddressList']
-#        else ValueError:
-#            logger.critical('selected adapter not in GetAdaptersInfo()')
-#            return []
-#                    
-#        logger.debug('got {0} ip addresses: {1}'.format(len(ips),ips))
-#        return [ x[0] for x in ips ]
 
     def got_data(self, data):
 #        print data[12:14].encode('hex'),unpack('H',data[12:14])[0]
@@ -348,24 +335,11 @@ if platform.system() == 'Linux':
 elif platform.system() == 'Windows':
     from tuntap.windows_tuntap import TunTapDevice
     TunTap = TunTapWindows
-    logger.info('Windows detected, usingTapTunWindows')
-
+    logger.info('Windows detected, using TapTunWindows')
+else:
+    raise OSError, "Unsupported platform for tuntap"
         
 if __name__ == '__main__':
-    import platform
-    if platform.system() == 'Windows':
-        ttw = TunTapWindows(None)
-        ttw.configure_iface('10.1.1.11/32')
-        ttw.start()
-        
-        try:
-            reactor.run()
-        except KeyboardInterrupt:
-            print 'closin'
-            
-    
-    else:
-#        tt = TunTap()
-        pass    
+    pass    
     
 

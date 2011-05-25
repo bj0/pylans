@@ -97,9 +97,6 @@ class TunTapDevice(object):
         # get mac handle
         self.mac_addr = w32f.DeviceIoControl(handle, TAP_IOCTL_GET_MAC, None, 6)
         
-        # set ip
-        #self.configure_iface('10.1.1.1/24')
-        
         # enable dev
         self.enable_iface()
         
@@ -147,10 +144,12 @@ class TunTapDevice(object):
     def close(self):
         if self._handle is not None:
             w32f.CloseHandle(self._handle)
+            self._handle = None
         
     def get_tap_handle(self):
-
+        '''Get a file handle to an available TAP adapter'''
         def findTaps():
+            '''get a list of TAP adapters'''
             h = reg.OpenKey(HKLM, class_key)
             devs = []
             for i in range(0,30):
@@ -169,6 +168,7 @@ class TunTapDevice(object):
                     continue
             return devs
 
+        # iterate through TAP adapters, trying to find one available for use
         for devid in findTaps():
             f = None
             path = '%s\\%s\\Connection' % (net_key, devid)
@@ -196,7 +196,7 @@ class TunTapDevice(object):
             return None    
     
     def read(self):
-        
+        '''Read data from TAP adapter (blocking)'''
         w32e.ResetEvent(self.overlapped_read.hEvent)
         
         (err, data) = w32f.ReadFile(self._handle, self.mtu, self.overlapped_read)
@@ -210,7 +210,7 @@ class TunTapDevice(object):
         return str(data[:size])
         
     def write(self, data):
-    
+        '''Write data to TAP adapter (blocking)'''
         w32e.ResetEvent(self.overlapped_write.hEvent)
         
         (err, size) = w32f.WriteFile(self._handle, data, self.overlapped_write)
