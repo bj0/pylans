@@ -36,6 +36,7 @@ from vpn.crypto import Crypter
 from util.event import Event
 from vpn.peers import PeerManager
 from vpn.pinger import Pinger
+from vpn import settings
 import util
 
 logger = logging.getLogger(__name__)
@@ -100,9 +101,9 @@ class Router(object):
         self.pm = PeerManager(self)
 
         # filterz
-        self._filterator = PacketFilter(self)
-        self.filter = self._filterator.filter
-        self.unfilter = self._filterator.unfilter
+        #self._filterator = PacketFilter(self)
+        #self.filter = self._filterator.filter
+        #self.unfilter = self._filterator.unfilter
 
         self.addr_map = self.pm.addr_map
         self.relay_map = self.pm.relay_map
@@ -393,13 +394,13 @@ class TapRouter(Router):
         # if ip in peer list
         if dst in self.addr_map:
             # encrypt packet
-            packet = self.filter(packet)
+            #packet = self.filter(packet)
             self.send(self.DATA, packet, self.addr_map[dst])
 
         # or if it's a broadcast
         elif self._tuntap.is_broadcast(dst):
             #encrypt packet
-            packet = self.filter(packet)
+            #packet = self.filter(packet)
             logger.debug('sending broadcast packet')
             for addr in self.addr_map.values():
                 self.send(self.DATA, packet, addr)
@@ -407,7 +408,7 @@ class TapRouter(Router):
         # if we don't have a direct connection...
         elif dst in self.relay_map:
             # encrypt packet
-            packet = self.filter(packet)
+            #packet = self.filter(packet)
             self.send(self.DATA_RELAY, self.pm[dst].id+packet, self.relay_map[dst])
         else:
             logger.debug('got packet on wire to unknown destination: \
@@ -416,11 +417,11 @@ class TapRouter(Router):
     def recv_packet(self, packet, frm):
         '''Got a data packet from a peer, need to inject it into tun/tap'''
         #decrypt packet
-        try:
-            packet = self.unfilter(packet, frm)
-        except:
-            logger.error('could not decrypt a packet')
-            return
+        #try:
+            #packet = self.unfilter(packet, frm)
+        #except:
+        #    logger.error('could not decrypt a packet')
+        #    return
 
         dst = packet[0:self.addr_size]
 

@@ -77,6 +77,8 @@ class PeerManager(object):
     PEER_XCHANGE = 17
     PEER_XCHANGE_ACK = 18
     PEER_ANNOUNCE = 19
+    REGISTER = 20
+    REGISTER_ACK = 21
 
     def __init__(self, router):
         # list of peers
@@ -127,6 +129,8 @@ class PeerManager(object):
         # should announce my change to my peerz
         self.send_announce(self._self, None)
 
+    def send(self, *x):
+        self.router.send(*x)
 
     def add_peer(self, peer):
         '''Add a peer connection'''
@@ -134,13 +138,16 @@ class PeerManager(object):
             if peer.relays > 0:
                 peer.is_direct = False
                 peer.relay_id = self[peer.address].id
-                self.try_register(peer)
+                #self.try_register(peer)
+                self.relay_map[peer.addr] = peer.address
             else:
                 peer.is_direct = True
                 peer.relay_id = None
                 if peer.address not in peer.direct_addresses:
                     peer.direct_addresses.append(peer.address)
                 self.addr_map[peer.addr] = peer.address
+                if peer.addr in self.relay_map:
+                    del self.relay_map[peer.addr]
 
             self.peer_list[peer.id] = peer
 
@@ -159,10 +166,12 @@ class PeerManager(object):
 #            del self.ip_map[peer.vip]
         if peer.addr in self.addr_map:
             del self.addr_map[peer.addr]
+        if peer.addr in self.relay_map:
+            del self.relay_map[peer.addr]
 
             # fire event
 #            self.peer_removed(peer)
-            event.emit('peer-removed', self, peer)
+        event.emit('peer-removed', self, peer)
 
     def _timeout(self, peer):
         logger.warning('peer {0} on network {1} timed out'.format(peer.name, self.router.network.name))
@@ -172,24 +181,35 @@ class PeerManager(object):
     def update_peer(self, opi, npi):
         changed = False
         if (opi.relays >= npi.relays and opi.address != npi.address):
-            self.addr_map[opi.addr] = npi.address
+            #self.addr_map[opi.addr] = npi.address
+            if npi.relays > 0:
+                self.relay_map[opi.addr] = npi.address
+            else:
+                del self.relay_map[opi.addr]
+                self.addr_map[opi.addr] = npi.address
+
             opi.address = npi.address
             opi.relays = npi.relays
             opi.is_direct = (opi.relays == 0)
-            #relay id?
+
+            #relay id? TODO
             changed = True
             logger.info('peer {0} relay changed.'.format(opi.id))
 
         if opi.addr != npi.addr:
-            # check for collision?
-            self.addr_map[npi.addr] = self.addr_map[opi.addr]
-            del self.addr_map[opi.addr]
+            # check for collision? TODO
+            if opi.addr in self.addr_map:
+                self.addr_map[npi.addr] = self.addr_map[opi.addr]
+                del self.addr_map[opi.addr]
+            if opi.addr in self.relay_map:
+                self.relay_map[npi.addr] = self.relay_map[opi.addr]
+                del self.relay_map[opi.addr]
             opi.addr = npi.addr
             changed = True
             logger.info('peer {0} addr changed.'.format(opi.id))
 
         if opi.vip != npi.vip:
-            # check for collision
+            # check for collision TODO
             opi.vip = npi.vip
             changed = True
             logger.info('peer {0} vip changed.'.format(opi.id))
@@ -199,7 +219,7 @@ class PeerManager(object):
             changed = True
             logger.info('peer {0} name changed.'.format(opi.id))
 
-        if sorted(opi.direct_addresses) != sorted(npi.direct_addresses):
+        if set(opi.direct_addresses) != set(npi.direct_addresses):
             # combine direct_addresses (w/out dupes)
             opi.direct_addresses = list(set(opi.direct_addresses).union(set(npi.direct_addresses)))
             changed = True
@@ -237,8 +257,11 @@ class PeerManager(object):
         logger.info('received an announce packet from {0}'.format(address))
         pi = pickle.loads(packet)
         if pi.id != self._self.id:
-            if pi.id not in self:
-                if pi.relays == 0: #potential replacement for reg packets?
+            if pi.id not in self.session_map:
+                # init (relayed) handshake
+                self.send_handshake(pi.id, address, pi.relays)
+            elif pi.id not in self.peer_map:
+                if pi.relays == 0: #potential replacement for reg packets? TODO
                     pi.address = address
                     self.add_peer(pi)
                     logger.info('announce from unknown peer {0}, adding and announcing self'.format(pi.name))
@@ -317,8 +340,9 @@ class PeerManager(object):
         self.router.send(self.GREET, '', address)
 
     def handle_greet(self, type, packet, address, src_id):
-        if src_id not in self.peer_list and src_id not in self.shaking_peers:
-            self.send_handshake(src_id, address)
+        if src_id not in self.session_map and src_id not in self.shaking_peers:
+            # unknown peer not currently shaking hands, start handshake
+            self.send_handshake(src_id, address, 0)
         else:
             # check to see if we found a direct route TODO
             pass
@@ -368,11 +392,11 @@ class PeerManager(object):
     def handshake_done(self, pid, salt, address):
         if pid in self.shaking_peers:
             session_key = hashlib.sha256(key+salt)
-            self.session_map[pid] = (pid, session_key, address)
+            self.session_map[pid] = (session_key, address, pid)
             # init encryption
 
             # do register, close session if failed
-            d = try_register(pid)
+            d = try_register(pid, self.shaking_peers[pid][1])
             d.addErrback(self.close_session, pid)
 
     def handshake_fail(self, pid):
@@ -388,19 +412,22 @@ class PeerManager(object):
         if pid in self.pm:
             self.pm.remove_peer(pid)
 
-    def try_register(self, pid, addr=None):
+    def try_register(self, pid, addr=None, relays=0):
         '''Try to register self with a peer by sending a register packet
         with own peer info.  Will continue to send this packet until an
         ack is received or MAX_REG_TRIES packets have been sent.'''
 
-        if pid not in self: # It's an (address,port) pair
+        if pid not in self.session_map: # It's an (address,port) pair
             raise TypeError, "Cannot send register to unknown address"
         elif addr is None:
-            addr = self[pid].address
+            addr = self.session_map[pid][1]
 
         d = defer.Deferred()
         if (pid not in self.peer_list):
-            packet = pid+self._my_pickle
+            # TODO set relay
+            self._self.relays = relays
+            packet = pickle.dumps(self._self, -1)
+            self._self.relays = 0
             def send_register(i):
                 '''Send a register packet and re-queues self'''
 
@@ -492,7 +519,7 @@ class PeerManager(object):
         '''Handle incoming reg packet by adding new peer and sending ack.'''
 
         #TODO do an address hop to count the hops ancryption
-        dpid, packet = packet[:16],packet[16:]
+        #dpid, packet = packet[:16],packet[16:]
 
         logger.info('received REG packet, sending ACK')
 
@@ -508,7 +535,11 @@ class PeerManager(object):
             pi.address = address
             self.update_peer(self.peer_list[pi.id], pi)
 
-        self.send(self.REGISTER_ACK, self._my_pickle, src_id)
+        # TODO set relay
+        self._self.relays = relays
+        packet = pickle.dumps(self._self, -1)
+        self._self.relays = 0
+        self.send(self.REGISTER_ACK, packet, src_id)
 
 
     def handle_reg_ack(self, type, packet, address, src_id):
@@ -520,16 +551,13 @@ class PeerManager(object):
 
         if pi.id == self._self.id:
             # yea yea...
-            pass
+            logger.warning('we recieved a reg ack from ourself...')
         elif pi.id not in self.peer_list:
             logger.info('received REG ACK packet from new peer {0}'.format(pi.name))
             pi.address = address
-#            pi.is_direct = (pi.relays == 0)
             self.add_peer(pi)
-#            self.try_px(pi)
         else:
             pi.address = address
-#            pi.is_direct = (pi.relays == 0)
             self.update_peer(self.peer_list[pi.id], pi)
 
 
@@ -584,15 +612,6 @@ class PeerManager(object):
         if isinstance(item, PeerInfo) and item in self:
             return item
 
-        elif isinstance(item, tuple):                     # address
-            peer = self.get_by_address(item)
-
-        #elif isinstance(item, str) and len(item) == 16:    # peer id
-        #    if item == self._self.id:
-        #        peer = self._self
-        #    else:
-        #        peer = self.peer_list[item]
-
         elif isinstance(item, str):  # name, addr, or id
             if len(item) == 16 and item in self.peer_list:
                 peer = self.peer_list[item]
@@ -603,6 +622,10 @@ class PeerManager(object):
                     peer = self.get_by_addr(item)
                 if peer is None:
                     peer = self.get_by_name(item)
+
+        elif isinstance(item, tuple):                     # address
+            peer = self.get_by_address(item)
+
         else:
             raise TypeError('Unrecognized key type')
 
