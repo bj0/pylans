@@ -139,14 +139,15 @@ class Prompt(Cmd):
         for net in nets:
             print '========= Peers (%s) =========' % net.name
             for p in self.iface.get_peer_list(net):
-                print 'name:      {0}'.format(p.name)
                 print 'id:        {0}'.format(p.id)
+                print 'name:      {0}'.format(p.name)
                 print 'vip:       {0}'.format(p.vip_str)
                 print 'addr:      {0}'.format(p.addr_str)
                 print 'address:   {0}'.format(p.address)
                 print 'is_direct: {0}'.format(p.is_direct)
                 if(not p.is_direct):
-                    print '  relay:   {0}'.format(p.relay_id)
+                    print '  relay:   {0} ({1})'.format(
+                    self.iface.get_peer_info(p.relay_id,net).name, p.relay_id)
                 print 'ping_time: {0} ms'.format(p.ping_time * 1e3)
                 print 'timeouts:  {0}'.format(p.timeouts)
             
