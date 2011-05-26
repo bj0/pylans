@@ -26,7 +26,6 @@
 
 import logging
 import random
-import uuid
 from struct import pack, unpack
 from tuntap import TunTap
 from twisted.internet import reactor, defer

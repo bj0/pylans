@@ -22,7 +22,6 @@
 
 import cPickle as pickle
 import logging
-import uuid
 from twisted.internet import reactor, defer
 import util
 from util import event
@@ -647,8 +646,8 @@ class PeerManager(object):
                         item.id == self._self.id)
         if isinstance(item, tuple):                     # address
             return self.get_by_address(item) is not None
-        elif isinstance(item, uuid.UUID):               # peer id
-            return (item in self.peer_list or
-                        item == self._self.id)
         elif isinstance(item, str):  # name or vip
-            return (self.get(item) != None)
+            return (item == self._self.id or
+                    item in self.peer_list or
+                    item in self.session_map or #TODO which to include here
+                self.get(item) != None)

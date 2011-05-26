@@ -19,7 +19,6 @@
 import binascii
 import logging
 import os
-#import uuid
 from util import event
 from vpn import router
 from vpn import settings
