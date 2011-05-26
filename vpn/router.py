@@ -73,7 +73,7 @@ class Router(object):
 
     TIMEOUT = 5 # 5s
     # packet types
-    HANDSHAKE = 0
+    #HANDSHAKE = 0
     DATA = 1
 #    DATA_BROADCAST = 2
     DATA_RELAY = 2
@@ -192,41 +192,40 @@ class Router(object):
 
 
     def send(self, type, data, dst, ack=False, id=0, ack_timeout=None):
-        '''Send a packet of type with data to address.  Address should be a vip
+        '''Send a packet of type with data to address.  Address should be an id
         if the peer is known, since address tuples aren't unique with relaying'''
         if type == self.DATA or type == self.DATA_RELAY:
             data = pack('H', type) + data
             self.send_udp(data, dst)
 
+        elif isinstance(dst, tuple): # address tuple (like for greets)
+            dst_id = '\x00'*16 # non-routable
+
+        elif dst in self.pm: # known peer dst
+            peer = self.pm[dst]
+            dst_id = peer.id
+            dst = peer.address
+
+        else: # unknown peer dst TODO: this should return an erroring deferred?
+            logger.warning('unknown dest {0} not an address tuple'.format(repr(dst)))
+            return
+
+        if ack or id > 0: # want ack
+            if id == 0:
+                id = random.randint(0, 0xFFFF)
+            d = defer.Deferred()
+            timeout = ack_timeout if ack_timeout is not None else self.TIMEOUT
+            timeout_call = reactor.callLater(timeout, util.get_weakref_proxy(self._timeout), id)
+            self._requested_acks[id] = (d, timeout_call)
         else:
-            if dst in self.pm: # known peer dst
-                peer = self.pm[dst]
-                dst_id = peer.id
-                dst = peer.address
+            d = None
 
-            else: # unknown peer dst (like for reg's) TODO: this should return an erroring deferred?
-                if not isinstance(dst, tuple):
-                    logger.warning('unknown dest {0} not an address tuple'.format(repr(dst)))
-                    return
-                dst_id = '\x00'*16
+        data = pack('2H', type, id) + dst_id + self.pm._self.id + data
 
-            if ack or id > 0: # want ack
-                if id == 0:
-                    id = random.randint(0, 0xFFFF)
-                d = defer.Deferred()
-                timeout = ack_timeout if ack_timeout is not None else self.TIMEOUT
-                timeout_call = reactor.callLater(timeout, util.get_weakref_proxy(self._timeout), id)
-                self._requested_acks[id] = (d, timeout_call)
+        #TODO exception handling for bad addresses
+        self.send_udp(data, dst)
 
-            else:
-                d = None
-
-            data = pack('2H', type, id) + dst_id + self.pm._self.id + data
-
-            #TODO exception handling for bad addresses
-            self.send_udp(data, dst)
-
-            return d
+        return d
 
     def handle_ack(self, type, data, address, src):
         id = unpack('H', data)[0]
@@ -277,7 +276,15 @@ class Router(object):
                 # it's not ours
                 self.relay(data, data[4:20])
 
-
+        # relay packet used to count hops
+        #elif pt == self.RELAY:
+        #    if data[4:20] == self.id:
+        #        # it's ours
+        #        self.recv_udp(data[20:], address)
+        #    else:
+        #        # it's not ours, inc counter
+        #        data = data[0] + chr(ord(data[1])+1) + data[2:]
+        #        self.relay(data, data[4:20])
 
         # should only be this on TAP
         #elif dt == self.DATA_BROADCAST:
