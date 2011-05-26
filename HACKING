@@ -7,7 +7,11 @@ k, addresses weren't tracking true addresses, they were being overwritten by rel
 3) keep peer.address unchanged unless we have a DC
 we need to know the DC addresses to try and establish a DC on a relay peer.
 
-drop uuids and just generate byte string ids of desired size?
+for new handhsake version: 3 options
+1) include a relay (TTL) field for each packet (most work, most overhead)
+2) send relay count with handshake packet (most like original version, know relays at connection)
+3) initiate connection with unknown relay count, then update with a 'tracert' packet: easiest, but may have difficulties selecting "best" path for a relay
+
 
 TODO:
 periodically try to DC relay peers?
