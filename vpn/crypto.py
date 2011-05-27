@@ -276,7 +276,7 @@ class _Crypter0(object):
             self.callback(self, *args)
 
 class _Crypter1(_Crypter0):
-    '''aes 128 (pycryptopp) in ctr mode'''
+    '''aes 256 (pycryptopp) in ctr mode'''
     key_size = 32
     block_size = 32
 

@@ -156,7 +156,7 @@ class Router(object):
         def start_connections(*x):
             self._bootstrap.start()
             self.pinger.start() #TODO make this more modular
-            #reactor.callLater(1, util.get_weakref_proxy(self.try_old_peers))
+            reactor.callLater(1, util.get_weakref_proxy(self.pm.try_old_peers))
 
         # when the adapter is up, start network tools
         d.addCallback(start_connections)
@@ -175,19 +175,6 @@ class Router(object):
 
         logger.info('router stopped')
 
-    #def try_old_peers(self):
-    #    '''Try to connect to addresses that were peers in previous sessions.'''
-    #
-    #    logger.info('trying to connect to previously known peers')
-    #
-    #    for pid in self.network.known_addresses:
-    #        if pid not in self.pm:
-    #            addrs = self.network.known_addresses[pid]
-    #            self.pm.try_register(addrs)
-    #
-    #    # re-schedule
-    #    reactor.callLater(60*5, util.get_weakref_proxy(self.try_old_peers))
-
     def relay(self, data, dst):
         if dst in self.pm:
             logger.debug('relaying packet to {0}'.format(repr(dst)))
@@ -203,7 +190,6 @@ class Router(object):
             dst = dst[0]
             # encode
             data = self.sm.encode(dst_id, data)
-            #type |= self.ENCODED
             # pack
             data = pack('!2H', type, id) + dst_id + self.pm._self.id + data
             # send
@@ -217,7 +203,8 @@ class Router(object):
             dst_id = pi.id
             dst = pi.address
 
-        elif isinstance(dst, tuple): # address tuple (like for greets)
+        # address tuple (like for greets)
+        elif isinstance(dst, tuple):
             pi = self.pm.get(dst)
             if pi is not None:
                 dst_id = pi.id
@@ -226,20 +213,18 @@ class Router(object):
             else:
                 dst_id = '\x00'*16 # non-routable
 
-        #elif dst in self.pm: # known peer dst
-        #    peer = self.pm[dst]
-        #    dst_id = peer.id
-        #    dst = peer.address
-
-        elif dst in self.sm.session_map: # peerless session (during handshake)
+        # peerless session (during handshake)
+        elif dst in self.sm.session_map:
             dst_id = dst
             dst = self.sm.session_map[dst]
 
-        else: # unknown peer dst TODO: this should return an erroring deferred?
+        # unknown peer dst TODO: this should return an erroring deferred?
+        else:
             logger.error('cannot send to unknown dest {0}'.format(repr(dst)))
             return #todo throw exception
 
-        if ack or id > 0: # want ack
+        # want ack
+        if ack or id > 0:
             if id == 0:
                 id = random.randint(0, 0xFFFF)
             d = defer.Deferred()
@@ -254,7 +239,6 @@ class Router(object):
             data = self.sm.encode(dst_id, pack('!H',type) + data)
             #logger.debug('encoding packet {0}'.format(type))
             type = self.ENCODED
-#            type |= self.ENCODED
         #else:
             #logger.critical('trying to send encrypted packets but no associated session')
             # TODO assert clear == true, because we can't encrypt here
@@ -411,22 +395,16 @@ class TapRouter(Router):
 
         # if ip in peer list
         if dst in self.addr_map:
-            # encrypt packet
-            #packet = self.sm.encode(self.addr_map[dst][1], packet)
             self.send(self.DATA, packet, self.addr_map[dst])
 
         # or if it's a broadcast
         elif self._tuntap.is_broadcast(dst):
             #logger.debug('sending broadcast packet')
             for addr in self.addr_map.values():
-                # encrypt
-                #epacket = self.sm.encode(addr[1], packet)
                 self.send(self.DATA, packet, addr)
 
         # if we don't have a direct connection...
         elif dst in self.relay_map:
-            # encrypt packet
-            #packet = self.sm.encode(self.relay_map[dst][1], packet)
             self.send(self.DATA, packet, self.relay_map[dst])
         else:
             logger.debug('got packet on wire to unknown destination: \
@@ -434,13 +412,6 @@ class TapRouter(Router):
 
     def recv_packet(self, packet, src):
         '''Got a data packet from a peer, need to inject it into tun/tap'''
-        #decrypt packet
-        #try:
-        #    #print 'dec',self.pm.get_by_address(address),(address)
-        #    packet = self.sm.decode(src, packet)
-        #except:
-        #    logger.error('could not decrypt a packet')
-        #    return
 
         dst = packet[0:self.addr_size]
 
@@ -448,6 +419,12 @@ class TapRouter(Router):
         if dst == self.pm._self.addr or self._tuntap.is_broadcast(dst):
             self._tuntap.doWrite(packet)
             logger.debug('writing packet to TAP device')
+
+# todo what to do about this
+#            src_addr = packet[self.addr_size:self.addr_size*2]
+#            if src_addr not in self.addr_map: # negligible speed hit
+#                self.addr_map[src_addr] = src
+#                logger.warning('got new addr from packet!')
         else:
             # no, odd
             self.send_packet(packet)

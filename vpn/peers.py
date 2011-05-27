@@ -27,6 +27,7 @@ import os
 from struct import pack, unpack
 import util
 from util import event
+from vpn import settings
 
 import hmac, hashlib
 
@@ -257,15 +258,10 @@ class PeerManager(object):
             if pi.id not in self.sm:
                 # init (relayed) handshake
                 self.send_handshake(pi.id, address, pi.relays)
-            elif pi.id not in self.peer_map:
-                if pi.relays == 0: #potential replacement for reg packets? TODO
-                    pi.address = address
-                    self.add_peer(pi)
-                    logger.info('announce from unknown peer {0}, adding and announcing self'.format(pi.name))
-                else:
-                    pi.address = address
-                    self.add_peer(pi)
-                    logger.info('announce for unknown peer {0}, trying to connect'.format(pi.name))
+            elif pi.id not in self.peer_list:
+                pi.address = address
+                self.add_peer(pi)
+                logger.info('announce from unknown peer {0}, adding and announcing self'.format(pi.name))
             else:
                 pi.address = address
                 self.update_peer(self.peer_list[pi.id], pi)
@@ -325,7 +321,10 @@ class PeerManager(object):
 
                 if peer.id in self.peer_list:
                     self.update_peer(self.peer_list[peer.id],peer)
-                else:
+                elif peer.id not in self.sm:
+                    #self.add_peer(peer)
+                    self.send_handshake(peer.id, peer.address, peer.relays)
+                elif peer.id not in self.peer_list:
                     self.add_peer(peer)
 
             # generate map?
@@ -470,7 +469,7 @@ class PeerManager(object):
     def handshake_done(self, pid, salt, address):
         logger.debug('handshake finished with {0}'.format(pid.encode('hex')))
         if pid in self.shaking_peers:
-            session_key = hashlib.sha256(self.router.network.key+salt).digest()
+            session_key = hashlib.md5(self.router.network.key+salt).digest()
             self.sm.open(pid, session_key)
             #self.session_map[pid] = (session_key, address, pid)
             # init encryption
@@ -534,6 +533,20 @@ class PeerManager(object):
         d.addErrback(logger.info)
         return d #TODO this funky thing needs testing
 
+    def try_old_peers(self):
+        '''Try to connect to addresses that were peers in previous sessions.'''
+
+        logger.info('trying to connect to previously known peers')
+
+        for pid in self.router.network.known_addresses:
+            if pid not in self:
+                addrs = self.router.network.known_addresses[pid]
+                self.try_greet(addrs)
+
+        # re-schedule
+        interval = settings.get_option(self.router.network.name + '/try_old_peers_interval', 60*5)
+        if interval > 0:
+            reactor.callLater(interval, util.get_weakref_proxy(self.try_old_peers))
 
 #    def try_register(self, addrs):
 #        '''Try to register self with a peer by sending a register packet
