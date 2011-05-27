@@ -299,11 +299,13 @@ class Router(object):
         Parse it and send it on its way.
         Data types get special treatment to reduce overhead.'''
 
+        # get dst and src 128-bit ids
         dst = data[4:20]
 
         # ours?
         if dst == self.pm._self.id or dst == '\x00'*16:
             pt = unpack('!H', data[:2])[0]
+            # get dst and src 128-bit ids
             src = data[20:36]
 
             if pt == self.DATA:
@@ -322,11 +324,6 @@ class Router(object):
                 # should i use 1byte type + 3byte id, or 2byte type + 2byte id TODO
                 id = unpack('!H', data[2:4])[0]
 
-                # get dst and src 128-bit ids
-                # should i mandate this or let handlers decide? how to do routing
-                # otherwise
-                #dst = data[4:20]
-                #src = data[20:36]
 
                 if pt in self.handlers:
                     # need to check if this is from a known peer?

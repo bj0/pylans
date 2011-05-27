@@ -476,6 +476,7 @@ class PeerManager(object):
             # init encryption
 
             # do register, close session if failed
+            # but do it after we send the ack
             def do_later():
                 d = self.try_register(pid, relays=self.shaking_peers[pid][1])
                 d.addErrback(self.close_session, pid)

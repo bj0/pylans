@@ -19,6 +19,10 @@ from vpn.crypto import Crypter
 from vpn.peers import PeerInfo
 
 class SessionManager(object):
+
+    KEY_XCHANGE = 30
+    KEY_XCHANGE_ACK = 31
+
     def __init__(self, router):
 
         self.router = util.get_weakref_proxy(router)
@@ -54,6 +58,51 @@ class SessionManager(object):
         if sid not in self:
             raise KeyError, "unknown session id: {0}".format(sid.encode('hex'))
         return self.session_objs[sid].decrypt(data)
+
+    def init_key_xc(self, sid):
+        #TODO prevent multiple key xc at the same time?
+        mynonce = os.urandom(32)
+        mac = hmac.new(self.router.network.key, mynonce, hashlib.sha256).digest()
+
+        self.router.send(self.KEY_XCHANGE, mynonce+mac, sid)
+
+    def handle_key_xc(self, type, packet, address, src_id):
+
+        nonce, mac = packet[:32], packet[32:]
+
+        # verify nonce
+        if hmac.new(self.router.network.key, nonce, hashlib.sha256).digest() != mac:
+            logger.critical("hmac verification failed on key xchange!")
+        else:
+            send_key_xc_ack(nonce, sid)
+
+    def send_key_xc_ack(self, nonce, sid):
+
+        mynonce = os.urandom(82)
+        mac = hmac.new(self.router.network.key, nonce+mynonce, hashlib.sha256).digets()
+
+        d = self.router.send(self.KEY_XCHANGE_ACK, nonce+mynonce+mac, sid, ack=True)
+        d.addCallback(lambda *x: self.key_xc_complete(nonce+mynonce, sid))
+        d.addErrback(lambda *x: self.key_xc_fail(sid))
+
+    def handle_key_xc_ack(self, type, packet, address, src_id):
+
+        mynonce, nonce, mac = packet[:32], packet[32:64], packet[64:]
+
+        # verify nonce
+        if hmac.new(self.router.network.key, nonce, hashlib.sha256).digest() != mac:
+            logger.critical('hmac verification failed on key xchange!')
+        else:
+            self.key_xc_complete(mynonce+nonce, src_id)
+
+    def key_xc_complete(self, salt, sid):
+
+        session_key = hashlib.sha256(self.router.network.key+salt).digest()
+        self.open(pid, session_key)
+
+    def key_xc_fail(self, sid):
+        logger.critical('key xchange failed!')
+        #TODO re-try key xchange, or drop session??
 
     ### Container Functions
     def get(self, item, default=None):
