@@ -146,6 +146,15 @@ class PeerManager(object):
             self.peer_list[peer.id] = peer
             if peer.addr not in self.addr_map:
                 self.addr_map[peer.addr] = (peer.address, peer.id)
+            elif peer.id != self.addr_map[peer.addr][1]:
+                # what if its here and has a diff id/addr? TODO
+                logger.critical('mac address collision between {0} and {1}'.format(
+                            self.addr_map[peer.addr][1].encode('hex'),
+                            peer.id.encode('hex') ))
+                self.addr_map[peer.addr] = (peer.address, peer.id)
+            elif peer.address != self.addr_map[peer.addr][0]:
+                # what to do if the addresses are diff?
+                logger.critical('multiple addresses for mac:{0}'.format(peer.addr_str))
 
             # fire event
             event.emit('peer-added', self, peer)
