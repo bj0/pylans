@@ -83,9 +83,9 @@ class PeerManager(object):
         # list of peers
         self.peer_list = {}
         # addr to (address,port)
-        self.addr_map = {}
+#        self.addr_map = {}
         # addr to (address,port) for relays
-        self.relay_map = {}
+#        self.relay_map = {}
         # id's shaking hands -> nonce
         self.shaking_peers = {}
         # id -> session key
@@ -103,9 +103,11 @@ class PeerManager(object):
         self._self.port = router.network.wan_port
         self._my_pickle = pickle.dumps(self._self,-1)
 
-        # packet handlers
         self.router = util.get_weakref_proxy(router)
         self.sm = util.get_weakref_proxy(self.router.sm)
+        self.addr_map = util.get_weakref_proxy(self.router.addr_map)
+
+        # packet handlers
         router.register_handler(self.PEER_XCHANGE, self.handle_px)
         router.register_handler(self.PEER_XCHANGE_ACK, self.handle_px_ack)
         router.register_handler(self.REGISTER, self.handle_reg)
@@ -135,18 +137,15 @@ class PeerManager(object):
             if peer.relays > 0:
                 peer.is_direct = False
                 peer.relay_id = self[peer.address].id
-                #self.try_register(peer)
-                self.relay_map[peer.addr] = (peer.address, peer.id)
             else:
                 peer.is_direct = True
                 peer.relay_id = None
                 if peer.address not in peer.direct_addresses:
                     peer.direct_addresses.append(peer.address)
-                self.addr_map[peer.addr] = (peer.address, peer.id)
-                if peer.addr in self.relay_map:
-                    del self.relay_map[peer.addr]
 
             self.peer_list[peer.id] = peer
+            if peer.addr not in self.addr_map:
+                self.addr_map[peer.addr] = (peer.address, peer.id)
 
             # fire event
             event.emit('peer-added', self, peer)

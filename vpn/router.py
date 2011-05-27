@@ -95,6 +95,7 @@ class Router(object):
 
         self.handlers = {}
         self._requested_acks = {}
+        self.addr_map = {}
 
         self.network = util.get_weakref_proxy(network)
         #self.filter = Crypter(network.key)
@@ -107,8 +108,8 @@ class Router(object):
         #self.filter = self._filterator.filter
         #self.unfilter = self._filterator.unfilter
 
-        self.addr_map = self.pm.addr_map
-        self.relay_map = self.pm.relay_map
+#        self.addr_map = self.pm.addr_map
+#        self.relay_map = self.pm.relay_map
 
         # move this out of router?
         self.pinger = Pinger(self)
@@ -168,6 +169,7 @@ class Router(object):
         self._bootstrap.stop()
         self._tuntap.stop()
         # bring down iface?
+        # todo determine states: online/offline/disabled/adapterless?
         self.pm.clear()
         if self._port is not None:
             self._port.stopListening()
@@ -295,7 +297,7 @@ class Router(object):
             if pt == self.DATA:
                 #src = self.pm.get_by_address(address)
                 packet = self.sm.decode(src, data[36:])
-                self.recv_packet(packet, src)
+                self.recv_packet(packet, src, address)
 
             else:
                 if pt == self.ENCODED:
@@ -404,13 +406,13 @@ class TapRouter(Router):
                 self.send(self.DATA, packet, addr)
 
         # if we don't have a direct connection...
-        elif dst in self.relay_map:
-            self.send(self.DATA, packet, self.relay_map[dst])
+        #elif dst in self.relay_map:
+        #    self.send(self.DATA, packet, self.relay_map[dst])
         else:
             logger.debug('got packet on wire to unknown destination: \
                          {0}'.format(dst.encode('hex')))
 
-    def recv_packet(self, packet, src):
+    def recv_packet(self, packet, src, address):
         '''Got a data packet from a peer, need to inject it into tun/tap'''
 
         dst = packet[0:self.addr_size]
@@ -421,10 +423,10 @@ class TapRouter(Router):
             logger.debug('writing packet to TAP device')
 
 # todo what to do about this
-#            src_addr = packet[self.addr_size:self.addr_size*2]
-#            if src_addr not in self.addr_map: # negligible speed hit
-#                self.addr_map[src_addr] = src
-#                logger.warning('got new addr from packet!')
+            src_addr = packet[self.addr_size:self.addr_size*2]
+            if src_addr not in self.addr_map: # negligible speed hit
+                self.addr_map[src_addr] = (address, src)
+                logger.warning('got new addr from packet!: {0}'.format(src_addr.encode('hex')))
         else:
             # no, odd
             self.send_packet(packet)
