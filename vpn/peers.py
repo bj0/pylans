@@ -155,6 +155,7 @@ class PeerManager(object):
             elif peer.address != self.addr_map[peer.addr][0]:
                 # what to do if the addresses are diff?
                 logger.critical('multiple addresses for mac:{0}'.format(peer.addr_str))
+                self.addr_map[peer.addr] = (peer.address, peer.id)
 
             # fire event
             event.emit('peer-added', self, peer)
@@ -165,17 +166,10 @@ class PeerManager(object):
         '''Remove a peer connection'''
         if peer.id in self.peer_list:
             del self.peer_list[peer.id]
-#        if peer.id in self.relay_list[peer.id]:
-#            del self.relay_list[peer.id]
-#        if peer.vip in self.ip_map:
-#            del self.ip_map[peer.vip]
-        if peer.addr in self.addr_map:
-            del self.addr_map[peer.addr]
-        if peer.addr in self.relay_map:
-            del self.relay_map[peer.addr]
+#        if peer.addr in self.addr_map:
+#            del self.addr_map[peer.addr]
 
-            # fire event
-#            self.peer_removed(peer)
+        # fire event
         event.emit('peer-removed', self, peer)
 
     def _timeout(self, peer):
@@ -186,12 +180,8 @@ class PeerManager(object):
     def update_peer(self, opi, npi):
         changed = False
         if (opi.relays >= npi.relays and opi.address != npi.address):
-            #self.addr_map[opi.addr] = npi.address
-            if npi.relays > 0:
-                self.relay_map[opi.addr] = npi.address
-            else:
-                del self.relay_map[opi.addr]
-                self.addr_map[opi.addr] = (npi.address, npi.id)
+            # point addr_map at better relay
+            self.addr_map[opi.addr] = (npi.address, npi.id)
 
             opi.address = npi.address
             opi.relays = npi.relays
