@@ -71,9 +71,6 @@ class PeerManager(object):
     PX_TRY_DELAY = 2
 
     # packet types
-    GREET = 14
-    HANDSHAKE = 15
-    HANDSHAKE_ACK = 16
     PEER_XCHANGE = 17
     PEER_XCHANGE_ACK = 18
     PEER_ANNOUNCE = 19
@@ -86,7 +83,7 @@ class PeerManager(object):
         # addr to (address,port)
 #        self.addr_map = {}
         # id's shaking hands -> nonce
-        self.shaking_peers = {}
+#        self.shaking_peers = {}
 
         # for display purposes
         self.peer_map = {}
@@ -102,7 +99,7 @@ class PeerManager(object):
 
         self.router = util.get_weakref_proxy(router)
         self.sm = util.get_weakref_proxy(self.router.sm)
-        self.addr_map = util.get_weakref_proxy(self.router.addr_map)
+        self.addr_map = self.router.addr_map
 
         # packet handlers
         router.register_handler(self.PEER_XCHANGE, self.handle_px)
@@ -110,9 +107,9 @@ class PeerManager(object):
         router.register_handler(self.REGISTER, self.handle_reg)
         router.register_handler(self.REGISTER_ACK, self.handle_reg_ack)
         router.register_handler(self.PEER_ANNOUNCE, self.handle_announce)
-        router.register_handler(self.GREET, self.handle_greet)
-        router.register_handler(self.HANDSHAKE, self.handle_handshake)
-        router.register_handler(self.HANDSHAKE_ACK, self.handle_handshake_ack)
+
+        event.register_handler('session-opened', None,
+                               lambda o, sid, r: self.try_register(sid, relays=r))
 
 
     #def clear(self):
@@ -327,169 +324,6 @@ class PeerManager(object):
 
     ###### Peer Register Functions
 
-    def try_greet(self, addrs):
-        if isinstance(addrs, tuple):
-            # It's an (address,port) pair
-            addrs = [addrs]
-
-        elif isinstance(addrs, PeerInfo):
-            if addrs.is_direct:
-                # don't need to...
-                return #TODO return a defffffer?
-
-            # it's a peer, try direct_addresses
-            # if a NAT scrambled the port, re-add it to the list for each IP
-            # list(set()) to eliminate duplicates
-            try:
-                addrs = \
-                    list(set([ (x[0], addrs.port) for x in addrs.direct_addresses
-                                                        if x[1] != addrs.port])) \
-                        + addrs.direct_addresses
-            except AttributeError: # if .port undefined (pre bzr rev 61)
-                addrs = addrs.direct_addresses
-
-        elif not isinstance(addrs, list):
-            logger.error('try_greet called with incorrect parameter: {0}'.format(addrs))
-            return #TODO defferrr?
-
-        main_d = defer.Deferred()
-
-        def try_address(err, j):
-            if j < len(addrs):
-                address = addrs[j]
-                logger.info('sending greet to {0}'.format(address))
-
-#                if (address not in self.router.pm) or not self.router.pm[address].is_direct:
-#                    d = defer.Deferred()
-
-                def send_greet(timeout_id, i, *x):
-                    '''Send a greet packet and re-queues self'''
-
-                    if i > 0:
-                        logger.debug('sending greet packet #{0}'.format(i))
-                        d = self.send_greet(address, ack=True)
-                        d.addCallbacks(main_d.callback, send_greet, None, None, (i-1,), None)
-                    else:
-                        # address didn't respond, try next address
-                        logger.info('(greet) address {0} timed out'.format(address))
-                        reactor.callLater(0, try_address, None, j+1)
-
-                send_greet(0, 3)
-            else:
-                logger.info('no addresses passed to try_register responded.')
-                main_d.errback(Exception('Could not establish connection with addresses.'))
-
-        reactor.callLater(0, try_address, None, 0)
-        main_d.addCallback(lambda *x: logger.debug('greet success! {0}'.format(x)))
-        main_d.addErrback(logger.info)
-        return main_d #TODO this funky thing needs testing
-
-    def send_greet(self, address, ack=False):
-        #if address not in self:
-        return self.router.send(self.GREET, '', address, ack=ack)
-
-    def handle_greet(self, type, packet, address, src_id):
-        if src_id == self._self.id:
-            logger.info('greeted self')
-            return
-
-        logger.debug('handle greet')
-        if src_id not in self.sm and src_id not in self.shaking_peers:
-            # unknown peer not currently shaking hands, start handshake
-            self.send_handshake(src_id, address, 0)
-        else:
-            # check to see if we found a direct route TODO
-            pass
-
-    def handshake_timeout(self, pid):
-        if pid not in self.sm:
-            logger.warning('handshake with {0} timed out'.format(pid.encode('hex')))
-            if pid in self.shaking_peers:
-                del self.shaking_peers[pid]
-            if pid in self.sm.session_map:
-                del self.sm.session_map[pid]
-
-    def send_handshake(self, pid, address, relays=0):
-        logger.debug('send handshake')
-        if pid not in self.sm and pid not in self.shaking_peers:
-            nonce = os.urandom(32) #todo crypto size
-            self.shaking_peers[pid] = (nonce, relays)
-            self.sm.session_map[pid] = address
-
-            # timeout handshake
-            reactor.callLater(3, self.handshake_timeout, pid)
-
-            mac = hmac.new(self.router.network.key, nonce, hashlib.sha256).digest()
-
-            # need ack?
-            self.router.send(self.HANDSHAKE, pack('!B', relays)+nonce+mac, pid)
-
-
-
-    def handle_handshake(self, type, packet, address, src_id):
-        if src_id not in self.peer_list and src_id not in self.shaking_peers:
-            r, nonce, mac = packet[0], packet[1:33], packet[33:]
-            r = unpack('!B', r)[0]
-
-            # verify nonce
-            if hmac.new(self.router.network.key, nonce, hashlib.sha256).digest() != mac:
-                logger.critical("hmac verification failed on handshake!")
-            else:
-                self.send_handshake_ack(nonce, src_id, address, r)
-
-    def send_handshake_ack(self, nonce, pid, address, relays=0):
-        logger.debug('sending handshake ack to {0}'.format(pid.encode('hex')))
-        mynonce = os.urandom(32)
-        self.shaking_peers[pid] = (mynonce, relays)
-        self.sm.session_map[pid] = address
-
-        mac = hmac.new(self.router.network.key, nonce+mynonce, hashlib.sha256).digest()
-        d = self.router.send(self.HANDSHAKE_ACK, mynonce+mac, pid, ack=True)
-        d.addCallback(lambda *x: self.handshake_done(pid, nonce+mynonce, address))
-        d.addErrback(lambda *x: self.handshake_fail(pid, x))
-
-    def handle_handshake_ack(self, type, packet, address, src_id):
-        logger.debug('got handshake ack from {0}'.format(src_id.encode('hex')))
-        if src_id in self.shaking_peers:
-            nonce, mac = packet[:32], packet[32:]
-            mynonce = self.shaking_peers[src_id][0]
-            if hmac.new(self.router.network.key, mynonce+nonce, hashlib.sha256).digest() != mac:
-                logger.critical("hmac verification failed on handshake_ack!")
-                self.handshake_fail(src_id)
-            else:
-                self.handshake_done(src_id, mynonce+nonce, address)
-
-
-    def handshake_done(self, pid, salt, address):
-        logger.debug('handshake finished with {0}'.format(pid.encode('hex')))
-        if pid in self.shaking_peers:
-            # todo - session key size?
-            session_key = hashlib.md5(self.router.network.key+salt).digest()
-            # init encryption
-            self.sm.open(pid, session_key)
-
-            # do register, close session if failed
-            # but do it after we send the ack
-            def do_later():
-                d = self.try_register(pid, relays=self.shaking_peers[pid][1])
-                d.addErrback(self.close_session, pid)
-            reactor.callLater(0, do_later)
-
-    def handshake_fail(self, pid, x):
-        logger.critical('handshake failed with {0}'.format(pid.encode('hex')))
-        if pid in self.shaking_peers:
-            del self.shaking_peers[pid]
-        if pid in self.sm.session_map:
-            del self.sm.session_map[pid]
-
-    def close_session(self, pid):
-        if pid in self.shaking_peers:
-            del self.shaking_peers[pid]
-        if pid in self.sm:
-            self.sm.close(pid)
-        if pid in self.pm:
-            self.pm.remove_peer(pid)
-
     def try_register(self, pid, addr=None, relays=0):
         '''Try to register self with a peer by sending a register packet
         with own peer info.  Will continue to send this packet until an
@@ -536,7 +370,7 @@ class PeerManager(object):
         for pid in self.router.network.known_addresses:
             if pid not in self:
                 addrs = self.router.network.known_addresses[pid]
-                self.try_greet(addrs)
+                self.sm.try_greet(addrs)
 
         # re-schedule
         interval = settings.get_option(self.router.network.name + '/try_old_peers_interval', 60*5)

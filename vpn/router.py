@@ -237,10 +237,14 @@ class Router(object):
             d = None
 
 
-        if data != '' and not clear and dst_id in self.sm:
-            data = self.sm.encode(dst_id, pack('!H',type) + data)
+        if data != '' and not clear:
+            if dst_id in self.sm:
+                data = self.sm.encode(dst_id, pack('!H',type) + data)
             #logger.debug('encoding packet {0}'.format(type))
-            type = self.ENCODED
+                type = self.ENCODED
+            else:
+                logger.critical('trying to send encrypted data ({0}) w/out session!!'.format(type))
+                return #todo throw exception?
         #else:
             #logger.critical('trying to send encrypted packets but no associated session')
             # TODO assert clear == true, because we can't encrypt here
