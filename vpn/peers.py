@@ -19,6 +19,7 @@
 # TODO local clients behind a firewall that use an external intermediary need a way to
 #     realize that they can DC using local addresses
 # TODO NAT port re-write not taken into account
+# TODO merge with session manager? inherit?
 
 import cPickle as pickle
 import logging
@@ -84,12 +85,8 @@ class PeerManager(object):
         self.peer_list = {}
         # addr to (address,port)
 #        self.addr_map = {}
-        # addr to (address,port) for relays
-#        self.relay_map = {}
         # id's shaking hands -> nonce
         self.shaking_peers = {}
-        # id -> session key
-        #self.session_map = {}
 
         # for display purposes
         self.peer_map = {}
@@ -122,7 +119,6 @@ class PeerManager(object):
     #    self.peer_list = {}
     #    self.peer_map = {}
     #    self.addr_map = {}
-    #    self.relay_map = {}
     #    self.shaking_peers = {}
 
     def _update_pickle(self):
@@ -467,10 +463,10 @@ class PeerManager(object):
     def handshake_done(self, pid, salt, address):
         logger.debug('handshake finished with {0}'.format(pid.encode('hex')))
         if pid in self.shaking_peers:
+            # todo - session key size?
             session_key = hashlib.md5(self.router.network.key+salt).digest()
-            self.sm.open(pid, session_key)
-            #self.session_map[pid] = (session_key, address, pid)
             # init encryption
+            self.sm.open(pid, session_key)
 
             # do register, close session if failed
             # but do it after we send the ack
@@ -480,10 +476,11 @@ class PeerManager(object):
             reactor.callLater(0, do_later)
 
     def handshake_fail(self, pid, x):
-        print 'fail',x
+        logger.critical('handshake failed with {0}'.format(pid.encode('hex')))
         if pid in self.shaking_peers:
-            logger.critical('handshake failed with {0}'.format(pid.encode('hex')))
             del self.shaking_peers[pid]
+        if pid in self.sm.session_map:
+            del self.sm.session_map[pid]
 
     def close_session(self, pid):
         if pid in self.shaking_peers:
@@ -545,70 +542,6 @@ class PeerManager(object):
         interval = settings.get_option(self.router.network.name + '/try_old_peers_interval', 60*5)
         if interval > 0:
             reactor.callLater(interval, util.get_weakref_proxy(self.try_old_peers))
-
-#    def try_register(self, addrs):
-#        '''Try to register self with a peer by sending a register packet
-#        with own peer info.  Will continue to send this packet until an
-#        ack is received or MAX_REG_TRIES packets have been sent.'''
-#
-#        if isinstance(addrs, tuple): # It's an (address,port) pair
-#            addrs = [addrs]
-#        elif isinstance(addrs, PeerInfo):
-#            # if a NAT scrambled the port, re-add it to the list for each IP
-#            # list(set()) to eliminate duplicates
-#            try:
-#                addrs = \
-#                    list(set([ (x[0], addrs.port) for x in addrs.direct_addresses
-#                                                        if x[1] != addrs.port])) \
-#                        + addrs.direct_addresses
-#            except AttributeError: # if .port undefined (pre bzr rev 61)
-#                addrs = addrs.direct_addresses
-#
-#        elif not isinstance(addrs, list):
-#            logger.error('try_register called with incorrect parameter: {0}'.format(addrs))
-#            return
-#
-#        main_d = defer.Deferred()
-#
-#        def try_address(err, j):
-#            if j < len(addrs):
-#                address = addrs[j]
-#                logger.info('initiating a register xchange with {0}'.format(address))
-#
-#                if (address not in self.router.pm):
-#                    d = defer.Deferred()
-#
-#                    def send_register(i):
-#                        '''Send a register packet and re-queues self'''
-#
-#                        if i <= self.MAX_REG_TRIES and address not in self.router.pm:
-#                            logger.debug('sending REG packet #{0}'.format(i))
-#                            self.router.send(self.REGISTER, self._my_pickle, address)
-#                            reactor.callLater(self.REG_TRY_DELAY, send_register, i+1)
-#                        elif i > self.MAX_REG_TRIES:
-#                            logger.info('(reg) address {0} timed out'.format(address))
-#                            d.errback(Exception('address timed out'))
-#                        else: # address in PM
-#                            logger.debug('(reg) address {0} in PM.'.format(address))
-#                            d.callback(self.router.pm[address])
-#
-##                    reactor.callLater(self.REG_TRY_DELAY, send_register, 0)
-#                    # add callbacks in parallel
-#                    d.addCallbacks(main_d.callback, try_address, None, None, (j+1,), None)
-#                    send_register(0)
-#                else:
-#                    logger.debug('address {0} already in peer list'.format(address))
-#                    main_d.callback(self.router.pm[address])
-#
-#            else:
-#                logger.info('no addresses passed to try_register responded.')
-#                main_d.errback(Exception('Could not establish connection with addresses.'))
-#
-##            return err
-#
-#        reactor.callLater(0, try_address, None, 0)
-#        main_d.addErrback(logger.info)
-#        return main_d
 #
     def handle_reg(self, type, packet, address, src_id):
         '''Handle incoming reg packet by adding new peer and sending ack.'''
