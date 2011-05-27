@@ -48,6 +48,13 @@ revno: 68+edits
  #naz > dev: 20 cpu busy
  #dev > naz: 16.5
 
+... new benchmark, iperf to lxc (pretty much the same both ways)
+revno: 89 (old version)
+naz > eye: 67.6 Mb/s  
+revno: 97/hsrelayz
+naz > eye: 71.4 Mb/s
+
+
 announces are kinda numerous when a new peer gets added.  there is an announce when a new peer is added as a relay from an announce and then a second announce if we can direct-connect to them.  This could end up causing a lot of unnecessary announces.
   Instead, I could make an incoming announce cause a direct connect attempt, and only add the peer as a relay if that fails (via deferred).  The downside of this is that it could take longer for a peer's presence to propagate through the net.
   The first method would propagate the peer as relays through the network really fast and then each relay would be updated when a direct connection is made, causing extra announces.  If there were a lot of peers this could cause a lot of traffic...?

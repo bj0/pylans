@@ -251,7 +251,7 @@ class PeerManager(object):
 
     def handle_announce(self, type, packet, address, src_id):
         logger.info('received an announce packet from {0}'.format(address))
-        packet = self.sm.decode(src_id, packet)
+        #packet = self.sm.decode(src_id, packet)
         pi = pickle.loads(packet)
         if pi.id != self._self.id:
             if pi.id not in self.sm:
@@ -292,7 +292,7 @@ class PeerManager(object):
         '''Handle a peer exchange packet.  Load the peer list with the px packet
         and send an ack packet with own peer list.'''
 
-        packet = self.sm.decode(src_id, packet)
+        #packet = self.sm.decode(src_id, packet)
         peer_list = pickle.loads(packet)
 
         # reply
@@ -308,7 +308,7 @@ class PeerManager(object):
 
         logger.info('received a PX ACK packet')
 
-        packet = self.sm.decode(src_id, packet)
+        #packet = self.sm.decode(src_id, packet)
         peer_list = pickle.loads(packet)
         self.parse_peer_list(self[src_id], peer_list)
 
@@ -602,7 +602,7 @@ class PeerManager(object):
         '''Handle incoming reg packet by adding new peer and sending ack.'''
 
         logger.info('received REG packet, sending ACK')
-        packet = self.sm.decode(src_id, packet)
+        #packet = self.sm.decode(src_id, packet)
         pi = pickle.loads(packet)
         if pi.id == self._self.id:
             # we sent a reg to ourself?
@@ -627,7 +627,7 @@ class PeerManager(object):
 
         logger.info('received REG ACK packet')
 
-        packet = self.sm.decode(src_id, packet)
+        #packet = self.sm.decode(src_id, packet)
         pi = pickle.loads(packet)
 
         if pi.id == self._self.id:

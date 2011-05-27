@@ -27,7 +27,7 @@ class SessionManager(object):
 
 
     def send(self, type, data, dest, *args, **kwargs):
-        data = self.encode(dest, data)
+        #data = self.encode(dest, data)
 
         self.router.send(type, data, dest, *args, **kwargs)
 
