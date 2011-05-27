@@ -53,6 +53,8 @@ revno: 89 (old version)
 naz > eye: 67.6 Mb/s  
 revno: 97/hsrelayz
 naz > eye: 71.4 Mb/s
+revno: 101/hsrelayz
+naz > eye: 69.7
 
 
 announces are kinda numerous when a new peer gets added.  there is an announce when a new peer is added as a relay from an announce and then a second announce if we can direct-connect to them.  This could end up causing a lot of unnecessary announces.

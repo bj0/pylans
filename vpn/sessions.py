@@ -36,7 +36,7 @@ class SessionManager(object):
         self.router.send(type, data, dest, *args, **kwargs)
 
     def open(self, sid, session_key):
-        obj = Crypter(session_key)
+        obj = Crypter(session_key, callback=self.init_key_xc, args=(sid,))
         self.session_objs[sid] = obj
 
     def close(self, sid):
@@ -59,7 +59,8 @@ class SessionManager(object):
             raise KeyError, "unknown session id: {0}".format(sid.encode('hex'))
         return self.session_objs[sid].decrypt(data)
 
-    def init_key_xc(self, sid):
+    def init_key_xc(self, obj, sid):
+        logger.info('new key xchange initiated')
         #TODO prevent multiple key xc at the same time?
         mynonce = os.urandom(32)
         mac = hmac.new(self.router.network.key, mynonce, hashlib.sha256).digest()
@@ -67,7 +68,7 @@ class SessionManager(object):
         self.router.send(self.KEY_XCHANGE, mynonce+mac, sid)
 
     def handle_key_xc(self, type, packet, address, src_id):
-
+        logger.info('got new key xchange packet')
         nonce, mac = packet[:32], packet[32:]
 
         # verify nonce
@@ -77,7 +78,7 @@ class SessionManager(object):
             send_key_xc_ack(nonce, sid)
 
     def send_key_xc_ack(self, nonce, sid):
-
+        logger.info('sending key xchange ack')
         mynonce = os.urandom(82)
         mac = hmac.new(self.router.network.key, nonce+mynonce, hashlib.sha256).digets()
 
@@ -86,7 +87,7 @@ class SessionManager(object):
         d.addErrback(lambda *x: self.key_xc_fail(sid))
 
     def handle_key_xc_ack(self, type, packet, address, src_id):
-
+        logger.info('got key xchange ack')
         mynonce, nonce, mac = packet[:32], packet[32:64], packet[64:]
 
         # verify nonce
@@ -96,7 +97,7 @@ class SessionManager(object):
             self.key_xc_complete(mynonce+nonce, src_id)
 
     def key_xc_complete(self, salt, sid):
-
+        logger.info('new key xchange complete')
         session_key = hashlib.sha256(self.router.network.key+salt).digest()
         self.open(pid, session_key)
 
