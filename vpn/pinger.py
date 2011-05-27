@@ -67,10 +67,10 @@ class Pinger(object):
 
     def ping_ack(self, id, peer, ping_time):
         dt = time() - ping_time
-        self.router.pm.peer_list[pi.peer_id].ping_time = dt
-        self.router.pm.peer_list[pi.peer_id].timeouts = 0
+        self.router.pm.peer_list[peer.id].ping_time = dt
+        self.router.pm.peer_list[peer.id].timeouts = 0
 
-        logger.debug('received ping response from {0} with time {1}'.format(self.router.pm.peer_list[pi.peer_id].name, dt))
+        logger.debug('received ping response from {0} with time {1}'.format(self.router.pm.peer_list[peer.id].name, dt))
 
 
     def do_pings(self):
@@ -80,7 +80,7 @@ class Pinger(object):
 
 
     def _ping_timeout(self, id, peer):
-
+        print 'wtf',id
         if peer.id in self.router.pm.peer_list:
 #            peer = self.router.pm.peer_list[peer.id]
             peer.timeouts += 1

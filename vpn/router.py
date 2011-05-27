@@ -199,6 +199,7 @@ class Router(object):
         if type == self.DATA or type == self.DATA_RELAY:
             data = pack('!H', type) + data
             self.send_udp(data, dst)
+            return #todo deferr
 
         elif isinstance(dst, tuple): # address tuple (like for greets)
             dst_id = '\x00'*16 # non-routable
@@ -420,11 +421,12 @@ class TapRouter(Router):
             logger.debug('got packet on wire to unknown destination: \
                          {0}'.format(dst.encode('hex')))
 
-    def recv_packet(self, packet, frm):
+    def recv_packet(self, packet, address):
         '''Got a data packet from a peer, need to inject it into tun/tap'''
         #decrypt packet
         try:
-            packet = self.sm.decode(frm, packet)
+            #print 'dec',self.pm.get_by_address(address),(address)
+            packet = self.sm.decode(self.pm.get_by_address(address), packet)
         except:
             logger.error('could not decrypt a packet')
             return

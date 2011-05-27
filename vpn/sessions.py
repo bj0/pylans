@@ -16,7 +16,7 @@
 #
 import util
 from vpn.crypto import Crypter
-
+from vpn.peers import PeerInfo
 
 class SessionManager(object):
     def __init__(self, router):
@@ -26,11 +26,10 @@ class SessionManager(object):
         self.session_map = {}
 
 
-    def send(self, type, dest, data, *args, **kwargs):
-
+    def send(self, type, data, dest, *args, **kwargs):
         data = self.encode(dest, data)
 
-        self.router.send(type, dest, data, *args, **kwargs)
+        self.router.send(type, data, dest, *args, **kwargs)
 
     def open(self, sid, session_key):
         obj = Crypter(session_key)
@@ -40,13 +39,20 @@ class SessionManager(object):
         del self.session_objs[sid]
 
     def encode(self, sid, data):
-        if dest not in self:
-            raise KeyError, "unknown session id"
+        if isinstance(sid, PeerInfo):
+            sid = sid.id
+
+        if sid not in self:
+            print 'wtf',sid
+            raise KeyError, "unknown session id: {0}".format(sid.encode('hex'))
         return self.session_objs[sid].encrypt(data)
 
     def decode(self, sid, data):
+        if isinstance(sid, PeerInfo):
+            sid = sid.id
+
         if sid not in self:
-            raise KeyError, "unknown session id"
+            raise KeyError, "unknown session id: {0}".format(sid.encode('hex'))
         return self.session_objs[sid].decrypt(data)
 
     ### Container Functions

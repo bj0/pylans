@@ -63,9 +63,9 @@ class PeerInfo(object):
 
 class PeerManager(object):
     '''Manages peer connections'''
-#    MAX_REG_TRIES = 5
+    MAX_REG_TRIES = 5
     MAX_PX_TRIES = 5
-#    REG_TRY_DELAY = 2
+    REG_TRY_DELAY = 2
     PX_TRY_DELAY = 2
 
     # packet types
@@ -114,9 +114,6 @@ class PeerManager(object):
         router.register_handler(self.HANDSHAKE, self.handle_handshake)
         router.register_handler(self.HANDSHAKE_ACK, self.handle_handshake_ack)
 
-        # Events
-#        self.peer_added = Event()
-#        self.peer_removed = Event()
 
     #def clear(self):
     #    self.peer_list = {}
@@ -131,9 +128,6 @@ class PeerManager(object):
         # should announce my change to my peerz
         self.send_announce(self._self, None)
 
-    def send(self, *x):
-        self.router.send(*x)
-
     def add_peer(self, peer):
         '''Add a peer connection'''
         if peer.id not in self.peer_list:
@@ -141,7 +135,7 @@ class PeerManager(object):
                 peer.is_direct = False
                 peer.relay_id = self[peer.address].id
                 #self.try_register(peer)
-                self.relay_map[peer.addr] = peer.address
+                self.relay_map[peer.addr] = (peer.address, peer.id)
             else:
                 peer.is_direct = True
                 peer.relay_id = None
@@ -246,17 +240,18 @@ class PeerManager(object):
             peerkle = self._my_pickle
 
         if address is not None:
-            self.send(self.PEER_ANNOUNCE, peerkle, address)
+            self.sm.send(self.PEER_ANNOUNCE, peerkle, address)
             logger.info('sending announce about {0} to {1}'.format(peer.id, address))
         else:
             for p in self.peer_list.values():
                 if p.id != peer.id:
-                    self.send(self.PEER_ANNOUNCE, peerkle, p)
+                    self.sm.send(self.PEER_ANNOUNCE, peerkle, p)
                     logger.info('sending announce about {0} to {1}'.format(peer.id, p.id))
 
 
     def handle_announce(self, type, packet, address, src_id):
         logger.info('received an announce packet from {0}'.format(address))
+        packet = self.sm.decode(src_id, packet)
         pi = pickle.loads(packet)
         if pi.id != self._self.id:
             if pi.id not in self.sm:
@@ -286,7 +281,7 @@ class PeerManager(object):
 
         def send_px(i):
             if i <= self.MAX_PX_TRIES and peer.id not in self.peer_map:
-                self.send(self.PEER_XCHANGE, pickle.dumps(self.peer_list,-1), peer)
+                self.sm.send(self.PEER_XCHANGE, pickle.dumps(self.peer_list,-1), peer)
                 logger.debug('sending PX packet #{0}'.format(i))
 
                 reactor.callLater(self.PX_TRY_DELAY, send_px, i+1)
@@ -297,11 +292,12 @@ class PeerManager(object):
         '''Handle a peer exchange packet.  Load the peer list with the px packet
         and send an ack packet with own peer list.'''
 
+        packet = self.sm.decode(src_id, packet)
         peer_list = pickle.loads(packet)
 
         # reply
         logger.info('received a PX packet, sending PX ACK')
-        self.send(self.PEER_XCHANGE_ACK, pickle.dumps(self.peer_list,-1), src_id)
+        self.sm.send(self.PEER_XCHANGE_ACK, pickle.dumps(self.peer_list,-1), src_id)
         self.parse_peer_list(self[src_id], peer_list)
 
 
@@ -312,6 +308,7 @@ class PeerManager(object):
 
         logger.info('received a PX ACK packet')
 
+        packet = self.sm.decode(src_id, packet)
         peer_list = pickle.loads(packet)
         self.parse_peer_list(self[src_id], peer_list)
 
@@ -399,6 +396,10 @@ class PeerManager(object):
         return self.router.send(self.GREET, '', address, ack=ack)
 
     def handle_greet(self, type, packet, address, src_id):
+        if src_id == self._self.id:
+            logger.info('greeted self')
+            return
+
         logger.debug('handle greet')
         if src_id not in self.sm and src_id not in self.shaking_peers:
             # unknown peer not currently shaking hands, start handshake
@@ -444,40 +445,46 @@ class PeerManager(object):
                 self.send_handshake_ack(nonce, src_id, address, r)
 
     def send_handshake_ack(self, nonce, pid, address, relays=0):
+        logger.debug('sending handshake ack to {0}'.format(pid.encode('hex')))
         mynonce = os.urandom(32)
         self.shaking_peers[pid] = (mynonce, relays)
         self.sm.session_map[pid] = address
 
         mac = hmac.new(self.router.network.key, nonce+mynonce, hashlib.sha256).digest()
         d = self.router.send(self.HANDSHAKE_ACK, mynonce+mac, pid, ack=True)
-        d.addCallback(self.handshake_done, pid, nonce+mynonce, address)
-        d.addErrback(self.handshake_fail, pid)
+        d.addCallback(lambda *x: self.handshake_done(pid, nonce+mynonce, address))
+        d.addErrback(lambda *x: self.handshake_fail(pid, x))
 
     def handle_handshake_ack(self, type, packet, address, src_id):
-        if pid in self.shaking_peers:
+        logger.debug('got handshake ack from {0}'.format(src_id.encode('hex')))
+        if src_id in self.shaking_peers:
             nonce, mac = packet[:32], packet[32:]
-            mynonce = self.shaking_peers[pid]
+            mynonce = self.shaking_peers[src_id][0]
             if hmac.new(self.router.network.key, mynonce+nonce, hashlib.sha256).digest() != mac:
                 logger.critical("hmac verification failed on handshake_ack!")
-                self.handshake_fail(pid)
+                self.handshake_fail(src_id)
             else:
-                self.handshae_done(pid, mynonce+nonce, address)
+                self.handshake_done(src_id, mynonce+nonce, address)
 
 
     def handshake_done(self, pid, salt, address):
+        logger.debug('handshake finished with {0}'.format(pid.encode('hex')))
         if pid in self.shaking_peers:
-            session_key = hashlib.sha256(self.router.network.key+salt)
+            session_key = hashlib.sha256(self.router.network.key+salt).digest()
             self.sm.open(pid, session_key)
             #self.session_map[pid] = (session_key, address, pid)
             # init encryption
 
             # do register, close session if failed
-            d = try_register(pid, self.shaking_peers[pid][1])
-            d.addErrback(self.close_session, pid)
+            def do_later():
+                d = self.try_register(pid, relays=self.shaking_peers[pid][1])
+                d.addErrback(self.close_session, pid)
+            reactor.callLater(0, do_later)
 
-    def handshake_fail(self, pid):
+    def handshake_fail(self, pid, x):
+        print 'fail',x
         if pid in self.shaking_peers:
-            logger.critical('handshake failed with {0}'.format(pid))
+            logger.critical('handshake failed with {0}'.format(pid.encode('hex')))
             del self.shaking_peers[pid]
 
     def close_session(self, pid):
@@ -507,16 +514,16 @@ class PeerManager(object):
             def send_register(i):
                 '''Send a register packet and re-queues self'''
 
-                if i <= self.MAX_REG_TRIES and pid not in self.router.peer_list:
+                if i <= self.MAX_REG_TRIES and pid not in self.peer_list:
                     logger.debug('sending REG packet #{0}'.format(i))
-                    self.send(self.REGISTER, packet, addr)
+                    self.sm.send(self.REGISTER, packet, addr)
                     reactor.callLater(self.REG_TRY_DELAY, send_register, i+1)
                 elif i > self.MAX_REG_TRIES:
                     logger.info('(reg) address {0} timed out'.format(pid))
                     d.errback(Exception('address timed out'))
                 else: # address in PM
                     logger.debug('(reg) address {0} in PM.'.format(pid))
-                    d.callback(self.router.peer_list[pid])
+                    d.callback(self.peer_list[pid])
 
             send_register(0)
         else:
@@ -595,7 +602,7 @@ class PeerManager(object):
         '''Handle incoming reg packet by adding new peer and sending ack.'''
 
         logger.info('received REG packet, sending ACK')
-
+        packet = self.sm.decode(src_id, packet)
         pi = pickle.loads(packet)
         if pi.id == self._self.id:
             # we sent a reg to ourself?
@@ -609,10 +616,10 @@ class PeerManager(object):
             self.update_peer(self.peer_list[pi.id], pi)
 
         # TODO set relay
-        self._self.relays = relays
+        self._self.relays = pi.relays
         packet = pickle.dumps(self._self, -1)
         self._self.relays = 0
-        self.send(self.REGISTER_ACK, packet, src_id)
+        self.sm.send(self.REGISTER_ACK, packet, src_id)
 
 
     def handle_reg_ack(self, type, packet, address, src_id):
@@ -620,6 +627,7 @@ class PeerManager(object):
 
         logger.info('received REG ACK packet')
 
+        packet = self.sm.decode(src_id, packet)
         pi = pickle.loads(packet)
 
         if pi.id == self._self.id:
@@ -687,7 +695,9 @@ class PeerManager(object):
 
         elif isinstance(item, str):  # name, addr, or id
             peer = None
-            if len(item) == 16 and item in self.peer_list:
+            if item == self._self.id:
+                peer = self._self
+            elif len(item) == 16 and item in self.peer_list:
                 peer = self.peer_list[item]
             else:
                 if len(item) == 4:
