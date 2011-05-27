@@ -110,6 +110,8 @@ class PeerManager(object):
 
         event.register_handler('session-opened', None,
                                lambda o, sid, r: self.try_register(sid, relays=r))
+        event.register_handler('session-closed', None,
+                               lambda o, sid: self.remove_peer(self.get(sid)))
 
 
     #def clear(self):
@@ -157,7 +159,7 @@ class PeerManager(object):
 
     def remove_peer(self, peer):
         '''Remove a peer connection'''
-        if peer.id in self.peer_list:
+        if peer is not None and peer.id in self.peer_list:
             del self.peer_list[peer.id]
 #        if peer.addr in self.addr_map:
 #            del self.addr_map[peer.addr]

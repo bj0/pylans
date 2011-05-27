@@ -81,9 +81,7 @@ class Pinger(object):
 
 
     def _ping_timeout(self, id, peer):
-        print 'wtf',id
         if peer.id in self.router.pm.peer_list:
-#            peer = self.router.pm.peer_list[peer.id]
             peer.timeouts += 1
             if peer.timeouts > self.MAX_TIMEOUTS:
                 self.router.pm._timeout(peer)
