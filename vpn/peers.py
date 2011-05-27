@@ -23,6 +23,8 @@
 import cPickle as pickle
 import logging
 from twisted.internet import reactor, defer
+import os
+from struct import pack, unpack
 import util
 from util import event
 
@@ -47,9 +49,6 @@ class PeerInfo(object):
         self.ping_time = 0              #
         self.timeouts = 0               # tracking ping timeouts
 
-#    def update(self, peer):
-#        self.name = peer.name
-#        self.vip = peer.vip
 
     @property
     def vip_str(self):
@@ -89,7 +88,7 @@ class PeerManager(object):
         # id's shaking hands -> nonce
         self.shaking_peers = {}
         # id -> session key
-        self.session_map = {}
+        #self.session_map = {}
 
         # for display purposes
         self.peer_map = {}
@@ -105,22 +104,26 @@ class PeerManager(object):
 
         # packet handlers
         self.router = util.get_weakref_proxy(router)
+        self.sm = util.get_weakref_proxy(self.router.sm)
         router.register_handler(self.PEER_XCHANGE, self.handle_px)
         router.register_handler(self.PEER_XCHANGE_ACK, self.handle_px_ack)
         router.register_handler(self.REGISTER, self.handle_reg)
         router.register_handler(self.REGISTER_ACK, self.handle_reg_ack)
         router.register_handler(self.PEER_ANNOUNCE, self.handle_announce)
+        router.register_handler(self.GREET, self.handle_greet)
+        router.register_handler(self.HANDSHAKE, self.handle_handshake)
+        router.register_handler(self.HANDSHAKE_ACK, self.handle_handshake_ack)
 
         # Events
 #        self.peer_added = Event()
 #        self.peer_removed = Event()
 
-    def clear(self):
-        self.peer_list = {}
-        self.peer_map = {}
-        self.addr_map = {}
-        self.relay_map = {}
-        self.shaking_peers = {}
+    #def clear(self):
+    #    self.peer_list = {}
+    #    self.peer_map = {}
+    #    self.addr_map = {}
+    #    self.relay_map = {}
+    #    self.shaking_peers = {}
 
     def _update_pickle(self):
         self._my_pickle = pickle.dumps(self._self,-1)
@@ -144,7 +147,7 @@ class PeerManager(object):
                 peer.relay_id = None
                 if peer.address not in peer.direct_addresses:
                     peer.direct_addresses.append(peer.address)
-                self.addr_map[peer.addr] = peer.address
+                self.addr_map[peer.addr] = (peer.address, peer.id)
                 if peer.addr in self.relay_map:
                     del self.relay_map[peer.addr]
 
@@ -185,7 +188,7 @@ class PeerManager(object):
                 self.relay_map[opi.addr] = npi.address
             else:
                 del self.relay_map[opi.addr]
-                self.addr_map[opi.addr] = npi.address
+                self.addr_map[opi.addr] = (npi.address, npi.id)
 
             opi.address = npi.address
             opi.relays = npi.relays
@@ -256,7 +259,7 @@ class PeerManager(object):
         logger.info('received an announce packet from {0}'.format(address))
         pi = pickle.loads(packet)
         if pi.id != self._self.id:
-            if pi.id not in self.session_map:
+            if pi.id not in self.sm:
                 # init (relayed) handshake
                 self.send_handshake(pi.id, address, pi.relays)
             elif pi.id not in self.peer_map:
@@ -334,27 +337,98 @@ class PeerManager(object):
 
     ###### Peer Register Functions
 
-    def send_greet(self, address):
+    def try_greet(self, addrs):
+        if isinstance(addrs, tuple):
+            # It's an (address,port) pair
+            addrs = [addrs]
+
+        elif isinstance(addrs, PeerInfo):
+            if addrs.is_direct:
+                # don't need to...
+                return #TODO return a defffffer?
+
+            # it's a peer, try direct_addresses
+            # if a NAT scrambled the port, re-add it to the list for each IP
+            # list(set()) to eliminate duplicates
+            try:
+                addrs = \
+                    list(set([ (x[0], addrs.port) for x in addrs.direct_addresses
+                                                        if x[1] != addrs.port])) \
+                        + addrs.direct_addresses
+            except AttributeError: # if .port undefined (pre bzr rev 61)
+                addrs = addrs.direct_addresses
+
+        elif not isinstance(addrs, list):
+            logger.error('try_greet called with incorrect parameter: {0}'.format(addrs))
+            return #TODO defferrr?
+
+        main_d = defer.Deferred()
+
+        def try_address(err, j):
+            if j < len(addrs):
+                address = addrs[j]
+                logger.info('sending greet to {0}'.format(address))
+
+#                if (address not in self.router.pm) or not self.router.pm[address].is_direct:
+#                    d = defer.Deferred()
+
+                def send_greet(timeout_id, i, *x):
+                    '''Send a greet packet and re-queues self'''
+
+                    if i > 0:
+                        logger.debug('sending greet packet #{0}'.format(i))
+                        d = self.send_greet(address, ack=True)
+                        d.addCallbacks(main_d.callback, send_greet, None, None, (i-1,), None)
+                    else:
+                        # address didn't respond, try next address
+                        logger.info('(greet) address {0} timed out'.format(address))
+                        reactor.callLater(0, try_address, None, j+1)
+
+                send_greet(0, 3)
+            else:
+                logger.info('no addresses passed to try_register responded.')
+                main_d.errback(Exception('Could not establish connection with addresses.'))
+
+        reactor.callLater(0, try_address, None, 0)
+        main_d.addCallback(lambda *x: logger.debug('greet success! {0}'.format(x)))
+        main_d.addErrback(logger.info)
+        return main_d #TODO this funky thing needs testing
+
+    def send_greet(self, address, ack=False):
         #if address not in self:
-        self.router.send(self.GREET, '', address)
+        return self.router.send(self.GREET, '', address, ack=ack)
 
     def handle_greet(self, type, packet, address, src_id):
-        if src_id not in self.session_map and src_id not in self.shaking_peers:
+        logger.debug('handle greet')
+        if src_id not in self.sm and src_id not in self.shaking_peers:
             # unknown peer not currently shaking hands, start handshake
             self.send_handshake(src_id, address, 0)
         else:
             # check to see if we found a direct route TODO
             pass
 
-    def send_handshake(self, pid, address, relays=0):
-        if src_id not in self.peer_list and src_id not in self.shaking_peers:
-            nonce = os.urandom(32) #todo crypto size
-            self.shaking_peers.append[pid] = (nonce, relays)
+    def handshake_timeout(self, pid):
+        if pid not in self.sm:
+            logger.warning('handshake with {0} timed out'.format(pid.encode('hex')))
+            if pid in self.shaking_peers:
+                del self.shaking_peers[pid]
+            if pid in self.sm.session_map:
+                del self.sm.session_map[pid]
 
-            mac = hmac.new(key, nonce, hashlib.sha256).digest()
+    def send_handshake(self, pid, address, relays=0):
+        logger.debug('send handshake')
+        if pid not in self.sm and pid not in self.shaking_peers:
+            nonce = os.urandom(32) #todo crypto size
+            self.shaking_peers[pid] = (nonce, relays)
+            self.sm.session_map[pid] = address
+
+            # timeout handshake
+            reactor.callLater(3, self.handshake_timeout, pid)
+
+            mac = hmac.new(self.router.network.key, nonce, hashlib.sha256).digest()
 
             # need ack?
-            self.router.send(self.HANDSHAKE, pack('!B', relays)+nonce+mac, pid) #TODO add pid such that send() works when it's not in peer_list
+            self.router.send(self.HANDSHAKE, pack('!B', relays)+nonce+mac, pid)
 
 
 
@@ -364,7 +438,7 @@ class PeerManager(object):
             r = unpack('!B', r)[0]
 
             # verify nonce
-            if hmac.new(key, nonce, hashlib.sha256).digest() != mac:
+            if hmac.new(self.router.network.key, nonce, hashlib.sha256).digest() != mac:
                 logger.critical("hmac verification failed on handshake!")
             else:
                 self.send_handshake_ack(nonce, src_id, address, r)
@@ -372,8 +446,10 @@ class PeerManager(object):
     def send_handshake_ack(self, nonce, pid, address, relays=0):
         mynonce = os.urandom(32)
         self.shaking_peers[pid] = (mynonce, relays)
-        mac = hmac.new(key, nonce+mynonce, hashlib.sha256).digest()
-        d = self.router.send(self.HANDSHAKE_ACK, mynonce+mac, pid, ack=True) #todo same as above
+        self.sm.session_map[pid] = address
+
+        mac = hmac.new(self.router.network.key, nonce+mynonce, hashlib.sha256).digest()
+        d = self.router.send(self.HANDSHAKE_ACK, mynonce+mac, pid, ack=True)
         d.addCallback(self.handshake_done, pid, nonce+mynonce, address)
         d.addErrback(self.handshake_fail, pid)
 
@@ -381,7 +457,7 @@ class PeerManager(object):
         if pid in self.shaking_peers:
             nonce, mac = packet[:32], packet[32:]
             mynonce = self.shaking_peers[pid]
-            if hmac.new(key, mynonce+nonce, hashlib.sha256).digest() != mac:
+            if hmac.new(self.router.network.key, mynonce+nonce, hashlib.sha256).digest() != mac:
                 logger.critical("hmac verification failed on handshake_ack!")
                 self.handshake_fail(pid)
             else:
@@ -390,8 +466,9 @@ class PeerManager(object):
 
     def handshake_done(self, pid, salt, address):
         if pid in self.shaking_peers:
-            session_key = hashlib.sha256(key+salt)
-            self.session_map[pid] = (session_key, address, pid)
+            session_key = hashlib.sha256(self.router.network.key+salt)
+            self.sm.open(pid, session_key)
+            #self.session_map[pid] = (session_key, address, pid)
             # init encryption
 
             # do register, close session if failed
@@ -406,8 +483,8 @@ class PeerManager(object):
     def close_session(self, pid):
         if pid in self.shaking_peers:
             del self.shaking_peers[pid]
-        if pid in self.session_map:
-            del self.session_map[pid]
+        if pid in self.sm:
+            self.sm.close(pid)
         if pid in self.pm:
             self.pm.remove_peer(pid)
 
@@ -416,10 +493,9 @@ class PeerManager(object):
         with own peer info.  Will continue to send this packet until an
         ack is received or MAX_REG_TRIES packets have been sent.'''
 
-        if pid not in self.session_map: # It's an (address,port) pair
-            raise TypeError, "Cannot send register to unknown address"
-        elif addr is None:
-            addr = self.session_map[pid][1]
+        if pid not in self.sm: # It's an (address,port) pair
+            raise TypeError, "Cannot send register to unknown session"
+        addr = pid if addr is None else addr
 
         d = defer.Deferred()
         if (pid not in self.peer_list):
@@ -427,12 +503,13 @@ class PeerManager(object):
             self._self.relays = relays
             packet = pickle.dumps(self._self, -1)
             self._self.relays = 0
+
             def send_register(i):
                 '''Send a register packet and re-queues self'''
 
                 if i <= self.MAX_REG_TRIES and pid not in self.router.peer_list:
                     logger.debug('sending REG packet #{0}'.format(i))
-                    self.send(self.REGISTER, packet, pid)
+                    self.send(self.REGISTER, packet, addr)
                     reactor.callLater(self.REG_TRY_DELAY, send_register, i+1)
                 elif i > self.MAX_REG_TRIES:
                     logger.info('(reg) address {0} timed out'.format(pid))
@@ -512,13 +589,10 @@ class PeerManager(object):
 #
 #        reactor.callLater(0, try_address, None, 0)
 #        main_d.addErrback(logger.info)
-#        return main_d #TODO this funky thing needs testing
+#        return main_d
 #
     def handle_reg(self, type, packet, address, src_id):
         '''Handle incoming reg packet by adding new peer and sending ack.'''
-
-        #TODO do an address hop to count the hops ancryption
-        #dpid, packet = packet[:16],packet[16:]
 
         logger.info('received REG packet, sending ACK')
 
@@ -612,6 +686,7 @@ class PeerManager(object):
             return item
 
         elif isinstance(item, str):  # name, addr, or id
+            peer = None
             if len(item) == 16 and item in self.peer_list:
                 peer = self.peer_list[item]
             else:
@@ -649,5 +724,5 @@ class PeerManager(object):
         elif isinstance(item, str):  # name or vip
             return (item == self._self.id or
                     item in self.peer_list or
-                    item in self.session_map or #TODO which to include here
+                    #TODO which to include here
                 self.get(item) != None)

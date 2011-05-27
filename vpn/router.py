@@ -35,6 +35,7 @@ from vpn.crypto import Crypter
 from util.event import Event
 from vpn.peers import PeerManager
 from vpn.pinger import Pinger
+from vpn.sessions import SessionManager
 from vpn import settings
 import util
 
@@ -97,6 +98,7 @@ class Router(object):
         self.network = util.get_weakref_proxy(network)
         #self.filter = Crypter(network.key)
         proto.router = util.get_weakref_proxy(self)
+        self.sm = SessionManager(self)
         self.pm = PeerManager(self)
 
         # filterz
@@ -195,7 +197,7 @@ class Router(object):
         '''Send a packet of type with data to address.  Address should be an id
         if the peer is known, since address tuples aren't unique with relaying'''
         if type == self.DATA or type == self.DATA_RELAY:
-            data = pack('H', type) + data
+            data = pack('!H', type) + data
             self.send_udp(data, dst)
 
         elif isinstance(dst, tuple): # address tuple (like for greets)
@@ -205,6 +207,10 @@ class Router(object):
             peer = self.pm[dst]
             dst_id = peer.id
             dst = peer.address
+
+        elif dst in self.sm.session_map: # peerless session (during handshake)
+            dst_id = dst
+            dst = self.sm.session_map[dst]
 
         else: # unknown peer dst TODO: this should return an erroring deferred?
             logger.warning('unknown dest {0} not an address tuple'.format(repr(dst)))
@@ -220,7 +226,7 @@ class Router(object):
         else:
             d = None
 
-        data = pack('2H', type, id) + dst_id + self.pm._self.id + data
+        data = pack('!2H', type, id) + dst_id + self.pm._self.id + data
 
         #TODO exception handling for bad addresses
         self.send_udp(data, dst)
@@ -228,7 +234,7 @@ class Router(object):
         return d
 
     def handle_ack(self, type, data, address, src):
-        id = unpack('H', data)[0]
+        id = unpack('!H', data)[0]
         logger.debug('got ack with id {0}'.format(id))
 
         if id in self._requested_acks:
@@ -241,9 +247,9 @@ class Router(object):
         if id in self._requested_acks:
             d = self._requested_acks[id][0]
             del self._requested_acks[id]
+            logger.info('ack timeout')
             d.errback(Exception('call {0} timed out'.format(id)))
 #            d.errback(id)
-            logger.info('ack timeout')
         else:
             logger.info('timeout called with bad id??!!?')
 
@@ -261,7 +267,7 @@ class Router(object):
         Data types get special treatment to reduce overhead.'''
 
         # packet type
-        pt = unpack('!H', data[:1])[0]
+        pt = unpack('!H', data[:2])[0]
 
         # data packet
         if pt == self.DATA:
@@ -287,7 +293,7 @@ class Router(object):
         #        self.relay(data, data[4:20])
 
         # should only be this on TAP
-        #elif dt == self.DATA_BROADCAST:
+        #elif pt == self.DATA_BROADCAST:
         #    logger.debug('got broadcast from {0}'.format(address))
         #    if data[2:8] == self.pm._self.addr:
         #        self.recv_packet(data[8:])
@@ -305,19 +311,20 @@ class Router(object):
             src = data[20:36]
 
             # is it ours?
-            if dst == self.pm._self.id.bytes or dst == '\x00'*16: #handle
-                if dt in self.handlers:
+            if dst == self.pm._self.id or dst == '\x00'*16: #handle
+                if pt in self.handlers:
                     # need to check if this is from a known peer?
-                    self.handlers[dt](dt, data[36:], address, src)
-                if id > 0: # ACK requested
+                    self.handlers[pt](pt, data[36:], address, src)
+                if id > 0: # ACK requested TODO: ack request from unknown peer fails
                     logger.debug('sending ack')
+                    # ack to unknown sources? TODO
                     self.send(self.ACK, data[2:4], src)
-                logger.debug('handling {0} packet from {1}'.format(dt, src.encode('hex')))
+                logger.debug('handling {0} packet from {1}'.format(pt, src.encode('hex')))
 
             # nope
             else:
                 self.relay(data, dst)
-#                logger.debug('relaying {0} packet to {1}'.format(dt, dst.encode('hex')))
+#                logger.debug('relaying {0} packet to {1}'.format(pt, dst.encode('hex')))
 
 
     def recv_packet(self, packet, address):
@@ -393,22 +400,22 @@ class TapRouter(Router):
         # if ip in peer list
         if dst in self.addr_map:
             # encrypt packet
-            #packet = self.filter(packet)
-            self.send(self.DATA, packet, self.addr_map[dst])
+            packet = self.sm.encode(self.addr_map[dst][1], packet)
+            self.send(self.DATA, packet, self.addr_map[dst][0])
 
         # or if it's a broadcast
         elif self._tuntap.is_broadcast(dst):
-            #encrypt packet
-            #packet = self.filter(packet)
-            logger.debug('sending broadcast packet')
+            #logger.debug('sending broadcast packet')
             for addr in self.addr_map.values():
-                self.send(self.DATA, packet, addr)
+                # encrypt
+                epacket = self.sm.encode(addr[1], packet)
+                self.send(self.DATA, epacket, addr[0])
 
         # if we don't have a direct connection...
         elif dst in self.relay_map:
             # encrypt packet
-            #packet = self.filter(packet)
-            self.send(self.DATA_RELAY, self.pm[dst].id+packet, self.relay_map[dst])
+            packet = self.sm.encode(self.relay_map[dst][1], packet)
+            self.send(self.DATA_RELAY, self.relay_map[dst][1]+packet, self.relay_map[dst][0])
         else:
             logger.debug('got packet on wire to unknown destination: \
                          {0}'.format(dst.encode('hex')))
@@ -416,11 +423,11 @@ class TapRouter(Router):
     def recv_packet(self, packet, frm):
         '''Got a data packet from a peer, need to inject it into tun/tap'''
         #decrypt packet
-        #try:
-            #packet = self.unfilter(packet, frm)
-        #except:
-        #    logger.error('could not decrypt a packet')
-        #    return
+        try:
+            packet = self.sm.decode(frm, packet)
+        except:
+            logger.error('could not decrypt a packet')
+            return
 
         dst = packet[0:self.addr_size]
 
