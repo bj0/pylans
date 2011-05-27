@@ -224,12 +224,12 @@ class AESCrypter3(object):
 # test pycryptopp, using one object for all encryptions.  need to keep track of count/position
 # faster encryption, slower decryption
 class _Crypter0(object):
-    '''aes 128 (pycryptopp) in ctr mode with one object for all encrypts,
-    new object for decrypts'''
+    '''aes 128 (pycryptopp) in ctr mode'''
     block_size = 16
     key_size = 16
     def __init__(self, key, can_rollover=False, callback=None, args=()): #pycryptopp uses CTR mode
-        self.key = hashlib.md5(key).digest()
+        assert len(key) == self.key_size, "Invalid key size"
+        self.key = key
         self.can_rollover = can_rollover
         self.callback = callback
         self.args = args
@@ -237,6 +237,7 @@ class _Crypter0(object):
         self.max_q = int(hexlify('\xFF'*(self.block_size-2)), 16)
         self.pos_r = 0
         self.pos_sz = self.block_size + 1
+        self.__fmt = '%%0.%dx'%(self.block_size*2)
         self.obj = aes.AES(self.key, iv='\x00'*self.block_size)
 
     def encrypt(self, string):
@@ -245,10 +246,7 @@ class _Crypter0(object):
             self._reset()
 
         l = len(string)
-        #iv = chr(self.pos_r) + struct.pack('!QQ', (self.pos_q >> 64)&0xFFFFFFFFFFFFFFFF,
-        #                                   (self.pos_q) & 0xFFFFFFFFFFFFFFFF)
-        #iv = chr(self.pos_r) + struct.pack('!QQ', *((self.pos_q >> i)&0xFFFFFFFFFFFFFFFF for i in (64,0)))
-        iv = chr(self.pos_r) + unhexlify('%0.32x'%self.pos_q) #seems like fastest
+        iv = chr(self.pos_r) + unhexlify(self.__fmt%self.pos_q) #seems like fastest
 
         # keep track of pos
         self.pos_q += (self.pos_r + l) // self.block_size
@@ -276,6 +274,12 @@ class _Crypter0(object):
             # so we don't keep calling this function over and over
             self.max_q = self.max_q << 1
             self.callback(self, *args)
+
+class _Crypter1(_Crypter0):
+    '''aes 128 (pycryptopp) in ctr mode'''
+    key_size = 32
+    block_size = 32
+
 
 if aes is not None:
     Crypter = _Crypter0
