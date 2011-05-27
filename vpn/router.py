@@ -251,9 +251,10 @@ class Router(object):
 
 
         if data != '' and not clear and dst_id in self.sm:
-            data = self.sm.encode(dst_id, data)
+            data = self.sm.encode(dst_id, pack('!H',type) + data)
+            type = self.ENCODED
             logger.info('encoding packet {0}'.format(type))
-            type |= self.ENCODED
+#            type |= self.ENCODED
         #else:
             #logger.critical('trying to send encrypted packets but no associated session')
             # TODO assert clear == true, because we can't encrypt here
@@ -311,10 +312,9 @@ class Router(object):
                 self.recv_packet(packet, src)
 
             else:
-
-                if (pt & self.ENCODED) > 0:
-                    pt = pt & 0x7F
+                if pt == self.ENCODED:
                     packet = self.sm.decode(src, data[36:])
+                    pt, packet = packet[:2], packet[2:]
                     #logger.info('got encoded packet {0}'.format(pt))
                 else:
                     packet = data[36:]
