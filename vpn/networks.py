@@ -46,7 +46,7 @@ class Network(object):
         elif key_str is not None:
             self.key_str = key_str
         elif (self.key is None) or self.key == '':
-            self.key = os.urandom(56)
+            self.key = os.urandom(16)
 
         if username is not None:
             self.username = username
