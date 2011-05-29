@@ -282,8 +282,8 @@ class TunTapLinux(TunTapBase):
 
 
 class TunTapWindows(TunTapBase):
-    TUNMODE = 'TUN'
-    TAPMODE = 'TAP'
+    TUNMODE = 0
+    TAPMODE = 1
 
     def __init__(self, router, mode):
         self._running = False
