@@ -29,7 +29,7 @@ class struct_sockaddr_in(Structure):
         ('sin_family', sa_family_t),
         ('sin_port', c_uint16),
         ('sin_addr', struct_in_addr)]
-        
+
 struct_in6_addr = c_byte * 16
 
 class struct_sockaddr_in6(Structure):
@@ -66,7 +66,8 @@ class py_ifaddrs:
 
     def __repr__(self):
         s = self.__class__.__name__ + '('
-        kwargs = {slot: getattr(self, slot) for slot in self.__slots__}
+#        kwargs = {slot: getattr(self, slot) for slot in self.__slots__} # this is 2.7+ only
+        kwargs = dict((slot,getattr(self, slot)) for slot in self.__slots__)
         kwargs['flags'] = hex(kwargs['flags'])
         s += ', '.join('{}={}'.format(k, v) for k, v in kwargs.items())
         return s + ')'
@@ -160,4 +161,3 @@ def getifaddrs():
 if __name__ == '__main__':
     from pprint import pprint
     pprint(getifaddrs())
-
