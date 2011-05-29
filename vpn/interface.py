@@ -172,7 +172,7 @@ class Interface(object):
 
     def connect_to_address(self, address, network=None):
         if self.get_network(network) is not None:
-            self._current.router.pm.try_greet(address)
+            self._current.router.sm.try_greet(address)
 
     def send_message(self, network, peer, msg):
 #        if not self._cbox.is_running():
