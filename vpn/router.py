@@ -144,7 +144,7 @@ class Router(object):
         if mtu is None:
             mtu = settings.get_option(self.network.name + '/' + 'set_mtu', None)
         if mtu is not None:
-            d.addCallback(self._tuntap.set_mtu, mtu)
+            d.addCallback(lambda *x: self._tuntap.set_mtu(mtu))
 
         # start UDP listener
         self._port = reactor.listenUDP(self.network.port, self._proto)
