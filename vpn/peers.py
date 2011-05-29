@@ -164,8 +164,8 @@ class PeerManager(object):
 #        if peer.addr in self.addr_map:
 #            del self.addr_map[peer.addr]
 
-        # fire event
-        event.emit('peer-removed', self, peer)
+            # fire event
+            event.emit('peer-removed', self, peer)
 
     def _timeout(self, peer):
         logger.warning('peer {0} on network {1} timed out'.format(peer.name, self.router.network.name))
@@ -236,12 +236,12 @@ class PeerManager(object):
 
         if address is not None:
             self.sm.send(self.PEER_ANNOUNCE, peerkle, address)
-            logger.info('sending announce about {0} to {1}'.format(peer.id, address))
+            logger.info('sending announce about {0} to {1}'.format(peer.id.encode('hex'), address))
         else:
             for p in self.peer_list.values():
                 if p.id != peer.id:
                     self.sm.send(self.PEER_ANNOUNCE, peerkle, p)
-                    logger.info('sending announce about {0} to {1}'.format(peer.id, p.id))
+                    logger.info('sending announce about {0} to {1}'.format(peer.id.encode('hex'), p.id))
 
 
     def handle_announce(self, type, packet, address, src_id):
@@ -251,7 +251,7 @@ class PeerManager(object):
         if pi.id != self._self.id:
             if pi.id not in self.sm:
                 # init (relayed) handshake
-                self.send_handshake(pi.id, address, pi.relays)
+                self.sm.send_handshake(pi.id, address, pi.relays)
             elif pi.id not in self.peer_list:
                 pi.address = address
                 self.add_peer(pi)
