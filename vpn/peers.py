@@ -169,7 +169,8 @@ class PeerManager(object):
 
     def _timeout(self, peer):
         logger.warning('peer {0} on network {1} timed out'.format(peer.name, self.router.network.name))
-        self.remove_peer(peer)
+        self.sm.close(peer.id) #TODO make this better
+#        self.remove_peer(peer)
 
 
     def update_peer(self, opi, npi):

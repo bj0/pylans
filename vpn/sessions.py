@@ -14,6 +14,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
+# TODO: need a pinger or something to determine when sessions are dead
 from twisted.internet import reactor, defer
 import hashlib, hmac
 from struct import pack, unpack
