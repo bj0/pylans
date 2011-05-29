@@ -317,7 +317,7 @@ class PeerManager(object):
                     self.update_peer(self.peer_list[peer.id],peer)
                 elif peer.id not in self.sm:
                     #self.add_peer(peer)
-                    self.send_handshake(peer.id, peer.address, peer.relays)
+                    self.sm.send_handshake(peer.id, peer.address, peer.relays)
                 elif peer.id not in self.peer_list:
                     self.add_peer(peer)
 
