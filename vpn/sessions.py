@@ -204,7 +204,7 @@ class SessionManager(object):
     def handle_greet(self, type, packet, address, src_id):
         if src_id == self.id:
             logger.info('greeted self')
-            return
+            return #todo throw exception to prevent acks?
 
         logger.debug('handle greet')
         if src_id not in self and src_id not in self.shaking:
