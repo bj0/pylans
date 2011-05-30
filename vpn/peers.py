@@ -185,7 +185,7 @@ class PeerManager(object):
 
             #relay id? TODO
             changed = True
-            logger.info('peer {0} relay changed.'.format(opi.id))
+            logger.info('peer {0} relay changed.'.format(opi.id.format('hex')))
 
         if opi.addr != npi.addr:
             # check for collision? TODO
@@ -195,26 +195,26 @@ class PeerManager(object):
             if opi.addr in self.relay_map:
                 self.relay_map[npi.addr] = self.relay_map[opi.addr]
                 del self.relay_map[opi.addr]
-            opi.addr = npi.addr #todo check if this is None?    
+            opi.addr = npi.addr #todo check if this is None?
             changed = True
-            logger.info('peer {0} addr changed.'.format(opi.id))
+            logger.info('peer {0} addr changed.'.format(opi.id.format('hex')))
 
         if opi.vip != npi.vip:
             # check for collision TODO
             opi.vip = npi.vip
             changed = True
-            logger.info('peer {0} vip changed.'.format(opi.id))
+            logger.info('peer {0} vip changed.'.format(opi.id.format('hex')))
 
         if opi.name != npi.name:
             opi.name = npi.name
             changed = True
-            logger.info('peer {0} name changed.'.format(opi.id))
+            logger.info('peer {0} name changed.'.format(opi.id.format('hex')))
 
         if set(opi.direct_addresses) != set(npi.direct_addresses):
             # combine direct_addresses (w/out dupes)
             opi.direct_addresses = list(set(opi.direct_addresses).union(set(npi.direct_addresses)))
             changed = True
-            logger.info('peer {0} good addresses changed. ({1})'.format(opi.id, opi.direct_addresses))
+            logger.info('peer {0} good addresses changed. ({1})'.format(opi.id.format('hex'), opi.direct_addresses))
 
         if changed:
             # fire event
