@@ -141,7 +141,9 @@ def getifaddrs():
         for ifa in ifap_iter(ifap):
             maddr = None
             baddr = None
-            family, addr = pythonize_sockaddr(ifa.ifa_addr.contents)
+            family, addr = None, None
+            if bool(ifa.ifa_addr): # non-null pointer
+                family, addr = pythonize_sockaddr(ifa.ifa_addr.contents)
             if bool(ifa.ifa_netmask): # non-null pointer
                 mfam, maddr = pythonize_sockaddr(ifa.ifa_netmask.contents)
             if ifa.ifa_flags & IFF_BROADCAST != 0 and bool(ifa.ifa_ifu.ifu_broadaddr):
