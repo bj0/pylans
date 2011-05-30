@@ -197,10 +197,10 @@ class Router(object):
             # send
             return self.send_udp(data, dst)
 
-        elif dst in self.sm:
+        elif dst in self.sm.session_map:
             dst_id = dst
             dst = self.sm.session_map[dst]
-        elif dst in self.pm:
+        elif dst in self.pm and dst != self.pm._self.id:
             pi = self.pm[dst]
             dst_id = pi.id
             dst = pi.address
@@ -215,10 +215,10 @@ class Router(object):
             else:
                 dst_id = '\x00'*16 # non-routable
 
-        # peerless session (during handshake)
-        elif dst in self.sm.session_map:
-            dst_id = dst
-            dst = self.sm.session_map[dst]
+        ## peerless session (during handshake)
+        #elif dst in self.sm.session_map:
+        #    dst_id = dst
+        #    dst = self.sm.session_map[dst]
 
         # unknown peer dst TODO: this should return an erroring deferred?
         else:
