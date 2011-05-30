@@ -74,7 +74,7 @@ class TunTapBase(object):
             mac = ret['AF_LINK']['addr']
         except (ValueError, KeyError):
             logger.critical('unable to get MAC address for {0}'.format(self.ifname))
-            #return None
+            #return None TODO: when this is none it passes it to other peers, causing exceptions, need better solution
             raise
 
         logger.debug('got mac address: {0}'.format(mac))

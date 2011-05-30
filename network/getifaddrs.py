@@ -69,7 +69,8 @@ class py_ifaddrs:
 #        kwargs = {slot: getattr(self, slot) for slot in self.__slots__} # this is 2.7+ only
         kwargs = dict((slot,getattr(self, slot)) for slot in self.__slots__)
         kwargs['flags'] = hex(kwargs['flags'])
-        s += ', '.join('{}={}'.format(k, v) for k, v in kwargs.items())
+#        s += ', '.join('{}={}'.format(k, v) for k, v in kwargs.items()) # 2.6 doesn't like empty format specifiers
+        s += ', '.join('{0}={1}'.format(k, v) for k, v in kwargs.items())
         return s + ')'
 
 class struct_in_pktinfo(Structure):
