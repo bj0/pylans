@@ -195,7 +195,7 @@ class PeerManager(object):
             if opi.addr in self.relay_map:
                 self.relay_map[npi.addr] = self.relay_map[opi.addr]
                 del self.relay_map[opi.addr]
-            opi.addr = npi.addr
+            opi.addr = npi.addr #todo check if this is None?    
             changed = True
             logger.info('peer {0} addr changed.'.format(opi.id))
 

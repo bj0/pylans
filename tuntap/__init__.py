@@ -74,8 +74,8 @@ class TunTapBase(object):
             mac = ret['AF_LINK']['addr']
         except (ValueError, KeyError):
             logger.critical('unable to get MAC address for {0}'.format(self.ifname))
-            return None
-            #raise
+            #return None
+            raise
 
         logger.debug('got mac address: {0}'.format(mac))
 

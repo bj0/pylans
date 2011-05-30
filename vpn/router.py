@@ -379,7 +379,7 @@ class TapRouter(Router):
                 logger.critical('TAP adapater has no addresses')
 
             # get mac addr
-            self.pm._self.addr = self._tuntap.get_mac()
+            self.pm._self.addr = self._tuntap.get_mac() #todo check if this is none?
             self.pm._update_pickle()
 
             reactor.callLater(0, d.callback, ips)
