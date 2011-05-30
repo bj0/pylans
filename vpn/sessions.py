@@ -69,6 +69,8 @@ class SessionManager(object):
             del self.session_map[sid]
         if sid in self.shaking:
             del self.shaking[sid]
+        if sid in self.router.addr_map:
+            del self.router.addr_map[sid]
         util.emit_async('session-closed', self, sid)
 
     def encode(self, sid, data):
