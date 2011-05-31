@@ -241,7 +241,7 @@ class PeerManager(object):
             for p in self.peer_list.values():
                 if p.id != peer.id:
                     self.sm.send(self.PEER_ANNOUNCE, peerkle, p)
-                    logger.info('sending announce about {0} to {1}'.format(peer.id.encode('hex'), p.id))
+                    logger.info('sending announce about {0} to {1}'.format(peer.id.encode('hex'), p.id.encode('hex')))
 
 
     def handle_announce(self, type, packet, address, src_id):
@@ -333,7 +333,9 @@ class PeerManager(object):
         ack is received or MAX_REG_TRIES packets have been sent.'''
 
         if pid not in self.sm: # It's an (address,port) pair
-            raise TypeError, "Cannot send register to unknown session"
+#            raise TypeError, "Cannot send register to unknown session"
+            logger.error("Cannot send register to unknown session {0}".format(pid.encode('hex')))
+            return defer.fail(TypeError("Cannot send register to unknown session"))
         addr = pid if addr is None else addr
 
         d = defer.Deferred()
