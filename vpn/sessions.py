@@ -217,12 +217,15 @@ class SessionManager(object):
                 if pi.relays > 0:
                     import copy
                     logger.critical('got us some directness')
-#                    pn = copy.deepcopy(pi)
+
+                    # update peer
                     pn = copy.copy(pi)
                     pn.relays = 0
                     pn.address = address
                     self.router.pm.update_peer(pi, pn)
-            pass
+
+                    # return the favor
+                    self.send_greet(address)
 
     def handshake_timeout(self, pid):
         if pid not in self:
