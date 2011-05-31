@@ -191,7 +191,11 @@ class Router(object):
             dst_id = dst[1]
             dst = dst[0]
             # encode
-            data = self.sm.encode(dst_id, data)
+            try:
+                data = self.sm.encode(dst_id, data)
+            except KeyError, s:
+                logger.critical('failed to encode data packet: {0}'.format(s))
+                return
             # pack
             data = pack('!2H', type, id) + dst_id + self.pm._self.id + data
             # send
@@ -200,7 +204,9 @@ class Router(object):
         elif dst in self.sm.session_map:
             dst_id = dst
             dst = self.sm.session_map[dst]
-        elif dst in self.pm and dst != self.pm._self.id:
+        elif dst in self.pm and dst != self.pm._self.id: # don't send to self...
+            # it shouldn't really reach this point, as there shouldn't be
+            # anyone in pm who's not in sm
             pi = self.pm[dst]
             dst_id = pi.id
             dst = pi.address
@@ -210,8 +216,8 @@ class Router(object):
             pi = self.pm.get(dst)
             if pi is not None:
                 dst_id = pi.id
-                if data != '' and not clear:
-                    data = self.sm.encode(dst_id, data)
+#                if data != '' and not clear:
+#                    data = self.sm.encode(dst_id, data)
             else:
                 dst_id = '\x00'*16 # non-routable
 
@@ -243,11 +249,11 @@ class Router(object):
             #logger.debug('encoding packet {0}'.format(type))
                 type = self.ENCODED
             else:
-                logger.critical('trying to send encrypted data ({0}) w/out session!!'.format(type))
+                logger.critical('trying to send encrypted packet ({0}) w/out session!!'.format(type))
                 return #todo throw exception?
-        #else:
+        else:
+            logger.warning('sending clear packet ({0})'.format(type))
             #logger.critical('trying to send encrypted packets but no associated session')
-            # TODO assert clear == true, because we can't encrypt here
 
         data = pack('!2H', type, id) + dst_id + self.pm._self.id + data
 
@@ -299,7 +305,7 @@ class Router(object):
             src = data[20:36]
 
             if pt == self.DATA:
-                #src = self.pm.get_by_address(address)
+                # data packets are always encrypted
                 packet = self.sm.decode(src, data[36:])
                 self.recv_packet(packet, src, address)
 
