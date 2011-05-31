@@ -212,6 +212,16 @@ class SessionManager(object):
             self.send_handshake(src_id, address, 0)
         else:
             # check to see if we found a direct route TODO
+            if src_id in self.router.pm:
+                pi = self.router.pm[src_id]
+                if pi.relays > 0:
+                    import copy
+                    logger.critical('got us some directness')
+#                    pn = copy.deepcopy(pi)
+                    pn = copy.copy(pi)
+                    pn.relays = 0
+                    pn.address = address
+                    self.router.pm.update_peer(pi, pn)
             pass
 
     def handshake_timeout(self, pid):

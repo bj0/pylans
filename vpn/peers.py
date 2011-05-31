@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 class PeerInfo(object):
     '''Represents a peer connection'''
-    def __init__(self):
+    def __init__(self, peer=None):
         self.id = 0                     # unique peer id
         self.name = 'wop'
         self.alias = None
