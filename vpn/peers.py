@@ -178,6 +178,7 @@ class PeerManager(object):
         if (opi.relays >= npi.relays and opi.address != npi.address):
             # point addr_map at better relay
             self.addr_map[opi.addr] = (npi.address, npi.id)
+            self.sm.session_map[npi.id] = npi.address
 
             opi.address = npi.address
             opi.relays = npi.relays
