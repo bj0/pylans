@@ -252,7 +252,7 @@ class Router(object):
                 logger.critical('trying to send encrypted packet ({0}) w/out session!!'.format(type))
                 return #todo throw exception?
         else:
-            logger.warning('sending clear packet ({0})'.format(type))
+            logger.debug('sending clear packet ({0})'.format(type))
             #logger.critical('trying to send encrypted packets but no associated session')
 
         data = pack('!2H', type, id) + dst_id + self.pm._self.id + data
