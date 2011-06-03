@@ -56,22 +56,25 @@ struct_ifaddrs._fields_ = [
     ('ifa_ifu', union_ifa_ifu),
     ('ifa_data', c_void_p),]
 
-class py_ifaddrs:
+#class py_ifaddrs:
 
-    __slots__ = 'name', 'flags', 'family', 'addr', 'netmask', 'broadcast'
+#    __slots__ = 'name', 'flags', 'family', 'addr', 'netmask', 'broadcast'
 
-    def __init__(self, **kwds):
-        for key, value in kwds.items():
-            setattr(self, key, value)
+#    def __init__(self, **kwds):
+#        for key, value in kwds.items():
+#            setattr(self, key, value)
 
-    def __repr__(self):
-        s = self.__class__.__name__ + '('
-#        kwargs = {slot: getattr(self, slot) for slot in self.__slots__} # this is 2.7+ only
-        kwargs = dict((slot,getattr(self, slot)) for slot in self.__slots__)
-        kwargs['flags'] = hex(kwargs['flags'])
-#        s += ', '.join('{}={}'.format(k, v) for k, v in kwargs.items()) # 2.6 doesn't like empty format specifiers
-        s += ', '.join('{0}={1}'.format(k, v) for k, v in kwargs.items())
-        return s + ')'
+#    def __repr__(self):
+#        s = self.__class__.__name__ + '('
+##        kwargs = {slot: getattr(self, slot) for slot in self.__slots__} # this is 2.7+ only
+#        kwargs = dict((slot,getattr(self, slot)) for slot in self.__slots__)
+#        kwargs['flags'] = hex(kwargs['flags'])
+##        s += ', '.join('{}={}'.format(k, v) for k, v in kwargs.items()) # 2.6 doesn't like empty format specifiers
+#        s += ', '.join('{0}={1}'.format(k, v) for k, v in kwargs.items())
+#        return s + ')'
+#from collections import namedtuple
+py_ifaddrs = collections.namedtuple('py_ifaddrs', 
+                            'name flags family addr netmask broadcast')
 
 class struct_in_pktinfo(Structure):
     _fields_ = [
@@ -154,7 +157,6 @@ def getifaddrs():
                 family=family,
                 flags=ifa.ifa_flags,
                 addr=addr,
-#                netmask=ifa.ifa_netmask,))
                 netmask=maddr,
                 broadcast=baddr))
         return retval

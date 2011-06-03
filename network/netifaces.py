@@ -10,6 +10,7 @@ elif platform.system() == 'Windows':
 
 
 if _linux:
+    # import and define linux-speciic stuph
     from getifaddrs import getifaddrs
     import socket
     from fcntl import ioctl
@@ -61,6 +62,7 @@ if _linux:
     #208 #define ifr_settings    ifr_ifru.ifru_settings  /* Device/proto settings*/    
 
 if _win32:
+    # import windows specific stuph
     from getadaptersinfo import GetAdaptersInfo, AF_LINK, AF_INET, MIB_IF_TYPE_LOOPBACK
 
 def _win32_interfaces():
@@ -69,7 +71,6 @@ def _win32_interfaces():
    
         #TODO test this on windows
 def _win32_ifaddresses(ifname=None):
-#    buflen = c_ulong(0) #sizeof(adapter_list)
     adapter_list = GetAdaptersInfo(ifname=ifname)
     
     result = {}
@@ -184,3 +185,10 @@ def ifaddresses(ifname=None):
         
     
 __all__ = ['interfaces', 'ifaddresses']
+
+if __name__ == '__main__':
+    import json
+    print 'interfaces:'
+    print json.dumps(interfaces(), indent=2)
+    print 'ifaddresses:'
+    print json.dumps(ifaddresses(), indent=2)
