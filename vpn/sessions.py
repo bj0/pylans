@@ -69,8 +69,13 @@ class SessionManager(object):
             del self.session_map[sid]
         if sid in self.shaking:
             del self.shaking[sid]
-        if sid in self.router.addr_map:
-            del self.router.addr_map[sid]
+
+        # addr map uses mac addresses as keys, not sids
+        # gen a list incase there are multiple addresses for an sid (there shouldn't be)
+        aslist = [k for k in self.router.addr_map if self.router.addr_map[k][-1] == sid]
+        for x in aslist:
+            logger.debug('removing addr map {0}->{1}'.format(util.decode_mac(x),sid.encode('hex')))
+            del self.router.addr_map[x]
         util.emit_async('session-closed', self, sid)
 
     def encode(self, sid, data):
@@ -236,7 +241,7 @@ class SessionManager(object):
                 del self.session_map[pid]
 
     def send_handshake(self, pid, address, relays=0):
-        logger.debug('send handshake')
+        logger.info('send handshake to {0}'.format(pid.encode('hex')))
         if pid not in self and pid not in self.shaking:
             nonce = os.urandom(32) #todo crypto size
             self.shaking[pid] = (nonce, relays)
@@ -263,7 +268,7 @@ class SessionManager(object):
                 self.send_handshake_ack(nonce, src_id, address, r)
 
     def send_handshake_ack(self, nonce, pid, address, relays=0):
-        logger.debug('sending handshake ack to {0}'.format(pid.encode('hex')))
+        logger.info('sending handshake ack to {0}'.format(pid.encode('hex')))
         mynonce = os.urandom(32)
         self.shaking[pid] = (mynonce, relays)
         self.session_map[pid] = address
@@ -274,7 +279,7 @@ class SessionManager(object):
         d.addErrback(lambda *x: self.handshake_fail(pid, x))
 
     def handle_handshake_ack(self, type, packet, address, src_id):
-        logger.debug('got handshake ack from {0}'.format(src_id.encode('hex')))
+        logger.info('got handshake ack from {0}'.format(src_id.encode('hex')))
         if src_id in self.shaking:
             nonce, mac = packet[:32], packet[32:]
             mynonce = self.shaking[src_id][0]
@@ -285,7 +290,7 @@ class SessionManager(object):
                 self.handshake_done(src_id, mynonce+nonce, address)
 
     def handshake_done(self, pid, salt, address):
-        logger.debug('handshake finished with {0}'.format(pid.encode('hex')))
+        logger.info('handshake finished with {0}'.format(pid.encode('hex')))
         if pid in self.shaking:
             # todo - session key size?
             session_key = hashlib.md5(self.router.network.key+salt).digest()
