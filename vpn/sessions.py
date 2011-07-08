@@ -83,7 +83,7 @@ class SessionManager(object):
             sid = sid.id
 
         if sid not in self:
-            #print 'wtf',sid
+            #logger.critical('unknown session id: {0}'.format(sid.encode('hex'))
             raise KeyError, "unknown session id: {0}".format(sid.encode('hex'))
         return self.session_objs[sid].encrypt(data)
 
@@ -94,6 +94,10 @@ class SessionManager(object):
         if sid not in self:
             raise KeyError, "unknown session id: {0}".format(sid.encode('hex'))
         return self.session_objs[sid].decrypt(data)
+
+
+
+###### ###### ###### Key XChange Stuff ###### ###### ###### 
 
     def init_key_xc(self, obj, sid):
         logger.info('new key xchange initiated')
@@ -143,9 +147,10 @@ class SessionManager(object):
 
 
 
-    ### Session Initiation/Handshake functions
+###### ###### ###### Session Initiation/Handshake functions ###### ###### ###### 
 
     def try_greet(self, addrs):
+        '''Try and send 'greet' packets to given address.'''
         if isinstance(addrs, tuple):
             # It's an (address,port) pair
             addrs = [addrs]
@@ -209,7 +214,7 @@ class SessionManager(object):
     def handle_greet(self, type, packet, address, src_id):
         if src_id == self.id:
             logger.info('greeted self')
-            return #todo throw exception to prevent acks?
+            return #TODO throw exception to prevent acks?
 
         logger.debug('handle greet')
         if src_id not in self and src_id not in self.shaking:
