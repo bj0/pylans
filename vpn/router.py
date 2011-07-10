@@ -322,8 +322,14 @@ class Router(object):
 
 
                 if pt in self.handlers:
-                    # need to check if this is from a known peer?
-                    self.handlers[pt](pt, packet, address, src)
+                    # TODO need to check if this is from a known peer?
+                    try:
+                        self.handlers[pt](pt, packet, address, src)
+                    except Exception, e:
+                        logger.error('packet handler for packet type {1} raised\
+                         exception:\n {0}'.format(e, pt))
+                        return # don't ack
+                        
                 if id > 0: # ACK requested TODO: ack request from unknown peer fails
                     logger.debug('sending ack')
                     # ack to unknown sources? TODO
