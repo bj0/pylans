@@ -52,10 +52,10 @@ class SessionManager(object):
         router.register_handler(self.KEY_XCHANGE, self.handle_key_xc)
         router.register_handler(self.KEY_XCHANGE_ACK, self.handle_key_xc_ack)
 
-    def send(self, type, data, dest, *args, **kwargs):
-        #data = self.encode(dest, data)
+#    def send(self, type, data, dest, *args, **kwargs):
+#        #data = self.encode(dest, data)
 
-        self.router.send(type, data, dest, *args, **kwargs)
+#        self.router.send(type, data, dest, *args, **kwargs)
 
     def open(self, sid, session_key, relays=0):
         obj = Crypter(session_key, callback=self.init_key_xc, args=(sid,))
@@ -277,7 +277,7 @@ class SessionManager(object):
         mynonce = os.urandom(32)
         self.shaking[pid] = (mynonce, relays)
         self.session_map[pid] = address
-
+        
         mac = hmac.new(self.router.network.key, nonce+mynonce, hashlib.sha256).digest()
         d = self.router.send(self.HANDSHAKE_ACK, mynonce+mac, pid, ack=True, clear=True)
         d.addCallback(lambda *x: self.handshake_done(pid, nonce+mynonce, address))
@@ -291,6 +291,7 @@ class SessionManager(object):
             if hmac.new(self.router.network.key, mynonce+nonce, hashlib.sha256).digest() != mac:
                 logger.critical("hmac verification failed on handshake_ack!")
                 self.handshake_fail(src_id)
+                raise Exception('hmac verification failed on handshake_ack!') # prevent ack
             else:
                 self.handshake_done(src_id, mynonce+nonce, address)
 
@@ -319,12 +320,7 @@ class SessionManager(object):
             del self.session_map[pid]
 
     def close_session(self, pid):
-#        if pid in self.shaking:
-#            del self.shaking[pid]
-#        if pid in self:
         self.close(pid)
-#        if pid in self.pm:
-            #self.pm.remove_peer(pid)
 
 
 
