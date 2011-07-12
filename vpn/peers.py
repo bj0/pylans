@@ -233,12 +233,12 @@ class PeerManager(object):
             peerkle = self._my_pickle
 
         if address is not None:
-            self.sm.send(self.PEER_ANNOUNCE, peerkle, address)
+            self.router.send(self.PEER_ANNOUNCE, peerkle, address)
             logger.info('sending announce about {0} to {1}'.format(peer.id.encode('hex'), address))
         else:
             for p in self.peer_list.values():
                 if p.id != peer.id:
-                    self.sm.send(self.PEER_ANNOUNCE, peerkle, p)
+                    self.router.send(self.PEER_ANNOUNCE, peerkle, p)
                     logger.info('sending announce about {0} to {1}'.format(peer.id.encode('hex'), p.id.encode('hex')))
 
 
@@ -269,7 +269,7 @@ class PeerManager(object):
 
         def send_px(i):
             if i <= self.MAX_PX_TRIES and peer.id not in self.peer_map:
-                self.sm.send(self.PEER_XCHANGE, pickle.dumps(self.peer_list,-1), peer)
+                self.router.send(self.PEER_XCHANGE, pickle.dumps(self.peer_list,-1), peer)
                 logger.debug('sending PX packet #{0}'.format(i))
 
                 reactor.callLater(self.PX_TRY_DELAY, send_px, i+1)
@@ -285,7 +285,7 @@ class PeerManager(object):
 
         # reply
         logger.info('received a PX packet, sending PX ACK')
-        self.sm.send(self.PEER_XCHANGE_ACK, pickle.dumps(self.peer_list,-1), src_id)
+        self.router.send(self.PEER_XCHANGE_ACK, pickle.dumps(self.peer_list,-1), src_id)
         self.parse_peer_list(self[src_id], peer_list)
 
 
@@ -348,7 +348,7 @@ class PeerManager(object):
 
                 if i <= self.MAX_REG_TRIES and pid not in self.peer_list:
                     logger.debug('sending REG packet #{0}'.format(i))
-                    self.sm.send(self.REGISTER, packet, addr)
+                    self.router.send(self.REGISTER, packet, addr)
                     reactor.callLater(self.REG_TRY_DELAY, send_register, i+1)
                 elif i > self.MAX_REG_TRIES:
                     logger.info('(reg) address {0} timed out'.format(pid))
@@ -401,7 +401,7 @@ class PeerManager(object):
         self._self.relays = pi.relays
         packet = pickle.dumps(self._self, -1)
         self._self.relays = 0
-        self.sm.send(self.REGISTER_ACK, packet, src_id)
+        self.router.send(self.REGISTER_ACK, packet, src_id)
 
 
     def handle_reg_ack(self, type, packet, address, src_id):
