@@ -261,7 +261,8 @@ class SessionManager(object):
 
     def handle_handshake(self, type, packet, address, src_id):
         logger.critical('got handshake!!!')
-        if src_id not in self and src_id not in self.shaking:
+        if (src_id not in self or self.router.pm[src_id].timeouts > 0) \
+         and src_id not in self.shaking:
             r, nonce, mac = packet[0], packet[1:33], packet[33:]
             r = unpack('!B', r)[0]
 
