@@ -146,7 +146,8 @@ class Prompt(Cmd):
                 print 'address:   {0}'.format(p.address)
                 print 'is_direct: {0}'.format(p.is_direct)
                 if(not p.is_direct):
-                    print '  relay:   {0} ({1})'.format(net.router.pm[p.relay_id].name,
+                    rp = self.iface.get_peer_info(p.relay_id)
+                    print '  relay:   {0} ({1})'.format(rp.name,
                                                      p.relay_id.encode('hex'))
                 print 'ping_time: {0} ms'.format(p.ping_time * 1e3)
                 print 'timeouts:  {0}'.format(p.timeouts)
