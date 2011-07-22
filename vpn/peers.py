@@ -384,7 +384,7 @@ class PeerManager(object):
         '''Handle incoming reg packet by adding new peer and sending ack.'''
 
         logger.info('received REG packet, sending ACK')
-        #packet = self.sm.decode(src_id, packet)
+
         pi = pickle.loads(packet)
         if pi.id == self._self.id:
             # we sent a reg to ourself?

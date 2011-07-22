@@ -52,11 +52,6 @@ class SessionManager(object):
         router.register_handler(self.KEY_XCHANGE, self.handle_key_xc)
         router.register_handler(self.KEY_XCHANGE_ACK, self.handle_key_xc_ack)
 
-#    def send(self, type, data, dest, *args, **kwargs):
-#        #data = self.encode(dest, data)
-
-#        self.router.send(type, data, dest, *args, **kwargs)
-
     def open(self, sid, session_key, relays=0):
         obj = Crypter(session_key, callback=self.init_key_xc, args=(sid,))
         self.session_objs[sid] = obj
@@ -217,7 +212,8 @@ class SessionManager(object):
             return #TODO throw exception to prevent acks?
 
         logger.debug('handle greet')
-        if src_id not in self and src_id not in self.shaking:
+        if (src_id not in self or self.router.pm[src_id].timeouts > 0) \
+         and src_id not in self.shaking:
             # unknown peer not currently shaking hands, start handshake
             self.send_handshake(src_id, address, 0)
         else:
@@ -246,8 +242,10 @@ class SessionManager(object):
                 del self.session_map[pid]
 
     def send_handshake(self, pid, address, relays=0):
-        logger.info('send handshake to {0}'.format(pid.encode('hex')))
-        if pid not in self and pid not in self.shaking:
+        if (pid not in self or self.router.pm[pid].timeouts > 0) \
+         and pid not in self.shaking:
+            logger.info('send handshake to {0}'.format(pid.encode('hex')))
+
             nonce = os.urandom(32) #todo crypto size
             self.shaking[pid] = (nonce, relays)
             self.session_map[pid] = address
@@ -262,6 +260,7 @@ class SessionManager(object):
 
 
     def handle_handshake(self, type, packet, address, src_id):
+        logger.critical('got handshake!!!')
         if src_id not in self and src_id not in self.shaking:
             r, nonce, mac = packet[0], packet[1:33], packet[33:]
             r = unpack('!B', r)[0]
