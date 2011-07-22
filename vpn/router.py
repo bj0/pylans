@@ -183,7 +183,7 @@ class Router(object):
             self.send_udp(data, self.pm[dst].address)
 
 
-    def send(self, type, data, dst, ack=False, id=0, ack_timeout=None, clear=False):
+    def send(self, type, data, dst, ack=False, id=0, ack_timeout=None, clear=False, faddress=None):
         '''Send a packet of type with data to address.  Address should be an id
         if the peer is known, since address tuples aren't unique with relaying'''
         # shortcut for data, to speed up teh BWs
@@ -227,6 +227,10 @@ class Router(object):
         #    dst = self.sm.session_map[dst]
 
         # unknown peer dst TODO: this should return an erroring deferred?
+        elif faddress is not None:
+            # got packet from an unknown id, send a greet to the address
+            self.sm.send_greet(faddress)
+            return
         else:
             logger.error('cannot send to unknown dest {0}'.format(repr(dst)))
             return #todo throw exception
@@ -333,7 +337,7 @@ class Router(object):
                 if id > 0: # ACK requested TODO: ack request from unknown peer fails
                     logger.debug('sending ack')
                     # ack to unknown sources? TODO
-                    self.send(self.ACK, data[2:4], src, clear=True)
+                    self.send(self.ACK, data[2:4], src, clear=True, faddress=address)
                 logger.debug('handling {0} packet from {1}'.format(pt, src.encode('hex')))
 
         # nope!
