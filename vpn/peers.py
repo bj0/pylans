@@ -132,6 +132,8 @@ class PeerManager(object):
             if peer.relays > 0:
                 peer.is_direct = False
                 peer.relay_id = self[peer.address].id
+                #try to DC
+                reactor.callLater(1, self.sm.try_greet, peer.direct_addresses)
             else:
                 peer.is_direct = True
                 peer.relay_id = None
@@ -213,6 +215,8 @@ class PeerManager(object):
             opi.direct_addresses = list(set(opi.direct_addresses).union(set(npi.direct_addresses)))
             changed = True
             logger.info('peer {0} good addresses changed. ({1})'.format(opi.id.encode('hex'), opi.direct_addresses))
+            # try to DC
+            reactor.callLater(1, self.sm.try_greet, opi.direct_addresses)
 
         if changed:
             # fire event

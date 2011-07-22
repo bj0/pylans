@@ -282,7 +282,6 @@ class Router(object):
             del self._requested_acks[id]
             logger.info('ack timeout')
             d.errback(Exception('call {0} timed out'.format(id)))
-#            d.errback(id)
         else:
             logger.info('timeout called with bad id??!!?')
 
@@ -326,7 +325,6 @@ class Router(object):
 
 
                 if pt in self.handlers:
-                    # TODO need to check if this is from a known peer?
                     try:
                         self.handlers[pt](pt, packet, address, src)
                     except Exception, e:
@@ -334,9 +332,9 @@ class Router(object):
                          exception:\n {0}'.format(e, pt))
                         return # don't ack
                         
-                if id > 0: # ACK requested TODO: ack request from unknown peer fails
+                if id > 0: # ACK requested 
                     logger.debug('sending ack')
-                    # ack to unknown sources? TODO
+                    # ack to unknown sources?  - send greets!
                     self.send(self.ACK, data[2:4], src, clear=True, faddress=address)
                 logger.debug('handling {0} packet from {1}'.format(pt, src.encode('hex')))
 
