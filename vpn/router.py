@@ -394,6 +394,16 @@ class TapRouter(Router):
 
             # get mac addr
             self.pm._self.addr = self._tuntap.get_mac() #todo check if this is none?
+            
+            # get 'direct' addresses
+            from network.netifaces import ifaddresses
+            addr = ifaddresses()
+            for dev in addr['AF_INET']:
+                if dev not in ['lo'] and not dev.startswith('pytun'):
+                    for address in addr['AF_INET'][dev]:
+                        self.pm._self.direct_addresses += (address['address'], 
+                                                        self.network.port)
+
             self.pm._update_pickle()
 
             reactor.callLater(0, d.callback, ips)
