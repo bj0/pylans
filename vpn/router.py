@@ -401,8 +401,8 @@ class TapRouter(Router):
             for dev in addr['AF_INET']:
                 if dev not in ['lo'] and not dev.startswith('pytun'):
                     for address in addr['AF_INET'][dev]:
-                        self.pm._self.direct_addresses += (address['address'], 
-                                                        self.network.port)
+                        self.pm._self.direct_addresses.append((address['address'], 
+                                                        self.network.port))
 
             self.pm._update_pickle()
 
