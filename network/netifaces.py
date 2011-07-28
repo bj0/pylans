@@ -103,11 +103,15 @@ def _win32_ifaddresses(ifname=None):
                 
             # if we're collecting them all...
             if ifname is None: 
-                addr = (adapter.AdapterName, addr)
-                
-            x = result.get('AF_INET',[])
-            x.append(addr)
-            result['AF_INET'] = x
+                x = result.get('AF_INET',{})#(adapter.AdapterName, addr)
+                y = x.get(adapter.AdapterName, [])
+                y.append(addr)
+                x[adapter.AdapterName] = y
+                result['AF_INET'] = x
+            else:                
+                x = result.get('AF_INET',[])
+                x.append(addr)
+                result['AF_INET'] = x
     
     if len(result) == 0:
         raise ValueError, 'You must specify a valid interface name.'
