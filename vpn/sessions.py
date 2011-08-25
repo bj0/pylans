@@ -185,9 +185,8 @@ class SessionManager(object):
                     # just keep trying...
 
         logger.info('Could not establish connection with addresses.')
-        return
+        return # same as defer.returnValue(None)
         #raise Exception('Could not establish connection with addresses.')
-
 
     def send_greet(self, address, ack=False):
         #if address not in self:

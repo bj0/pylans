@@ -329,45 +329,42 @@ class PeerManager(object):
 
     ###### Peer Register Functions
 
+    @defer.inlineCallbacks
     def try_register(self, pid, addr=None, relays=0):
         '''Try to register self with a peer by sending a register packet
         with own peer info.  Will continue to send this packet until an
         ack is received or MAX_REG_TRIES packets have been sent.'''
+        
+        def sleep(secs):
+            '''Async sleep call'''
+            d = defer.Deferred()
+            reactor.callLater(secs, d.callback, None)
+            return d
 
         if pid not in self.sm: # It's an (address,port) pair
-#            raise TypeError, "Cannot send register to unknown session"
             logger.error("Cannot send register to unknown session {0}".format(pid.encode('hex')))
-            return defer.fail(TypeError("Cannot send register to unknown session"))
+            raise TypeError("Cannot send register to unknown session")
         addr = pid if addr is None else addr
 
-        d = defer.Deferred()
         if (pid not in self.peer_list):
             # TODO set relay
             self._self.relays = relays
             packet = pickle.dumps(self._self, -1)
             self._self.relays = 0
-
-            def send_register(i):
-                '''Send a register packet and re-queues self'''
-
-                if i <= self.MAX_REG_TRIES and pid not in self.peer_list:
+            
+            for i in range(self.MAX_REG_TRIES):
+                if pid in self.peer_list:
+                    defer.returnValue(self.peer_list[pid])
+                else:
                     logger.debug('sending REG packet #{0}'.format(i))
                     self.router.send(self.REGISTER, packet, addr)
-                    reactor.callLater(self.REG_TRY_DELAY, send_register, i+1)
-                elif i > self.MAX_REG_TRIES:
-                    logger.info('(reg) address {0} timed out'.format(pid))
-                    d.errback(Exception('address timed out'))
-                else: # address in PM
-                    logger.debug('(reg) address {0} in PM.'.format(pid))
-                    d.callback(self.peer_list[pid])
+                    yield sleep(self.REG_TRY_DELAY)
 
-            send_register(0)
+            logger.info('(reg) address {0} timed out'.format(pid))
+            raise Exception('(reg) address {0} timed out'.format(pid))
         else:
             logger.debug('address {0} already in peer list'.format(pid))
-            reactor.callLater(0, d.callback, self.router.pm[pid])
-
-        d.addErrback(logger.info)
-        return d #TODO this funky thing needs testing
+            defer.returnValue(self.peer_list[pid])
 
     def try_old_peers(self):
         '''Try to connect to addresses that were peers in previous sessions.'''
