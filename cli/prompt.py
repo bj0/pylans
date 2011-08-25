@@ -206,7 +206,10 @@ class Prompt(Cmd):
 #        settings.save()
 
     def do_py(self, line):
-        exec line
+        try:
+            exec line
+        except Exception, e:
+            logger.critical('command threw exception:{0}'.format(e))
 
 #    def emptyline(self, *args):
 #        self.do_status('')
