@@ -17,7 +17,6 @@
 #
 # router.py
 #
-#TODO another way to check if an id is known, if there are going to be multiple networks using the same router...
 # #### each network has it's own adapter/router
 #TODO make tun/tap both work, selectable
 #TODO starting/stopping router doesn't owrk right
@@ -30,7 +29,6 @@ from struct import pack, unpack
 from tuntap import TunTap
 from twisted.internet import reactor, defer
 from twisted.internet.protocol import DatagramProtocol
-#from vpn import settings
 from vpn.crypto import Crypter
 from util.event import Event
 from vpn.peers import PeerManager
@@ -74,10 +72,8 @@ class Router(object):
 
     TIMEOUT = 5 # 5s
     # packet types
-    #HANDSHAKE = 0
     ENCODED = 0x80
     DATA = 1
-#    DATA_BROADCAST = 2
     DATA_RELAY = 2
     ACK = 3
     RELAY = 4

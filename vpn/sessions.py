@@ -144,6 +144,7 @@ class SessionManager(object):
 
 ###### ###### ###### Session Initiation/Handshake functions ###### ###### ###### 
 
+    @defer.inlineCallbacks
     def try_greet(self, addrs):
         '''Try and send 'greet' packets to given address.'''
         if isinstance(addrs, tuple):
@@ -153,7 +154,8 @@ class SessionManager(object):
         elif isinstance(addrs, PeerInfo):
             if addrs.is_direct:
                 # don't need to...
-                return #TODO return a defffffer?
+                return
+                #yield defer.succeed(None)
 
             # it's a peer, try direct_addresses
             # if a NAT scrambled the port, re-add it to the list for each IP
@@ -168,39 +170,24 @@ class SessionManager(object):
 
         elif not isinstance(addrs, list):
             logger.error('try_greet called with incorrect parameter: {0}'.format(addrs))
-            return #TODO defferrr?
+            #return
+            raise Exception('try_greet called with incorrect parameter: {0}'.format(addrs))
 
-        main_d = defer.Deferred()
+        for address in addrs:
+            logger.info('sending greet to {0}'.format(address))
+            for i in range(3):
+                logger.debug('sending greet packet #{0}'.format(i))
+                try:
+                    ret = yield self.send_greet(address, ack=True)
+                    return # stop trying if successful TODO: return address?
+                except Exception, e:
+                    logger.info('(greet) address {0} timed out'.format(address))
+                    # just keep trying...
 
-        def try_address(err, j):
-            if j < len(addrs):
-                address = addrs[j]
-                logger.info('sending greet to {0}'.format(address))
+        logger.info('Could not establish connection with addresses.')
+        return
+        #raise Exception('Could not establish connection with addresses.')
 
-#                if (address not in self.router.pm) or not self.router.pm[address].is_direct:
-#                    d = defer.Deferred()
-
-                def send_greet(timeout_id, i, *x):
-                    '''Send a greet packet and re-queues self'''
-
-                    if i > 0:
-                        logger.debug('sending greet packet #{0}'.format(i))
-                        d = self.send_greet(address, ack=True)
-                        d.addCallbacks(main_d.callback, send_greet, None, None, (i-1,), None)
-                    else:
-                        # address didn't respond, try next address
-                        logger.info('(greet) address {0} timed out'.format(address))
-                        reactor.callLater(0, try_address, None, j+1)
-
-                send_greet(0, 3)
-            else:
-                logger.info('no addresses passed to try_register responded.')
-                main_d.errback(Exception('Could not establish connection with addresses.'))
-
-        reactor.callLater(0, try_address, None, 0)
-        main_d.addCallback(lambda *x: logger.debug('greet success! {0}'.format(x)))
-        main_d.addErrback(logger.info)
-        return main_d #TODO this funky thing needs testing
 
     def send_greet(self, address, ack=False):
         #if address not in self:
