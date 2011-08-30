@@ -139,7 +139,6 @@ class Prompt(Cmd):
         for net in nets:
             print '========= Peers (%s) =========' % net.name
             for p in self.iface.get_peer_list(net):
-                print 'id:        {0}'.format(p.id)
                 print 'name:      {0}'.format(p.name)
                 print 'id:        {0}'.format(p.id.encode('hex'))
                 print 'vip:       {0}'.format(p.vip_str)
