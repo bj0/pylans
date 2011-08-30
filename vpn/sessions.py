@@ -208,7 +208,7 @@ class SessionManager(object):
                 pi = self.router.pm[src_id]
                 if pi.relays > 0:
                     import copy
-                    logger.critical('got us some directness')
+                    logger.info('direct connection established with {0}'.format(src_id.encode('hex'))
 
                     # update peer
                     pn = copy.copy(pi)
@@ -246,7 +246,7 @@ class SessionManager(object):
 
 
     def handle_handshake(self, type, packet, address, src_id):
-        logger.critical('got handshake!!!')
+        logger.info('got handshake packet from {0}'.format(src_id.encode('hex'))
         if (src_id not in self or self.router.pm[src_id].timeouts > 0) \
          and src_id not in self.shaking:
             r, nonce, mac = packet[0], packet[1:33], packet[33:]
