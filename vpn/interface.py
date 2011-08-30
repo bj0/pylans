@@ -36,13 +36,13 @@ class Interface(object):
 
 
     def __init__(self, mgr=None):
-    
+
         if mgr is None:
             mgr = networks.MANAGER
-            
+
         self._mgr = mgr
         self._current = None
-            
+
         # Events
         self.network_started = Event()
         self.network_stopped = Event()
@@ -73,23 +73,23 @@ class Interface(object):
     @property
     def log_level(self):
         return settings.get_option('settings/loglevel', 40)
-        
+
     @log_level.setter
     def log_level(self, value):
         if self.log_level != value:
             settings.set_option('settings/loglevel', value)
-            global_logger.setLevel(value)     
-            settings.save()       
+            global_logger.setLevel(value)
+            settings.save()
 
     def _peer_added(self, pm, peer):
         self.peer_added(pm.router.network, peer)
-    
-    def _peer_removed(self, pm, peer):    
+
+    def _peer_removed(self, pm, peer):
         self.peer_removed(pm.router.network, peer)
-        
+
     def _peer_changed(self, pm, peer):
         self.peer_changed(pm.router.network, peer)
-        
+
     def _message_received(self, cbox, nid, pid, text):
         network = self._mgr[nid]
         self.message_received(network, network.router.pm[pid], text)
@@ -99,57 +99,57 @@ class Interface(object):
 
     def get_network_list(self):
         return self._mgr.network_list.values()
-        
+
     def get_network_names(self):
         return [ net.name for net in self.get_network_list() ]
-        
+
     def get_network_dict(self):
         return self._mgr.network_list
-            
+
     def _get_router(self, network):
         net = self.get_network(network)
         if net is not None:
             return net.router
         return None
-    
-    def get_network(self, network=None):            
+
+    def get_network(self, network=None):
         # does not catch invalid network names, just returns previous correct
         # network
         if isinstance(network, networks.Network):
             self._current = network
         elif network is not None and network in self._mgr:
             self._current = self._mgr[network]
-    
+
         return self._current
-            
-    
+
+
     def get_peer_dict(self, network=None):
         router = self._get_router(network)
         if router is not None:
             return router.pm.peer_list
         return {}
-        
+
     def get_peer_list(self, network=None):
         return self.get_peer_dict(network).values()
-        
+
     def get_peer_names(self, network=None):
         return [ peer.name for peer in self.get_peer_list(network) ]
-        
+
     def get_peer_info(self, peer, network=None):
         #TODO add gets for vip, name, alias?
         router = self._get_router(network)
         if router is not None and peer in router.pm:
             return router.pm[peer]
         return None
-            
+
 
     def create_new_network(self, name, key=None, username=None, address=None, port=None,
                 id=None, enabled=None, mode=None, key_str=None):
         if name not in self._mgr:
-            self._current = self._mgr.create(name=name, key=key, username=username, 
+            self._current = self._mgr.create(name=name, key=key, username=username,
                     address=address, port=port, id=id, enabled=enabled, mode=mode, key_str=key_str)
         return self._current
-    
+
     def delete_network(self, network):
         if self.get_network(network) is not None:
             self._mgr.remove(self._current.name)
@@ -157,23 +157,23 @@ class Interface(object):
 
     def start_network(self, network):
         self._mgr.start_network(network)
-    
+
     def start_all_networks(self):
         self._mgr.start_all()
-        
+
     def stop_network(self, network):
         self._mgr.stop_network(network)
-        
+
     def enable_network(self, network):
         self._mgr.enable_network(network)
-            
+
     def disable_network(self, network):
         self._mgr.disable_network(network)
 
     def connect_to_address(self, address, network=None):
         if self.get_network(network) is not None:
-            self._current.router.pm.try_register(address)
-            
+            self._current.router.sm.try_greet(address)
+
     def send_message(self, network, peer, msg):
 #        if not self._cbox.is_running():
 #            self._cbox.start()
@@ -184,17 +184,17 @@ class Interface(object):
     def set_network_name(self, newname, network=None):
         if self.get_network(network) is not None:
             self._current.name = newname
-    
+
     def set_network_key(self, key, network=None):
         if self.get_network(network) is not None:
             self._current.key = key
-    
+
     def set_network_username(self, username, network=None):
         if self.get_network(network) is not None:
             self._current.username = username
-    
+
     def set_network_address(self, address, network=None):
-        if self.get_network(network) is not None:    
+        if self.get_network(network) is not None:
             if '/' in address:
                 self._current.address = address
             else:
@@ -203,24 +203,24 @@ class Interface(object):
     def set_network_ping_interval(self, interval, network=None):
         if self.get_network(network) is not None:
             settings.set_option(network.name+'/ping_interval', interval)
-            
+
     def set_network_tracker_url(self, url, network=None):
         if self.get_network(network) is not None:
             settings.set_option(network.name+'/tracker', url)
-            
+
     def set_network_use_tracker(self, use_tracker, network=None):
         if self.get_network(network) is not None:
             settings.set_option(network.name+'/use_tracker', use_tracker)
-            
+
     def set_network_tracker_interval(self, interval, network=None):
         if self.get_network(network) is not None:
-            settings.set_option(network.name+'/tracker_interval', interval)   
-            
+            settings.set_option(network.name+'/tracker_interval', interval)
+
     def get_network_setting(self, setting, network=None):
         if self.get_network(network) is not None:
             return settings.get_option(network.name+'/'+setting, None)
-            
+
     def set_network_setting(self, setting, value, network=None):
         if self.get_network(network) is not None:
             settings.set_option(network.name+'/'+setting, value)
-            settings.save()     
+            settings.save()

@@ -51,24 +51,24 @@ class Event:
 
 class EventManager(object):
 
-    def __init__(self):    
+    def __init__(self):
         self._handlers = {}
-        
+
     def register_handler(self, type, obj, handler):
         _id = id(obj)
-        
+
         if type not in self._handlers:
             self._handlers[type] = {}
             self._handlers[type][id(None)] = Event()
-            
+
         if _id not in self._handlers[type]:
             self._handlers[type][_id] = Event()
-            
+
         self._handlers[type][_id] += handler
-    
+
     def unregister_handler(self, type, obj, handler):
         self._handlers[type][id(obj)] -= handler
-    
+
     def emit(self, type, obj, *args, **kwargs):
         if type in self._handlers:
             if obj is not None and \
@@ -77,7 +77,7 @@ class EventManager(object):
 
             self._handlers[type][id(None)](obj, *args, **kwargs)
             logger.info('event {0} emitted to {1} handlers'.format(type, len(self._handlers[type])))
-            
+
 MANAGER = EventManager()
 register_handler = MANAGER.register_handler
 unregister_handler = MANAGER.unregister_handler

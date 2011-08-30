@@ -22,7 +22,6 @@ gtk2reactor.install()
 import os
 import gtk
 import gobject
-import uuid
 import logging
 import math
 from gtk import glade
@@ -43,19 +42,19 @@ def find_iter(model, obj, col):
     for row in model:
         if row[col] == obj:
             return row.iter
-        
+
     return None
 
 def show_message(text):
     dlg = gtk.MessageDialog(type=gtk.MESSAGE_INFO, buttons=gtk.BUTTONS_OK, message_format=text)
     dlg.connect('response', lambda *x: dlg.destroy())
     dlg.show_all()
-    
+
 class TextBufferHandler(logging.Handler):
     def __init__(self, buffer):
         self.buf = buffer
         logging.Handler.__init__(self)
-        
+
     def emit(self, record):
 #        print dir(record)
         self.buf.insert(self.buf.get_end_iter(), '{1} : {0} : {2}\n'.format(record.name,
@@ -64,35 +63,35 @@ class TextBufferHandler(logging.Handler):
 
 class NetPage:
     def __init__(self, net, nb_label=None):
-        
+
         self.net = net
         self.widget = gtk.VBox()
         self.label = gtk.Label()
         self.label_eb = gtk.EventBox()
         self.nb_label = nb_label
 
-        self.update_label()        
+        self.update_label()
         self.label.set_justify(gtk.JUSTIFY_CENTER)
-        
+
         # list store: name, ip, peer_id
         self.model = gtk.ListStore(str, str, str, object)
-        
+
         self.view = gtk.TreeView(self.model)
-        
+
         cr = gtk.CellRendererText()
         col = gtk.TreeViewColumn('Name',cr,text=0)
         self.view.append_column(col)
-        
+
         cr = gtk.CellRendererText()
         col = gtk.TreeViewColumn('IP',cr,text=1)
         self.view.append_column(col)
-        
+
         self.label_eb.add(self.label)
         self.widget.pack_start(self.label_eb, False, False, 0)
         self.widget.pack_end(self.view, True, True, 0)
-        
+
         self.selection = self.view.get_selection()
-        
+
     def update_label(self):
         if self.net.enabled:
             if self.net.is_running:
@@ -101,9 +100,9 @@ class NetPage:
                 status = 'offline'
         else:
             status = 'disabled'
-        
+
         self.label.set_markup('<b>{0}</b>\n<i>{1}</i>\n{2}'.format(self.net.username,self.net.ip,status))
-        
+
         if self.nb_label is not None:
             if self.net.is_running:
                 self.nb_label.set_markup('<b>{0}</b>'.format(self.net.name))
@@ -111,34 +110,34 @@ class NetPage:
                 self.nb_label.set_markup('<i>{0}</i>'.format(self.net.name))
         else:
             self.nb_label.set_markup('<i><s>{0}</i></s>'.format(self.net.name))
-            
+
 
     def clear(self):
         self.model.clear()
-        
+
     def add_peer(self, peer):
         iter = find_iter(self.model, str(peer.id), 2)
 
         if iter is None:
             self.model.append([peer.name,peer.vip_str,peer.id, peer])
-            
+
             logger.info('added peer {0}'.format(peer.name))
-            
+
         else:
             row = self.model[iter]
             row[0] = peer.name
             row[1] = peer.vip_str
             row[2] = str(peer.id)
             row[3] = peer
-            
+
             logger.info('updated peer information for {0}'.format(peer.name))
-            
+
     def remove_peer(self, peer):
         iter = find_iter(self.model, str(peer.id), 2)
-        
+
         if iter is not None:
             self.model.remove(iter)
-            
+
             logger.info('removed peer {0}'.format(peer.name))
 
 class MainWin:
@@ -149,24 +148,24 @@ class MainWin:
 
         # get objects from xml
         self.get_objects()
-        
+
         # a dict to store the pages in
         self._net_page = {}
 
         self.builder.connect_signals(self)
 #        self._selection = self._peer_treeview.get_selection()
-        
+
         self._main_window.resize(200,400)
         self._main_window.connect('delete-event', lambda *x: reactor.stop())
         self._main_window.show_all()
-        
+
 #        nw = iface.get_network_list()[0]
 #        self._name_label.set_text('%s - %s' % (nw.username, nw.virtual_ip))
-        
+
         handler = TextBufferHandler(gtk.TextBuffer())
         logging.getLogger().addHandler(handler)
         self._log_buffer = handler.buf
-        
+
         #Events
         iface.peer_added += self._add_peer
         iface.peer_removed += self._remove_peer
@@ -177,11 +176,11 @@ class MainWin:
         iface.network_disabled += self._network_disabled
         iface.network_created += self._add_network
         iface.network_removed += self._remove_network
-        iface.network_changed += lambda nw: (nw.id in self._net_page) and self._net_page[nw.id].update_label() 
+        iface.network_changed += lambda nw: (nw.id in self._net_page) and self._net_page[nw.id].update_label()
         iface.message_received += self._message
-        
+
         nws = iface.get_network_list()
-        
+
         # This just makes it so disabled networks get put at the end
         en = []
         dn = []
@@ -192,7 +191,7 @@ class MainWin:
                 dn.append(nw)
         for nw in (en+dn):
             self._add_network(None, nw)
-        
+
         self.iface = iface
 
     def _get_np(self, widget):
@@ -221,7 +220,7 @@ class MainWin:
     def on_view_log(self, widget):
         builder = gtk.Builder()
         builder.add_from_file('gui/main.ui')
-        
+
         win = builder.get_object('log_window')
         leb = builder.get_object('log_level_eb')
         tv = builder.get_object('log_view')
@@ -229,7 +228,7 @@ class MainWin:
         bclear = builder.get_object('clear_button')
 
         tv.set_buffer(self._log_buffer)
-        
+
         cb = gtk.combo_box_new_text()
         leb.add(cb)
         cb.append_text('DEBUG')
@@ -237,28 +236,28 @@ class MainWin:
         cb.append_text('WARNING')
         cb.append_text('ERROR')
         cb.append_text('CRITICAL')
-        
+
         cb.set_active(self.iface.log_level/10 - 1)
-        
+
         def do_changed(*args):
             idx = cb.get_active()
             self.iface.log_level = (idx + 1)*10
-        
+
         cb.connect('changed', do_changed)
-        
+
         bclear.connect('clicked', lambda *x: self._log_buffer.delete(self._log_buffer.get_start_iter(),self._log_buffer.get_end_iter()))
         bclose.connect('clicked', lambda *x: win.destroy())
-        
+
         win.resize(500,400)
         win.show_all()
 
-        
+
     def on_rename(self, *x):
         n = self._netbook.get_current_page()
         np = self._get_np(self._netbook.get_nth_page(n))
         if np is not None:
             net = np.net
-            dlg = gtk.MessageDialog(self._main_window, type=gtk.MESSAGE_QUESTION, 
+            dlg = gtk.MessageDialog(self._main_window, type=gtk.MESSAGE_QUESTION,
                 buttons=gtk.BUTTONS_OK_CANCEL, message_format='Enter new name for network \'{0}\':'.format(net.name))
             dlg.set_title('Rename Network')
             entry = gtk.Entry()
@@ -267,32 +266,32 @@ class MainWin:
             hbox.pack_end(entry)
             dlg.vbox.pack_end(hbox, True, True, 0)
             entry.connect('activate', lambda entry, dialog, res: dlg.response(res))
-            
+
             def response(dialog, rid):
                 if rid == gtk.RESPONSE_OK:
                     self.iface.set_network_name(entry.get_text(), net)
                 dialog.destroy()
-            
+
             dlg.connect('response',response)
             dlg.show_all()
-        
+
     def on_delete(self, *x):
         n = self._netbook.get_current_page()
         np = self._get_np(self._netbook.get_nth_page(n))
         if np is not None:
             net = np.net
-            dlg = gtk.MessageDialog(self._main_window, type=gtk.MESSAGE_QUESTION, 
+            dlg = gtk.MessageDialog(self._main_window, type=gtk.MESSAGE_QUESTION,
                 buttons=gtk.BUTTONS_YES_NO, message_format='Really delete network \'{0}\'?'.format(net.name))
             dlg.set_title('Delete Network')
-            
+
             def response(dialog, rid):
                 dialog.destroy()
                 if rid == gtk.RESPONSE_YES:
                     self.iface.delete_network(net)
-            
+
             dlg.connect('response',response)
             dlg.show_all()
-        
+
     def on_create(self, *x):
         builder = gtk.Builder()
         builder.add_from_file('gui/main.ui')
@@ -311,12 +310,12 @@ class MainWin:
         bt_url = builder.get_object('bt_url_entry')
         ping_interval = builder.get_object('ping_spinbox')
         meb = builder.get_object('mode_eb')
-        
+
         mcb = gtk.combo_box_new_text()
         meb.add(mcb)
         mcb.append_text('TAP')
         mcb.append_text('TUN')
-        
+
 
         # Default values
         name_entry.set_text('new_network')
@@ -324,21 +323,21 @@ class MainWin:
         key_entry.set_text(os.urandom(56).encode('base64'))
         address_entry.set_text('10.1.1.1/24')
         port_spinbox.set_value(8500)
-        
+
         enabled_cb.set_active(True)
         use_bt.set_active(False)
         bt_url.set_text('')
         ping_interval.set_value(5)
         mcb.set_active(0)
-        
-        
+
+
         def response(dialog, rid):
             if rid == gtk.RESPONSE_OK:
                 name = name_entry.get_text()
                 if name in self.iface.get_network_names():
                     show_message('A network with that name already exists')
                     return
-                
+
                 alias = alias_entry.get_text()
                 key = key_entry.get_text()
                 if key == '':
@@ -347,8 +346,8 @@ class MainWin:
                 port = int(port_spinbox.get_value())
                 mode = 'TAP' if mcb.get_active() == 0 else 'TUN'
                 enabled = enabled_cb.get_active()
-                
-                nw = self.iface.create_new_network(name, username=alias, key_str=key, port=port, 
+
+                nw = self.iface.create_new_network(name, username=alias, key_str=key, port=port,
                                     address=address, enabled=enabled, mode=mode)
                 #print 'create',name,alias,key,port
                 # do BT and ping stuff?
@@ -356,10 +355,10 @@ class MainWin:
                 self.iface.set_network_use_tracker(use_bt, nw)
                 if bt_url != '':
                     self.iface.set_network_tracker(bt_url, nw)
-                
-                
+
+
             dialog.destroy()
-        
+
         dlg.connect('response',response)
         dlg.show_all()
 
@@ -368,7 +367,7 @@ class MainWin:
         np = self._get_np(self._netbook.get_nth_page(n))
         if np is not None:
             net = np.net
-            
+
             builder = gtk.Builder()
             builder.add_from_file('gui/main.ui')
 
@@ -387,12 +386,12 @@ class MainWin:
             ping_interval = builder.get_object('ping_spinbox')
             meb = builder.get_object('mode_eb')
             nb = builder.get_object('net_notebook')
-            
+
             mcb = gtk.combo_box_new_text()
             meb.add(mcb)
             mcb.append_text('TAP')
             mcb.append_text('TUN')
-            
+
 
             # set values
             name_entry.set_text(net.name)
@@ -400,7 +399,7 @@ class MainWin:
             key_entry.set_text(net.key_str)
             address_entry.set_text(net.virtual_address)
             port_spinbox.set_value(net.port)
-            
+
             enabled_cb.set_active(net.enabled)
             bt_url.set_text(self.iface.get_network_setting('tracker', net))
             ping_interval.set_value(self.iface.get_network_setting('ping_interval', net))
@@ -410,7 +409,7 @@ class MainWin:
             da = gtk.DrawingArea()
             nb.insert_page(da, gtk.Label('Plot'), 0)
             nb.set_current_page(0)
-            
+
             def response(dialog, rid):
                 if rid == gtk.RESPONSE_OK:
                     net.name = name_entry.get_text()
@@ -425,25 +424,25 @@ class MainWin:
                     # do BT and ping stuff?
                     self.iface.set_network_setting('ping_interval', ping_interval.get_value(), net)
                     self.iface.set_network_setting('use_tracker', use_bt.get_active(), net)
-                    
+
                     if bt_url != '':
                         self.iface.set_network_setting('tracker', bt_url, net)
-                    
-                    
+
+
                 dialog.destroy()
-                
-            
+
+
             # Drawing stuff
             def expose(widget, event):
                 ctx = widget.window.cairo_create()
                 ctx.rectangle(event.area.x,event.area.y,event.area.width,event.area.height)
                 ctx.clip()
-                
+
                 rec = widget.get_allocation()
                 cx = (rec.width)/2.
                 cy = (rec.height)/2. - 15
                 r = min(rec.width,rec.height)/2. - 20
-            
+
                 _map = net.router.pm.peer_map
                 _map[net.router.pm._self.id] = net.router.pm.peer_list
                 n = len(_map)
@@ -457,7 +456,7 @@ class MainWin:
                     y = cy+math.cos(t)*r
                     loc[p] = (x,y)
                     i += 1
-                
+
                 ctx.set_source_rgb(0,0,0)
                 ctx.set_line_width(1)
                 # Draw Lines
@@ -475,7 +474,7 @@ class MainWin:
                 ctx.set_dash(())
                 for p in _map:
                     x, y = loc[p][0],loc[p][1]
-                    
+
                     # draw mark
                     if net.router.pm._self.id == p:
                         ctx.set_source_rgb(.4,.4,.4)
@@ -483,12 +482,12 @@ class MainWin:
                         ctx.set_source_rgb(0,0,1)
                     else:
                         ctx.set_source_rgb(0,1,0)
-                        
+
                     ctx.arc(x, y, 6, 0, 2*math.pi)
                     ctx.fill_preserve()
                     ctx.set_source_rgb(0,0,0)
                     ctx.stroke()
-                    
+
                     # draw text
                     dy = 24
                     dt = 10
@@ -501,14 +500,14 @@ class MainWin:
                     ctx.move_to(x-tw/2., y+dy)
                     ctx.show_text(net.router.pm[p].name)
                     ctx.stroke()
-            
+
             da.connect('expose-event', expose)
             dlg.connect('response',response)
             dlg.show_all()
-            
-            
+
+
             print 'NET INFO:',net.name,net.id,net.virtual_address,net.port,net.username
-    
+
     def on_peer_get_info(self, widget):
         n = self._netbook.get_current_page()
         np = self._get_np(self._netbook.get_nth_page(n))
@@ -517,14 +516,14 @@ class MainWin:
         if iter is not None:
             peer = model.get_value(iter, 3)
             print 'PEER INFO:',peer.name,peer.id,peer.vip_str
-        
-        
+
+
     def on_network_connect_peer(self, widget):
         n = self._netbook.get_current_page()
         np = self._get_np(self._netbook.get_nth_page(n))
         if np is not None:
             net = np.net
-            
+
             # get address
             def get_address(dialog, responseid, entry):
                 if responseid == gtk.RESPONSE_OK:
@@ -533,7 +532,7 @@ class MainWin:
                     addr = (addr, int(port))
                     self.iface.connect_to_address(addr, net)
                 dialog.destroy()
-                
+
             time = None
             dialog = gtk.MessageDialog(
                         None,
@@ -553,8 +552,8 @@ class MainWin:
             dialog.vbox.pack_end(hbox, True, True, 0)
             dialog.show_all()
             dialog.connect('response', get_address, entry)
-            
-        
+
+
     def on_peer_copy_ip(self, widget):
         n = self._netbook.get_current_page()
         np = self._get_np(self._netbook.get_nth_page(n))
@@ -573,7 +572,7 @@ class MainWin:
                 path, col, cx, cy = path_info
                 widget.grab_focus()
                 widget.set_cursor(path, col, 0)
-                
+
                 self._peer_menu.popup(None, None, None, event.button, event.time)
 
     def on_notebook_click(self, widget, event, np):
@@ -581,7 +580,7 @@ class MainWin:
             n = self._netbook.page_num(np.widget)
             self._netbook.set_current_page(n)
             self._network_menu.popup(None, None, None, event.button, event.time)
-        
+
 
     def on_network_toggle_online(self, widget):
         n = self._netbook.get_current_page()
@@ -596,7 +595,7 @@ class MainWin:
                 net.start()
 
                 logger.info('starting network {0}'.format(net.name))
-        
+
     def on_network_toggle_enabled(self, widget):
         n = self._netbook.get_current_page()
         np = self._get_np(self._netbook.get_nth_page(n))
@@ -613,12 +612,12 @@ class MainWin:
 
     def _add_network(self, mgr, nw):
         if nw.id not in self._net_page:
-        
+
             lab = gtk.Label(nw.name)
             lab.set_angle(270)
             np = NetPage(nw, lab)
             self._net_page[nw.id] = np
-            
+
             # use an eventbox to capture events for apopup menu
             eb = gtk.EventBox()
             eb.add(lab)
@@ -629,7 +628,7 @@ class MainWin:
             self._netbook.set_tab_reorderable(np.widget, True)
             np.widget.show_all()
             eb.show_all()
-            
+
     def _remove_network(self, mgr, nw):
         if nw.id in self._net_page:
             np = self._net_page[nw.id]
@@ -638,15 +637,15 @@ class MainWin:
 
     def _add_peer(self, net, peer):
         self._net_page[net.id].add_peer(peer)
-    
-    
+
+
     def _remove_peer(self, net, peer):
         self._net_page[net.id].remove_peer(peer)
-    
+
     def _network_on(self, net):
         self._add_network(None, net)
         self._net_page[net.id].update_label()
-        
+
         logger.info('network {0} online'.format(net.name))
 
     def _network_off(self, net):
@@ -659,16 +658,16 @@ class MainWin:
         self._net_page[net.id].update_label()
 
         logger.info('network {0} online'.format(net.name))
-    
+
     def _network_disabled(self, net):
         self._net_page[net.id].clear()
         self._net_page[net.id].update_label()
 
         logger.info('network {0} disabled'.format(net.name))
-    
+
     def _message(self, net, peer, msg):
         print 'msg',net, peer, msg
-    
+
 
 
 def main():

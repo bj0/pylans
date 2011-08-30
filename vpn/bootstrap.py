@@ -58,7 +58,7 @@ class TrackerBootstrap(object):
     use_tracker = property(lambda s: s._get('use_tracker', False), lambda s,v: s._set('use_tracker',v))
         
     def tracker_request(self):
-        id = self.net.router.pm._self.id.bytes*2
+        id = self.net.router.pm._self.id*2
         id = urllib2.quote(id[:20])
         hash = sha1(self.net.key).digest()
         hash = urllib2.quote(hash)
@@ -97,7 +97,7 @@ class TrackerBootstrap(object):
                     peers = peers[6:]
                 
                 logger.info('got response from tracker with peers:'+str(addrs))
-                self.net.router.pm.try_register(addrs)
+                self.net.router.sm.try_greet(addrs)
                 reactor.callLater(self.interval, self.run)
                 
             def do_error(err):

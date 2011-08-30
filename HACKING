@@ -7,7 +7,11 @@ k, addresses weren't tracking true addresses, they were being overwritten by rel
 3) keep peer.address unchanged unless we have a DC
 we need to know the DC addresses to try and establish a DC on a relay peer.
 
-drop uuids and just generate byte string ids of desired size?
+for new handhsake version: 3 options
+1) include a relay (TTL) field for each packet (most work, most overhead)
+2) send relay count with handshake packet (most like original version, know relays at connection)
+3) initiate connection with unknown relay count, then update with a 'tracert' packet: easiest, but may have difficulties selecting "best" path for a relay
+
 
 TODO:
 periodically try to DC relay peers?
@@ -43,6 +47,17 @@ revno: 68+edits
  XP > naz: 11.2
  #naz > dev: 20 cpu busy
  #dev > naz: 16.5
+
+... new benchmark, iperf to lxc (pretty much the same both ways)
+revno: 89 (old version)
+naz > eye: 67.6 Mb/s  
+revno: 97/hsrelayz
+naz > eye: 71.4 Mb/s
+revno: 101/hsrelayz
+naz > eye: 69.7
+revno: 102/hsrelayz
+naz > eye: 70.6
+
 
 announces are kinda numerous when a new peer gets added.  there is an announce when a new peer is added as a relay from an announce and then a second announce if we can direct-connect to them.  This could end up causing a lot of unnecessary announces.
   Instead, I could make an incoming announce cause a direct connect attempt, and only add the peer as a relay if that fails (via deferred).  The downside of this is that it could take longer for a peer's presence to propagate through the net.

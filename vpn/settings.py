@@ -25,7 +25,6 @@ from ConfigParser import (
 import logging
 import os
 
-from uuid import UUID
 #import glib
 
 logger = logging.getLogger(__name__)
@@ -204,7 +203,7 @@ class SettingsManager(RawConfigParser):
             for (name, value) in self.items(section):
                 self.set(new_section, name, value)
             self.remove_section(section)
-            
+
         else:
             raise NoSectionError
 
@@ -326,6 +325,6 @@ def new(file):
     get_option = MANAGER.get_option
     set_option = MANAGER.set_option
     save = MANAGER.save
-    
+
 
 # vim: et sts=4 sw=4
