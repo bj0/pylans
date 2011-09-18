@@ -98,7 +98,7 @@ class PeerManager(object):
         self._my_pickle = pickle.dumps(self._self,-1)
 
         self.router = util.get_weakref_proxy(router)
-        self.sm = util.get_weakref_proxy(self.router.sm)
+        self.sm = util.get_weakref_proxy(router.sm)
         self.addr_map = self.router.addr_map
 
         # packet handlers
@@ -108,10 +108,16 @@ class PeerManager(object):
         router.register_handler(self.REGISTER_ACK, self.handle_reg_ack)
         router.register_handler(self.PEER_ANNOUNCE, self.handle_announce)
 
-        event.register_handler('session-opened', None,
-                               lambda o, sid, r: self.try_register(sid, relays=r))
-        event.register_handler('session-closed', None,
-                               lambda o, sid: self.remove_peer(self.get(sid)))
+        def do_session_opened(obj, sid, relays):
+            if self.sm == obj:
+                self.try_register(sid, relays=relays)
+        
+        def do_session_closed(obj, sid):
+            if self.sm == obj:
+                self.remove_peer(self.get(sid))
+            
+        event.register_handler('session-opened', None, do_session_opened)
+        event.register_handler('session-closed', None, do_session_closed)
 
 
     #def clear(self):
@@ -343,7 +349,7 @@ class PeerManager(object):
 
         if pid not in self.sm: # It's an (address,port) pair
             logger.error("Cannot send register to unknown session {0}".format(pid.encode('hex')))
-            raise TypeError("Cannot send register to unknown session")
+            raise TypeError("Cannot send register to unknown session {0}".format(pid.encode('hex')))
         addr = pid if addr is None else addr
 
         if (pid not in self.peer_list):
