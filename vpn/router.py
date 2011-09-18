@@ -324,8 +324,10 @@ class Router(object):
                     try:
                         self.handlers[pt](pt, packet, address, src)
                     except Exception, e:
+                        import traceback
                         logger.error('packet handler for packet type {1} raised\
-                         exception:\n {0}'.format(e, pt))
+                            exception:\n {0}'.format(e, pt))
+                        logger.debug(traceback.format_exc())
                         return # don't ack
                         
                 if id > 0: # ACK requested 
