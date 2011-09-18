@@ -325,3 +325,12 @@ class SessionManager(object):
 
     def __len__(self):
         len(self.session_objs)
+        
+    def __eq__(self, other):
+        import weakref
+        if isinstance(other, weakref.ProxyTypes):
+            other = other._ref()
+        return self is other
+        
+    def _ref(self):
+        return self
