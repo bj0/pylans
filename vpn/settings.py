@@ -157,6 +157,9 @@ class SettingsManager(RawConfigParser):
         try:
             value = self.get(section, key)
             value = self._str_to_val(value)
+        except ValueError, s:
+            logger.warning(s)
+            value = default
         except NoSectionError:
             value = default
         except NoOptionError:
@@ -247,10 +250,7 @@ class SettingsManager(RawConfigParser):
         """
             Convert setting strings back to normal values.
         """
-        try:
-            kind, value = value.split(': ', 1)
-        except ValueError:
-            return ''
+        kind, value = value.split(': ', 1)
 
         # Lists and dictionaries are special case
         if kind in ('L', 'D'):
