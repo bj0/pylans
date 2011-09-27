@@ -20,6 +20,7 @@
 #     realize that they can DC using local addresses
 # TODO NAT port re-write not taken into account
 # TODO merge with session manager? inherit?
+# TODO routing check, make sure displayed relay is actual relay
 
 import cPickle as pickle
 import logging
@@ -62,6 +63,15 @@ class PeerInfo(object):
             return util.decode_ip(self.addr)
         else:
             return util.decode_mac(self.addr)
+            
+    def __str__(self):
+        return ('PeerInfo Object(name={0},'+ \
+                'addr={1},'+ \
+                'address={2})').format(
+                self.name,
+                util.decode_mac(self.addr),
+                self.address)
+                
 
 class PeerManager(object):
     '''Manages peer connections'''
