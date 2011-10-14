@@ -197,7 +197,7 @@ class Router(object):
             # send
             return self.send_udp(data, dst)
 
-        elif dst in self.sm.session_map:
+        elif dst in self.sm.session_map: # sid
             dst_id = dst
             dst = self.sm.session_map[dst]
         elif dst in self.pm and dst != self.pm._self.id: # don't send to self...

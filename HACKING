@@ -64,8 +64,7 @@ announces are kinda numerous when a new peer gets added.  there is an announce w
   The first method would propagate the peer as relays through the network really fast and then each relay would be updated when a direct connection is made, causing extra announces.  If there were a lot of peers this could cause a lot of traffic...?
 
 Crytpo:
-  Should I use a PGP key for the network, and generate new random keys between peers when they connect?  Right now I just use a symmetric cypher key for the network and encrypt all traffic with that (ala n2n).  
-  If I switch, I need to change the packet format to let the client know if the incoming packet is encrypted with PGP or a Cypher.
+    I use a larger, 'network' key that is used for HMAC on the per-session generated keys.
 
 Packet Format:
   Currently, if it is a 'data' packet, or a packet that goes over the TUN wire, the packet is just [type-2B][data].  Since data is an IP packet, src and destination virtual IPs are included.
