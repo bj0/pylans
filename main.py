@@ -50,6 +50,7 @@ def main():
         
     elif ops.daemon: #needs testing TODO
         from vpn.interface import Interface
+        from twisted.internet import reactor
         iface = Interface()
         iface.start_all_networks()
         reactor.run()
