@@ -75,6 +75,9 @@ class Prompt(Cmd):
             print 'Logging threshold is currently {0}'.format(logging.getLevelName(self.iface.log_level))
 
         settings.save()
+        
+    def help_log(self):
+        print 'log ([level])\n set or display current log level\n'
 
     def do_connect(self, line):
         try:
@@ -97,6 +100,10 @@ class Prompt(Cmd):
         except ValueError:
             print 'Invalid arguments.'
 
+    def help_connect(self):
+        print 'connect [ip] [port] ([network])\n connect to a new peer address ' \
+               + 'on specified or current network\n'
+                
 
     def do_status(self, line):
         line = line.split()
@@ -128,6 +135,8 @@ class Prompt(Cmd):
 
         return [ net for net in nets if net.startswith(text) ]
 
+    def help_status(self):
+        print 'status\n display status of defined networks\n'
 
     def do_list(self, line):
         line = line.strip()
@@ -164,6 +173,9 @@ class Prompt(Cmd):
             return nets
 
         return [ net for net in nets if net.startswith(text) ]
+
+    def help_list(self):
+        print 'list ([network])\n list info for specified or active networks\n'
 
     def do_msg(self, line):
         # this doesn't work if the network as a '@' in it
@@ -216,6 +228,9 @@ class Prompt(Cmd):
             exec line
         except Exception, e:
             logger.critical('command threw exception:{0}'.format(e))
+
+    def help_py(self):
+        print 'py [line]\n executes a python line, only for testing\n'
 
 #    def emptyline(self, *args):
 #        self.do_status('')
