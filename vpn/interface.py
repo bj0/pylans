@@ -117,8 +117,11 @@ class Interface(object):
         # network
         if isinstance(network, networks.Network):
             self._current = network
-        elif network is not None and network in self._mgr:
-            self._current = self._mgr[network]
+        elif network is not None:
+            if network in self._mgr:
+                self._current = self._mgr[network]
+            else:
+                logger.warning('specified network not found')
 
         return self._current
 
