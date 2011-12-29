@@ -136,7 +136,8 @@ class Prompt(Cmd):
         else:
             nets = self.iface.get_network_list()
 
-        for net in nets:
+        # print info for online networks
+        for net in (x for x in nets if x.router is not None and x.is_running):
             print '========= Peers (%s) =========' % net.name
             for p in self.iface.get_peer_list(net):
                 print 'name:      {0}'.format(p.name)
