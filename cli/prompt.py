@@ -43,6 +43,7 @@ class Prompt(Cmd):
         iface.message_received += lambda net, peer, msg: logger.critical('{0}@{1}: {2}'.format(peer.name, net.name, msg))
 
         self.previous_et = None
+        self.prompt = 'pylans:>'
 
         Cmd.__init__(self)
 
@@ -224,8 +225,13 @@ class Prompt(Cmd):
         reactor.callFromThread(reactor.stop)
         return True
 
-
-
+    def postcmd(self, stop, line):
+        '''This is executed after every command'''
+        net = self.iface.get_network()
+        if net is not None:
+            self.prompt = 'pylans:{0}>'.format(net.name)
+        
+        return stop
 
 def main():
     iface = Interface()
