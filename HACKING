@@ -58,6 +58,10 @@ naz > eye: 69.7
 revno: 102/hsrelayz
 naz > eye: 70.6
 
+... new benchmark, iperf between 2 arkose containers on new i5 system (arkose v 1.4)
+revno: 103
+183 Mb/s
+
 
 announces are kinda numerous when a new peer gets added.  there is an announce when a new peer is added as a relay from an announce and then a second announce if we can direct-connect to them.  This could end up causing a lot of unnecessary announces.
   Instead, I could make an incoming announce cause a direct connect attempt, and only add the peer as a relay if that fails (via deferred).  The downside of this is that it could take longer for a peer's presence to propagate through the net.

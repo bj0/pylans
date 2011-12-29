@@ -262,7 +262,6 @@ def main():
 #    reactor.callLater(5, reactor.listenTCP, cbox.port, cbox)
 
 
-#    print 'run'
     reactor.run()
 
 
