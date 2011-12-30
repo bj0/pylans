@@ -6,7 +6,7 @@ import os
 import optparse
 
 # make sure settings file is here
-from vpn import settings
+import settings
 
 # py2exe
 if platform.system() == 'Windows':
@@ -49,7 +49,7 @@ def main():
         gui.main.main()
         
     elif ops.daemon: #needs testing TODO
-        from vpn.interface import Interface
+        from interface import Interface
         from twisted.internet import reactor
         iface = Interface()
         iface.start_all_networks()

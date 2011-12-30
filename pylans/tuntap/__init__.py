@@ -47,7 +47,6 @@ import socket
 import struct
 import util
 from network.netifaces import *
-from vpn import settings
 
 
 

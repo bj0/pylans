@@ -29,12 +29,11 @@ from struct import pack, unpack
 from tuntap import TunTap
 from twisted.internet import reactor, defer
 from twisted.internet.protocol import DatagramProtocol
-from vpn.crypto import Crypter
 from util.event import Event
-from vpn.peers import PeerManager
-from vpn.pinger import Pinger
-from vpn.sessions import SessionManager
-from vpn import settings
+from peers import PeerManager
+from mods.pinger import Pinger
+from sessions import SessionManager
+import settings
 import util
 
 logger = logging.getLogger(__name__)
@@ -94,7 +93,7 @@ class Router(object):
         self.addr_map = {}
 
         self.network = util.get_weakref_proxy(network)
-        #self.filter = Crypter(network.key)
+
         proto.router = util.get_weakref_proxy(self)
         self.sm = SessionManager(self)
         self.pm = PeerManager(self)
@@ -176,7 +175,7 @@ class Router(object):
     def relay(self, data, dst):
         if dst in self.pm:
             logger.debug('relaying packet to {0}'.format(repr(dst)))
-            self.send_udp(data, self.pm[dst].address)
+            self.proto.send(data, self.pm[dst].address)
 
 
     def send(self, type, data, dst, ack=False, id=0, ack_timeout=None, clear=False, faddress=None):
@@ -195,7 +194,7 @@ class Router(object):
             # pack
             data = pack('!2H', type, id) + dst_id + self.pm._self.id + data
             # send
-            return self.send_udp(data, dst)
+            return self.prot.send(data, dst)
 
         elif dst in self.sm.session_map: # sid
             dst_id = dst
@@ -258,7 +257,7 @@ class Router(object):
         data = pack('!2H', type, id) + dst_id + self.pm._self.id + data
 
         #TODO exception handling for bad addresses
-        self.send_udp(data, dst)
+        self.proto.send(data, dst)
 
         return d
 
@@ -281,9 +280,9 @@ class Router(object):
         else:
             logger.info('timeout called with bad id??!!?')
 
-    def send_udp(self, data, address):
+#    def send_udp(self, data, address):
         #data = self.filter.encrypt(data)
-        self._proto.send(data, address)
+#        self._proto.send(data, address)
 
     def send_packet(self, packet):
         '''Got a packet from the tun/tap device that needs to be sent out'''

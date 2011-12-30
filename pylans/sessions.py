@@ -15,13 +15,14 @@
 #
 #
 # TODO: need a pinger or something to determine when sessions are dead
+# TODO: what is the difference between a session and a peer?
 from twisted.internet import reactor, defer
 import hashlib, hmac
 from struct import pack, unpack
 import os
 import util
-from vpn.crypto import Crypter
-from vpn.peers import PeerInfo
+from crypto import Crypter
+from peers import PeerInfo
 import logging
 
 logger = logging.getLogger(__name__)
@@ -137,7 +138,7 @@ class SessionManager(object):
         self.open(pid, session_key)
 
     def key_xc_fail(self, sid):
-        logger.critical('key xchange failed!')
+        logger.error('key xchange failed!')
         #TODO re-try key xchange, or drop session??
 
 

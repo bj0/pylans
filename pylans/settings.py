@@ -309,6 +309,7 @@ class SettingsManager(RawConfigParser):
         self._saving = False
         self._dirty = False
 
+#TODO constistant path for settings (probably ~/.config/pylans)
 MANAGER = SettingsManager(
 #    os.path.join(xdg.get_config_dir(), "settings.ini" ),
     'settings.ini'

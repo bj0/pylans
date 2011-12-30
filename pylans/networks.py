@@ -20,8 +20,8 @@ import binascii
 import logging
 import os
 from util import event
-from vpn import router
-from vpn import settings
+import router
+import settings
 
 #from router import Router
 

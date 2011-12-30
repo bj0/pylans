@@ -20,16 +20,16 @@
 # global interface "singleton" (like settings)
 
 import logging
-from vpn import settings
+import settings
 
 logging.basicConfig(level=settings.get_option('settings/loglevel', 40))
 logger = logging.getLogger(__name__)
 global_logger = logging.getLogger()
 
-from vpn.chatter import ChatterBox
+from mods.chatter import ChatterBox
 from util.event import Event
 from util import event
-from vpn import networks
+import networks
 
 
 class Interface(object):

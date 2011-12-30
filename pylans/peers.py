@@ -29,7 +29,7 @@ import os
 from struct import pack, unpack
 import util
 from util import event
-from vpn import settings
+import settings
 
 import hmac, hashlib
 

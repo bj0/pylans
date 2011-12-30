@@ -26,7 +26,7 @@ import util
 from twisted.internet import reactor
 from twisted.web import client
 from util import bencode
-from vpn import settings
+import settings
 
 
 
