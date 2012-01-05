@@ -117,7 +117,23 @@ def ip_to_net_host_subnet(addr_str, mask=None):
     host = add - net
     
     return (ip_ltoa(net), ip_ltoa(host), ip_ltoa(0xFFFFFFFF-mask))
-    
+   
+def prompt(vars, message="Entering Interactive Python Interpreter"):
+    try:
+        from IPython.Shell import IPShellEmbed
+        ipshell = IPShellEmbed(argv=[''],banner=message,exit_msg="Goodbye")
+        return  ipshell
+    except ImportError:
+        ## this doesn't quite work right, in that it doesn't go to the right env
+        ## so we just fail.
+        import code
+        import rlcompleter
+        import readline
+        readline.parse_and_bind("tab: complete")
+        # calling this with globals ensures we can see the environment
+        print message
+        shell = code.InteractiveConsole(vars)
+        return shell.interact 
     
 
 class _WeakMethod:

@@ -25,7 +25,7 @@ from twisted.internet import reactor
 from twisted.internet.threads import deferToThread
 from vpn import settings
 from vpn.interface import Interface
-
+import util
 
 logger = logging.getLogger()
 
@@ -224,13 +224,11 @@ class Prompt(Cmd):
 #        settings.save()
 
     def do_py(self, line):
-        try:
-            exec line
-        except Exception, e:
-            logger.critical('command threw exception:{0}'.format(e))
+        p = util.prompt(globals(),'IPython Interactive Console')
+        p()
 
     def help_py(self):
-        print 'py [line]\n executes a python line, only for testing\n'
+        print 'py\n enter an (i)python interactive terminal for debugging purposes\n'
 
 #    def emptyline(self, *args):
 #        self.do_status('')
