@@ -8,3 +8,5 @@ Makefile
 _diff.diff
 .komodotools
 pylans.komodoproject
+cert.pem
+key.pem
