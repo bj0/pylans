@@ -115,8 +115,8 @@ class SessionManager(object):
         if isinstance(sid, PeerInfo):
             sid = sid.id
 
-        if sid not in self:
-            #logger.critical('unknown session id: {0}'.format(sid.encode('hex'))
+        if sid not in self.session_objs:
+            logger.error('unknown session id: {0}'.format(sid.encode('hex'))
             raise KeyError, "unknown session id: {0}".format(sid.encode('hex'))
         return self.session_objs[sid].encrypt(data)
 
@@ -124,7 +124,8 @@ class SessionManager(object):
         if isinstance(sid, PeerInfo):
             sid = sid.id
 
-        if sid not in self:
+        if sid not in self.session_objs:
+            logger.error('unknown session id: {0}'.format(sid.encode('hex'))
             raise KeyError, "unknown session id: {0}".format(sid.encode('hex'))
         return self.session_objs[sid].decrypt(data)
 
@@ -146,7 +147,7 @@ class SessionManager(object):
 
         # verify nonce
         if hmac.new(self.router.network.key, nonce, hashlib.sha256).digest() != mac:
-            logger.critical("hmac verification failed on key xchange!")
+            logger.error("hmac verification failed on key xchange!")
         else:
             send_key_xc_ack(nonce, sid)
 
@@ -165,7 +166,7 @@ class SessionManager(object):
 
         # verify nonce
         if hmac.new(self.router.network.key, nonce, hashlib.sha256).digest() != mac:
-            logger.critical('hmac verification failed on key xchange!')
+            logger.error('hmac verification failed on key xchange!')
         else:
             self.key_xc_complete(mynonce+nonce, src_id)
 
@@ -288,7 +289,7 @@ class SessionManager(object):
 
             # verify nonce
             if hmac.new(self.router.network.key, nonce, hashlib.sha256).digest() != mac:
-                logger.critical("hmac verification failed on handshake!")
+                logger.error("hmac verification failed on handshake!")
             else:
                 self.send_handshake_ack(nonce, src_id, address, r)
 
@@ -310,7 +311,7 @@ class SessionManager(object):
             nonce, mac = packet[:32], packet[32:]
             mynonce = self.shaking[src_id][0]
             if hmac.new(self.router.network.key, mynonce+nonce, hashlib.sha256).digest() != mac:
-                logger.critical("hmac verification failed on handshake_ack!")
+                logger.error("hmac verification failed on handshake_ack!")
                 self.handshake_fail(src_id)
                 raise Exception('hmac verification failed on handshake_ack!') # prevent ack
             else:
@@ -331,7 +332,7 @@ class SessionManager(object):
             self.close(sid)
 
     def handshake_fail(self, sid, x):
-        logger.critical('handshake failed with {0}'.format(sid.encode('hex')))
+        logger.error('handshake failed with {0}'.format(sid.encode('hex')))
         self.close(sid)
 
     def close_session(self, sid):

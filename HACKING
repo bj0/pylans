@@ -61,6 +61,10 @@ naz > eye: 70.6
 ... new benchmark, iperf between 2 arkose containers on new i5 system (arkose v 1.4)
 revno: 103
 183 Mb/s
+restructure: (w/SSL) revno 119
+165 Mbs
+restructure: (w/oSSL) revno 120
+191 Mbs
 
 
 announces are kinda numerous when a new peer gets added.  there is an announce when a new peer is added as a relay from an announce and then a second announce if we can direct-connect to them.  This could end up causing a lot of unnecessary announces.
