@@ -16,13 +16,14 @@
 #
 # TODO: need a pinger or something to determine when sessions are dead
 # TODO: what is the difference between a session and a peer?
-from twisted.internet import reactor, defer
+from twisted.internet import ssl, reactor, defer
 import hashlib, hmac
 from struct import pack, unpack
 import os
 import util
 from crypto import Crypter
 from peers import PeerInfo
+import protocol
 import logging
 
 logger = logging.getLogger(__name__)
@@ -35,14 +36,22 @@ class SessionManager(object):
     KEY_XCHANGE = 30
     KEY_XCHANGE_ACK = 31
 
-    def __init__(self, router):
+    HANDSHAKE_TIMEOUT = 3 #seconds
+    def __init__(self, router, proto=None):
+
+        if proto is None:
+            proto = protocol.UDPPeerProtocol(router.recv)
+    
+#        proto.router = util.get_weakref_proxy(router)
+        self.proto = proto
+        self.port = None
 
         self.router = util.get_weakref_proxy(router)
         # sid -> encryption object
         self.session_objs = {}
         # sid -> address
         self.session_map = {}
-        # sid -> (nonce, relays) for handshake
+        # sid -> (nonce, relays, address) for handshake
         self.shaking = {}
 
         self.id = self.router.network.id
@@ -53,10 +62,38 @@ class SessionManager(object):
         router.register_handler(self.KEY_XCHANGE, self.handle_key_xc)
         router.register_handler(self.KEY_XCHANGE_ACK, self.handle_key_xc_ack)
 
+    
+###### ###### ###### Protocol Stuff ###### ###### ###### 
+
+    def update_map(self, sid, address):
+        self.session_map[sid] = address
+
+    def send(self, data, sid, address):
+        self.proto.send(data, address)
+
+    def start(self, port):
+        # start listening on port
+        self.port = reactor.listenUDP(port, self.proto)
+        return self.port
+        
+    def stop(self):
+        if self.port is not None:
+            self.port.stopListening()
+            self.port = None
+
     def open(self, sid, session_key, relays=0):
-        obj = Crypter(session_key, callback=self.init_key_xc, args=(sid,))
-        self.session_objs[sid] = obj
-        util.emit_async('session-opened', self, sid, relays)
+        if sid in self.shaking:
+            # create encryption option
+            obj = Crypter(session_key, callback=self.init_key_xc, args=(sid,))
+            self.session_objs[sid] = obj
+            
+            # update sid -> address map
+            self.update_map(sid, self.shaking[sid][2])
+            del self.shaking[sid]
+            
+            util.emit_async('session-opened', self, sid, relays)
+        else:
+            raise Exception, "TODO: key-exchange"
 
     def close(self, sid):
         if sid in self.session_objs:
@@ -135,7 +172,7 @@ class SessionManager(object):
     def key_xc_complete(self, salt, sid):
         logger.info('new key xchange complete')
         session_key = hashlib.sha256(self.router.network.key+salt).digest()
-        self.open(pid, session_key)
+        self.open(sid, session_key)
 
     def key_xc_fail(self, sid):
         logger.error('key xchange failed!')
@@ -144,6 +181,9 @@ class SessionManager(object):
 
 
 ###### ###### ###### Session Initiation/Handshake functions ###### ###### ###### 
+
+    def connect(self, addrs):
+        self.try_greet(self, addrs)
 
     @defer.inlineCallbacks
     def try_greet(self, addrs):
@@ -189,6 +229,9 @@ class SessionManager(object):
         return # same as defer.returnValue(None)
         #raise Exception('Could not establish connection with addresses.')
 
+    def connect(self, address, ack=False):
+        self.send_greet(address, ack)
+        
     def send_greet(self, address, ack=False):
         #if address not in self:
         return self.router.send(self.GREET, '', address, ack=ack)
@@ -199,7 +242,7 @@ class SessionManager(object):
             return #TODO throw exception to prevent acks?
 
         logger.debug('handle greet')
-        if (src_id not in self or self.router.pm[src_id].timeouts > 0) \
+        if (src_id not in self.session_map or self.router.pm[src_id].timeouts > 0) \
          and src_id not in self.shaking:
             # unknown peer not currently shaking hands, start handshake
             self.send_handshake(src_id, address, 0)
@@ -220,35 +263,25 @@ class SessionManager(object):
                     # return the favor
                     self.send_greet(address)
 
-    def handshake_timeout(self, pid):
-        if pid not in self:
-            logger.warning('handshake with {0} timed out'.format(pid.encode('hex')))
-            if pid in self.shaking:
-                del self.shaking[pid]
-            if pid in self.session_map:
-                del self.session_map[pid]
-
-    def send_handshake(self, pid, address, relays=0):
-        if (pid not in self or self.router.pm[pid].timeouts > 0) \
-         and pid not in self.shaking:
-            logger.info('send handshake to {0}'.format(pid.encode('hex')))
+    def send_handshake(self, sid, address, relays=0):
+        if (sid not in self.session_map or self.router.pm[sid].timeouts > 0) \
+         and sid not in self.shaking:
+            logger.info('send handshake to {0}'.format(sid.encode('hex')))
 
             nonce = os.urandom(32) #todo crypto size
-            self.shaking[pid] = (nonce, relays)
-            self.session_map[pid] = address
+            self.shaking[sid] = (nonce, relays, address)
 
             # timeout handshake
-            reactor.callLater(3, self.handshake_timeout, pid)
-
+            reactor.callLater(self.HANDSHAKE_TIMEOUT, self.handshake_timeout, sid)
             mac = hmac.new(self.router.network.key, nonce, hashlib.sha256).digest()
-
-            # need ack?
-            self.router.send(self.HANDSHAKE, pack('!B', relays)+nonce+mac, pid, clear=True)
+ 
+            # don't need ack, should get handshake-ack or timeout
+            self.router.send(self.HANDSHAKE, pack('!B', relays)+nonce+mac, sid, clear=True)
 
 
     def handle_handshake(self, type, packet, address, src_id):
         logger.info('got handshake packet from {0}'.format(src_id.encode('hex')))
-        if (src_id not in self or self.router.pm[src_id].timeouts > 0) \
+        if (src_id not in self.session_map or self.router.pm[src_id].timeouts > 0) \
          and src_id not in self.shaking:
             r, nonce, mac = packet[0], packet[1:33], packet[33:]
             r = unpack('!B', r)[0]
@@ -259,16 +292,17 @@ class SessionManager(object):
             else:
                 self.send_handshake_ack(nonce, src_id, address, r)
 
-    def send_handshake_ack(self, nonce, pid, address, relays=0):
-        logger.info('sending handshake ack to {0}'.format(pid.encode('hex')))
+    def send_handshake_ack(self, nonce, sid, address, relays=0):
+        logger.info('sending handshake ack to {0}'.format(sid.encode('hex')))
         mynonce = os.urandom(32)
-        self.shaking[pid] = (mynonce, relays)
-        self.session_map[pid] = address
+        self.shaking[sid] = (mynonce, relays, address)
+#        self.session_map[sid] = address
+#        self.update_map(sid, address)
         
         mac = hmac.new(self.router.network.key, nonce+mynonce, hashlib.sha256).digest()
-        d = self.router.send(self.HANDSHAKE_ACK, mynonce+mac, pid, ack=True, clear=True)
-        d.addCallback(lambda *x: self.handshake_done(pid, nonce+mynonce, address))
-        d.addErrback(lambda *x: self.handshake_fail(pid, x))
+        d = self.router.send(self.HANDSHAKE_ACK, mynonce+mac, sid, ack=True, clear=True)
+        d.addCallback(lambda *x: self.handshake_done(sid, nonce+mynonce, address))
+        d.addErrback(lambda *x: self.handshake_fail(sid, x))
 
     def handle_handshake_ack(self, type, packet, address, src_id):
         logger.info('got handshake ack from {0}'.format(src_id.encode('hex')))
@@ -282,50 +316,45 @@ class SessionManager(object):
             else:
                 self.handshake_done(src_id, mynonce+nonce, address)
 
-    def handshake_done(self, pid, salt, address):
-        logger.info('handshake finished with {0}'.format(pid.encode('hex')))
-        if pid in self.shaking:
+    def handshake_done(self, sid, salt, address):
+        logger.info('handshake finished with {0}'.format(sid.encode('hex')))
+        if sid in self.shaking:
             # todo - session key size?
             session_key = hashlib.md5(self.router.network.key+salt).digest()
             # init encryption
-            self.open(pid, session_key, relays=self.shaking[pid][1])
-            del self.shaking[pid]
+            self.open(sid, session_key, relays=self.shaking[sid][1])
 
-            # emit event, close session if failed
-            # but do it after we send the ack
-            #def do_later():
-                #pass
-            #    d = self.try_register(pid, relays=self.shaking[pid][1])
-            #    d.addErrback(self.close_session, pid)
-            #reactor.callLater(0, do_later)
 
-    def handshake_fail(self, pid, x):
-        logger.critical('handshake failed with {0}'.format(pid.encode('hex')))
-        if pid in self.shaking:
-            del self.shaking[pid]
-        if pid in self.session_map:
-            del self.session_map[pid]
+    def handshake_timeout(self, sid):
+        if sid not in self.session_map:
+            logger.warning('handshake with {0} timed out'.format(sid.encode('hex')))
+            self.close(sid)
 
-    def close_session(self, pid):
-        self.close(pid)
+    def handshake_fail(self, sid, x):
+        logger.critical('handshake failed with {0}'.format(sid.encode('hex')))
+        self.close(sid)
+
+    def close_session(self, sid):
+        self.close(sid)
 
 
 
     ### Container Functions
-    def get(self, item, default=None):
-        try:
-            return self[item]
-        except KeyError:
-            return default
+#    def get(self, item, default=None):
+#        try:
+#            return self[item]
+#        except KeyError:
+#            return default
 
-    def __contains__(self, item):
-        return item in self.session_objs
+#    def __contains__(self, item):
 
-    def __getitem__(self, item):
-        return self.session_objs[item]
+#    def __getitem__(self, item):
 
-    def __len__(self):
-        len(self.session_objs)
+#        else:
+#            raise KeyError, "sid not found"
+
+#    def __len__(self):
+
         
     def __eq__(self, other):
         import weakref
@@ -335,3 +364,151 @@ class SessionManager(object):
         
     def _ref(self):
         return self
+        
+        
+        
+        
+class SSLSessionManager(SessionManager, protocol.SSLPeerFactory):
+
+    def __init__(self, router):
+        self.connecting = {}
+        SessionManager.__init__(self, router, proto=self)
+        
+        
+###### ###### ###### Protocol Factory Stuff ###### ###### ###### 
+
+    def buildProtocol(self, addr):
+        # server and client
+        addr = (addr.host, addr.port)   # match dict key
+        if addr not in self.connecting:
+            d = defer.Deferred()
+            self.connecting[addr] = (None, d)
+        else:
+            d = self.connecting[addr][1]
+            
+        p = self.protocol(d, self.router.recv)
+        self.connecting[addr] += (p,)
+        d.addCallback(self._connect_success, addr)
+        d.addErrback(self._connect_fail, addr)
+        return p
+#
+    def clientConnectLost(self, connector, reason):
+        # client only
+        address = connector.getDestination()
+        address = (address.host,address.port)
+        if address in self.connecting:
+            ctr, d = self.connecting[address]
+            logger.debug('connection lost: {0}, {1}, {2}, {3}'.format(
+                ctr, connector, address, reason))
+            del self.connecting[address]
+            d.errback()
+        
+    def clientConnectionFailed(self, connector, reason):
+        self.clientConnectionLost(connector, reason)
+        
+
+###### ###### ###### Connection Stuff ###### ###### ###### 
+
+    def update_map(self, sid, addr):
+        if isinstance(addr, protocol.SSLPeerProtocol):
+            self.session_map[sid] = addr
+        else:
+            raise ValueError, "session map stores ssl connections, not {0}".format(addr)
+
+    def _connect_fail(self, proto, addr):
+        # called for both server and client
+        if addr in self.connecting:
+            del self.connecting[addr]
+            
+        logger.info('connection failed: {0}, {1}'.format(addr, proto))
+
+        # get sids using this protocol
+        sids = [ k for k in self.session_map.keys() if self.session_map[k] == proto ]
+
+        # close them down
+        for sid in sids:
+            self.close(sid)
+        
+        
+    def _connect_success(self, proto, addr):
+        # called for both server and client
+#        if addr in self.connecting:
+#            del self.connecting[addr]
+
+        logger.info('connection success: {0}, {1}'.format(addr, proto))
+        #TODO connected but not shaking state?
+
+    def connect(self, address):
+        #TODO check if already connected
+        if address not in self.connecting:
+            logger.debug('trying to connect to {0}'.format(address))
+            d = defer.Deferred()
+            # how to deferr the result of this, or save this connection in handshaking?
+            self.connecting[address] = \
+                 (reactor.connectSSL(address[0],address[1], self,
+                  ssl.ClientContextFactory()), d)
+#                (reactor.connectSSL(address[0],address[1], self),d)
+            # glib timeout? TODO
+        else:
+            logger.debug('already connected to {0}'.format(address))
+            d = self.connecting[address][1]
+            
+        return d
+
+
+#    def try_greet(self, address):
+#        logger.critical('try_greet not implimented')
+        
+    def send_greet(self, address, ack=False):
+        d = self.connect(address)
+        d.addCallback(lambda *x: self.router.send(self.GREET, '', address, ack=ack))
+#        d.addErrback(self._connect_fail
+        return d
+
+    def open(self, sid, session_key, relays=0):
+        if sid in self.shaking:
+            addr = self.shaking[sid][2]
+            # shouldn't be in shaking if not in connecting
+            self.session_map[sid] = self.connecting[addr][2]
+            del self.shaking[sid]
+            del self.connecting[addr]
+            util.emit_async('session-opened', self, sid, relays)
+
+    def start(self, port):
+        self.port = reactor.listenSSL(port, self,
+                ssl.DefaultOpenSSLContextFactory('key.pem','cert.pem'))
+        return self.port
+        
+    def stop(self):
+        if self.port is not None:
+            self.port.stopListening()
+            self.port = None
+        
+    def send(self, data, sid, address):
+        if sid in self.session_map:
+            self.session_map[sid].send(data)
+        elif address in self.connecting: #TODO handle greets/handshakes
+            #TODO check for valid packets
+            self.connecting[address][2].send(data)
+        else:
+            logger.error("cannot send to sid not in session map")
+            raise KeyError, "cannot send to sid not in session map"
+            
+    def encode(self, sid, data):
+        if sid in self.session_map:
+            return data
+        else:
+            logger.error("encode: sid not in session map")
+            raise KeyError, "encode: sid not in session map"
+        
+    def decode(self, sid, data):
+        if sid in self.session_map:
+            return data
+        else:
+            logger.error("decode: sid not in session map")
+            raise KeyError, "decode: sid not in session map"
+
+    def _get_proto_by_addr(self, addr):
+        d = dict(((x.getPeer().host,x.getPeer().port),x) for x in self.session_map.values())
+        #TODO tuple or ipv4addr?
+        return d.get(addr, None)
