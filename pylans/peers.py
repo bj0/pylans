@@ -29,7 +29,7 @@ import os
 from struct import pack, unpack
 import util
 from util import event
-from vpn import settings
+import settings
 
 import hmac, hashlib
 
@@ -196,7 +196,8 @@ class PeerManager(object):
         if (opi.relays >= npi.relays and opi.address != npi.address):
             # point addr_map at better relay
             self.addr_map[opi.addr] = (npi.address, npi.id)
-            self.sm.session_map[npi.id] = npi.address
+            #self.sm.session_map[npi.id] = npi.address
+            self.sm.update_map(npi.id, npi.address)
 
             opi.address = npi.address
             opi.relays = npi.relays
@@ -267,7 +268,7 @@ class PeerManager(object):
         #packet = self.sm.decode(src_id, packet)
         pi = pickle.loads(packet)
         if pi.id != self._self.id:
-            if pi.id not in self.sm:
+            if pi.id not in self.sm.session_map:
                 # init (relayed) handshake
                 self.sm.send_handshake(pi.id, address, pi.relays)
             elif pi.id not in self.peer_list:
@@ -333,7 +334,7 @@ class PeerManager(object):
 
                 if peer.id in self.peer_list:
                     self.update_peer(self.peer_list[peer.id],peer)
-                elif peer.id not in self.sm:
+                elif peer.id not in self.sm.session_map:
                     #self.add_peer(peer)
                     self.sm.send_handshake(peer.id, peer.address, peer.relays)
                 elif peer.id not in self.peer_list:
@@ -357,7 +358,7 @@ class PeerManager(object):
             reactor.callLater(secs, d.callback, None)
             return d
 
-        if pid not in self.sm: # It's an (address,port) pair
+        if pid not in self.sm.session_map: # It's an (address,port) pair
             logger.error("Cannot send register to unknown session {0}".format(pid.encode('hex')))
             raise TypeError("Cannot send register to unknown session {0}".format(pid.encode('hex')))
         addr = pid if addr is None else addr

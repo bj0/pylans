@@ -17,15 +17,21 @@
 # util.py
 # utility functions
 
+from twisted.internet.utils import getProcessOutput
+from twisted.internet import defer
 from inspect import ismethod, isfunction
 from new import instancemethod
 from functools import wraps
 from struct import pack, unpack
+import subprocess as sp
+import shlex
 import socket
 import threading
 import weakref
 import event
+import logging
 
+logger = logging.getLogger(__name__)
 
 def encode_mac(mac_str):
     '''Encode a string MAC address into 6 bytes.
@@ -117,7 +123,7 @@ def ip_to_net_host_subnet(addr_str, mask=None):
     host = add - net
     
     return (ip_ltoa(net), ip_ltoa(host), ip_ltoa(0xFFFFFFFF-mask))
-   
+    
 def prompt(vars, message="Entering Interactive Python Interpreter", 
         prompt="pylans", exit_msg="Returning to pylans cli"):
     try:
@@ -135,7 +141,48 @@ def prompt(vars, message="Entering Interactive Python Interpreter",
         # calling this with globals ensures we can see the environment
         print message
         shell = code.InteractiveConsole(vars)
-        return shell.interact 
+        return shell.interact
+
+    
+#def run_cmd(self, cmd):
+#    if isinstance(cmd, list):
+#        # command already split up for subprocess
+#        pass
+#    elif isinstance(cmd, str):
+#        # command all in one string
+#        cmd = shlex.split(cmd)
+#    else:
+#        raise ValueError, "invalid cmd parameter, require string or list"
+
+#    return sp.call(cmd)
+#    
+#def run_cmds(self, cmds):
+#    res = []
+#    for cmd in cmds:
+#        res.append(run_cmd(cmd))
+#    return res
+
+def run_cmd(cmd):
+    if isinstance(cmd, list):
+        # command already split up for subprocess
+        pass
+    elif isinstance(cmd, str):
+        # command all in one string
+        cmd = shlex.split(cmd)
+    else:
+        raise ValueError, "invalid cmd parameter, require string or list"
+    
+    logger.debug('running command: {0}'.format(cmd))
+    return getProcessOutput(cmd[0], cmd[1:])
+    
+@defer.inlineCallbacks
+def run_cmds(cmds):
+    res = []
+    for cmd in cmds:
+        ret = yield run_cmd(cmd)
+        res.append(ret)
+    defer.returnValue(res)
+
 
 class _WeakMethod:
     """Represent a weak bound method, i.e. a method doesn't keep alive the

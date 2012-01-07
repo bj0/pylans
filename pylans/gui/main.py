@@ -32,8 +32,8 @@ from twisted.cred.credentials import UsernamePassword
 from twisted.internet import error as netError
 
 import util
-from vpn.interface import Interface
-from vpn.chatter import ChatterBox
+from interface import Interface
+from chatter import ChatterBox
 
 logger = logging.getLogger(__name__)
 

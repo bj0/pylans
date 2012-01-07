@@ -23,8 +23,8 @@ from cmd import Cmd
 import logging
 from twisted.internet import reactor
 from twisted.internet.threads import deferToThread
-from vpn import settings
-from vpn.interface import Interface
+import settings
+from interface import Interface
 import util
 
 logger = logging.getLogger()

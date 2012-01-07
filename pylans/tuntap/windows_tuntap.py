@@ -28,7 +28,7 @@ import win32event as w32e
 import win32file as w32f
 import winerror
 import util
-from network.getadaptersinfo import GetAdaptersInfo
+from net.getadaptersinfo import GetAdaptersInfo
 
 logger = logging.getLogger(__name__)
 

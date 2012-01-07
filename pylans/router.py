@@ -28,37 +28,14 @@ import random
 from struct import pack, unpack
 from tuntap import TunTap
 from twisted.internet import reactor, defer
-from twisted.internet.protocol import DatagramProtocol
-from vpn.crypto import Crypter
 from util.event import Event
-from vpn.peers import PeerManager
-from vpn.pinger import Pinger
-from vpn.sessions import SessionManager
-from vpn import settings
+from peers import PeerManager
+from mods.pinger import Pinger
+from sessions import SessionManager, SSLSessionManager
+import settings
 import util
 
 logger = logging.getLogger(__name__)
-
-class UDPPeerProtocol(DatagramProtocol):
-    '''Protocol or sending/receiving data to peers'''
-
-    def send(self, data, address):
-        '''Send data to address'''
-        try:
-            self.transport.write(data, address)
-            logger.debug('sending {1} bytes on UDP port to {0}'.format(address, len(data)))
-        except Exception, e:
-            logger.warning('UDP send threw exception:\n  {0}'.format(e))
-            ##TODO this is here because UDP socket fills up and just dies
-            # but it's UDP so we can drop packets
-
-    def datagramReceived(self, data, address):
-        '''Called by twisted when data is received from address'''
-        self.router.recv_udp(data, address)
-        logger.debug('received {1} bytes on UDP port from {0}'.format(address, len(data)))
-
-    def connectionRefused(self):
-        logger.debug('connectionRefused on UDP port')
 
 
 class Router(object):
@@ -80,12 +57,10 @@ class Router(object):
 
     #USER = 0x80
 
-    def __init__(self, network, proto=None, tuntap=None):
+    def __init__(self, network, tuntap=None):
         if tuntap is None:
             mode = network.adapter_mode
             tuntap = TunTap(self, mode)
-        if proto is None:
-            proto = UDPPeerProtocol()
 
         logger.info('Initializing router in {0} mode.'.format('TAP' if tuntap.is_tap else 'TUN'))
 
@@ -94,25 +69,18 @@ class Router(object):
         self.addr_map = {}
 
         self.network = util.get_weakref_proxy(network)
-        #self.filter = Crypter(network.key)
-        proto.router = util.get_weakref_proxy(self)
-        self.sm = SessionManager(self)
+
+        # check if we are using SSL
+        if settings.get_option(self.network.name + '/' + 'use_ssl', False):
+            self.sm = SSLSessionManager(self)
+        else:
+            self.sm = SessionManager(self)
         self.pm = PeerManager(self)
-
-        # filterz
-        #self._filterator = PacketFilter(self)
-        #self.filter = self._filterator.filter
-        #self.unfilter = self._filterator.unfilter
-
-#        self.addr_map = self.pm.addr_map
-#        self.relay_map = self.pm.relay_map
 
         # move this out of router?
         self.pinger = Pinger(self)
 
-        self._proto = proto
         self._tuntap = tuntap
-        self._port = None
 
         # move out of router?
         import bootstrap
@@ -126,6 +94,7 @@ class Router(object):
         Override'''
         pass
 
+    @defer.inlineCallbacks
     def start(self):
         '''Start the router.  Starts the tun/tap device and begins listening on
         the UDP port.'''
@@ -133,30 +102,36 @@ class Router(object):
         self._tuntap.start()
 
         # configure tun/tap address
-        d = self._tuntap.configure_iface(self.network.virtual_address)
+        yield self._tuntap.configure_iface(self.network.virtual_address)
 
         # set mtu (if possible)
         mtu = settings.get_option(self.network.name + '/' + 'set_mtu', None)
         if mtu is None:
             mtu = settings.get_option(self.network.name + '/' + 'set_mtu', None)
         if mtu is not None:
-            d.addCallback(lambda *x: self._tuntap.set_mtu(mtu))
-
-        # start UDP listener
-        self._port = reactor.listenUDP(self.network.port, self._proto)
+            self._tuntap.set_mtu(mtu)
+            
+        # start connection listener
+        self.sm.start(self.network.port)
 
         # get addresses
-        d.addCallback(self.get_my_address)
+        yield self.get_my_address()
 
-        logger.info('router started, listening on UDP port {0}'.format(self._port))
+        logger.info('router started, listening on port {0}'.format(self.network.port))
 
-        def start_connections(*x):
-            self._bootstrap.start()
-            self.pinger.start() #TODO make this more modular
-            reactor.callLater(1, util.get_weakref_proxy(self.pm.try_old_peers))
+        self._bootstrap.start()
+        self.pinger.start()
+        reactor.callLater(1, util.get_weakref_proxy(self.pm.try_old_peers))
 
-        # when the adapter is up, start network tools
-        d.addCallback(start_connections)
+#        def start_connections(*x):
+#            self._bootstrap.start()
+#            self.pinger.start() #TODO make this more modular
+#            reactor.callLater(1, util.get_weakref_proxy(self.pm.try_old_peers))
+
+#        # when the adapter is up, start network tools
+#        d.addCallback(start_connections)
+#        
+#        return d
 
     def stop(self):
         '''Stop the router.  Stops the tun/tap device and stops listening on the
@@ -167,16 +142,14 @@ class Router(object):
         # bring down iface?
         # todo determine states: online/offline/disabled/adapterless?
         self.pm.clear()
-        if self._port is not None:
-            self._port.stopListening()
-            self._port = None
+        self.sm.stop()
 
         logger.info('router stopped')
 
     def relay(self, data, dst):
         if dst in self.pm:
             logger.debug('relaying packet to {0}'.format(repr(dst)))
-            self.send_udp(data, self.pm[dst].address)
+            self.sm.send(data, self.pm[dst].id, self.pm[dst].address)
 
 
     def send(self, type, data, dst, ack=False, id=0, ack_timeout=None, clear=False, faddress=None):
@@ -195,11 +168,14 @@ class Router(object):
             # pack
             data = pack('!2H', type, id) + dst_id + self.pm._self.id + data
             # send
-            return self.send_udp(data, dst)
+            return self.sm.send(data, dst_id, dst)
 
         elif dst in self.sm.session_map: # sid
             dst_id = dst
             dst = self.sm.session_map[dst]
+        elif dst in self.sm.shaking: #TODO: check for valid shaking packets
+            dst_id = dst
+            dst = self.sm.shaking[dst][2]
         elif dst in self.pm and dst != self.pm._self.id: # don't send to self...
             # it shouldn't really reach this point, as there shouldn't be
             # anyone in pm who's not in sm
@@ -212,26 +188,20 @@ class Router(object):
             pi = self.pm.get(dst)
             if pi is not None:
                 dst_id = pi.id
-#                if data != '' and not clear:
-#                    data = self.sm.encode(dst_id, data)
             else:
                 dst_id = '\x00'*16 # non-routable
 
-        ## peerless session (during handshake)
-        #elif dst in self.sm.session_map:
-        #    dst_id = dst
-        #    dst = self.sm.session_map[dst]
 
         # unknown peer dst TODO: this should return an erroring deferred?
         elif faddress is not None:
             # got packet from an unknown id, send a greet to the address
-            self.sm.send_greet(faddress)
-            return
+            self.sm.try_greet(faddress)
+            return #TODO does this prevent acks on greets?
         else:
             logger.error('cannot send to unknown dest {0}'.format(repr(dst)))
             return #todo throw exception
 
-        # want ack
+        # want ack?
         if ack or id > 0:
             if id == 0:
                 id = random.randint(0, 0xFFFF)
@@ -242,9 +212,9 @@ class Router(object):
         else:
             d = None
 
-
+        # encode the data
         if data != '' and not clear:
-            if dst_id in self.sm:
+            if dst_id in self.sm.session_map:
                 data = self.sm.encode(dst_id, pack('!H',type) + data)
             #logger.debug('encoding packet {0}'.format(type))
                 type = self.ENCODED
@@ -253,12 +223,11 @@ class Router(object):
                 return #todo throw exception?
         else:
             logger.debug('sending clear packet ({0})'.format(type))
-            #logger.critical('trying to send encrypted packets but no associated session')
 
         data = pack('!2H', type, id) + dst_id + self.pm._self.id + data
 
         #TODO exception handling for bad addresses
-        self.send_udp(data, dst)
+        self.sm.send(data, dst_id, dst)
 
         return d
 
@@ -281,16 +250,12 @@ class Router(object):
         else:
             logger.info('timeout called with bad id??!!?')
 
-    def send_udp(self, data, address):
-        #data = self.filter.encrypt(data)
-        self._proto.send(data, address)
-
     def send_packet(self, packet):
         '''Got a packet from the tun/tap device that needs to be sent out'''
         pass
 
-    def recv_udp(self, data, address):
-        '''Received a packet from the UDP port.
+    def recv(self, data, address):
+        '''Received a packet from the protocol port.
         Parse it and send it on its way.
         Data types get special treatment to reduce overhead.'''
 
@@ -392,9 +357,9 @@ class TapRouter(Router):
 
             # get mac addr
             self.pm._self.addr = self._tuntap.get_mac() #todo check if this is none?
-            
+
             # get 'direct' addresses
-            from network.netifaces import ifaddresses
+            from net.netifaces import ifaddresses
             addr = ifaddresses()
             for dev in addr['AF_INET']:
                 if dev not in ['lo'] and not dev.startswith('pytun'):

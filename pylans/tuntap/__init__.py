@@ -37,7 +37,7 @@
 #
 # TODO: for windows: setting ip address, mtu,
 
-from twisted.internet import reactor, utils
+from twisted.internet import reactor, utils, defer
 from twisted.internet.interfaces import IReadDescriptor
 from twisted.internet.threads import deferToThread
 from zope.interface import implements
@@ -46,8 +46,7 @@ import os
 import socket
 import struct
 import util
-from network.netifaces import *
-from vpn import settings
+from net.netifaces import *
 
 
 
@@ -226,6 +225,7 @@ class TunTapLinux(TunTapBase):
 
         return self.mtu
 
+    @defer.inlineCallbacks
     def configure_iface(self, address, mtu=None):
         '''
             Configure the tun/tap interface with given address/mask (ie: '10.1.1.1/24')
@@ -234,10 +234,14 @@ class TunTapLinux(TunTapBase):
             if retval != 0:
                 logger.error('error configuring address {0} on interface {1}'.format(address, self.ifname))
 
-        # re-do this to chain deferreds?
-        utils.getProcessValue('/sbin/ip',('addr','add',address,'dev',self.ifname)).addCallback(response)
-        d = utils.getProcessValue('/sbin/ip',('link','set',self.ifname,'up'))
-        d.addCallback(response)
+        # TODO is this right?
+        retval = yield utils.getProcessValue('/sbin/ip',
+            ('addr','add',address,'dev',self.ifname))
+        response(retval)
+        retval = yield utils.getProcessValue('/sbin/ip',
+            ('link','set',self.ifname,'up'))
+        response(retval)
+        
 
         # set mtu
 #        if mtu is not None:
@@ -246,7 +250,6 @@ class TunTapLinux(TunTapBase):
 
         logger.info('configuring interface {1} to: {0}'.format(address, self.ifname))
 
-        return d
 
     def doRead(self):
         '''
