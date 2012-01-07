@@ -16,9 +16,11 @@
 #
 # networks.py
 
+from twisted.internet import defer
 import binascii
 import logging
 import os
+import util
 from util import event
 import router
 import settings
@@ -36,6 +38,8 @@ class Network(object):
 #        self.name = self._name
         self._id = None
         self.router = None
+        self.smgr = None
+        self.pmgr = None
         self._running = False
 
         if enabled is not None:
@@ -114,30 +118,50 @@ class Network(object):
             event.emit('network-changed', self)
             settings.save()
 
+    @defer.inlineCallbacks
     def start(self):
         if self.enabled:
             if self._running:
                 return
+                
             if self.router is None:
                 self.router = router.get_router(self)
 
-            event.register_handler('peer-added', self.router.pm, self.new_connection);
-            self.router.start()
+            #TODO pre-start scripts, also handle this stuff with deferreds
+            cmd_list = settings.get_option(self._name+'/pre_start',[])
+            yield util.run_cmds(cmd_list)
+            
+            event.register_handler('peer-added', self.router.pm, self.new_connection)
+
+            yield self.router.start()
             self._running = True
             event.emit('network-started', self)
             logger.info('network {0} started'.format(self.name))
+
+            #TODO post-start scripts
+            cmd_list = settings.get_option(self._name+'/post_start',[])
+            yield util.run_cmds(cmd_list)
         else:
             logger.info('network {0} not starting, disabled'.format(self.name))
 
+    @defer.inlineCallbacks
     def stop(self):
         if not self._running:
             return
         if self.router is not None:
-            event.unregister_handler('peer-added', self.router.pm, self.new_connection);
+            #TODO pre-stop scripts
+            cmd_list = settings.get_option(self._name+'/pre_stop',[])
+            yield util.run_cmds(cmd_list)
+            
+            event.unregister_handler('peer-added', self.router.pm, self.new_connection)
             self.router.stop()
             self._running = False
             event.emit('network-stopped', self)
             logger.info('network {0} stopped'.format(self.name))
+
+            #TODO post-stop scripts
+            cmd_list = settings.get_option(self._name+'/post_stop',[])
+            yield util.run_cmds(cmd_list)
 
     def _get(self, item, default=None):
         return settings.get_option(self._name+'/%s'%item, default)
@@ -311,6 +335,11 @@ class NetworkManager(object):
     def stop_network(self, network):
         if network in self:
             self[network].stop()
+            
+    def stop_all(self):
+        for net in self.network_list.values():
+            if net.is_running:
+                net.stop()
 
     def enable_network(self, network):
         if network in self:
