@@ -167,6 +167,9 @@ class Interface(object):
     def stop_network(self, network):
         self._mgr.stop_network(network)
 
+    def stop_all_networks(self):
+        self._mgr.stop_all()
+
     def enable_network(self, network):
         self._mgr.enable_network(network)
 
@@ -227,3 +230,7 @@ class Interface(object):
         if self.get_network(network) is not None:
             settings.set_option(network.name+'/'+setting, value)
             settings.save()
+            
+    def exit(self):
+        self.stop_all_networks()
+        reactor.stop()
