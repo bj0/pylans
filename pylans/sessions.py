@@ -116,7 +116,7 @@ class SessionManager(object):
             sid = sid.id
 
         if sid not in self.session_objs:
-            logger.error('unknown session id: {0}'.format(sid.encode('hex'))
+            logger.error('unknown session id: {0}'.format(sid.encode('hex')))
             raise KeyError, "unknown session id: {0}".format(sid.encode('hex'))
         return self.session_objs[sid].encrypt(data)
 
@@ -125,7 +125,7 @@ class SessionManager(object):
             sid = sid.id
 
         if sid not in self.session_objs:
-            logger.error('unknown session id: {0}'.format(sid.encode('hex'))
+            logger.error('unknown session id: {0}'.format(sid.encode('hex')))
             raise KeyError, "unknown session id: {0}".format(sid.encode('hex'))
         return self.session_objs[sid].decrypt(data)
 
@@ -490,6 +490,7 @@ class SSLSessionManager(SessionManager, protocol.SSLPeerFactory):
             self.session_map[sid].send(data)
         elif address in self.connecting: #TODO handle greets/handshakes
             #TODO check for valid packets
+#            type = struct.unpack('!1H', data[:2])[0]
             self.connecting[address][2].send(data)
         else:
             logger.error("cannot send to sid not in session map")
