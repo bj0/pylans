@@ -491,12 +491,14 @@ class SSLSessionManager(SessionManager, protocol.SSLPeerFactory):
             # check for valid packets
             type = struct.unpack('!1H', data[:2])[0]
             if type in [self.GREET, self.HANDSHAKE, self.HANDSHAKE_ACK,
-                        self.KEY_XCHANGE, self.KEY_XCHANGE_ACK, self.router.ACK]
+                        self.KEY_XCHANGE, self.KEY_XCHANGE_ACK, self.router.ACK]:
 
                 self.connecting[address][2].send(data)
             else:
-                logger.error("trying to send {0} packet through uninitialized session")
-                raise ValueError, "trying to send {0} packet through uninitialized session"
+                logger.error("trying to send {0} packet through uninitialized"
+                            +" session")
+                raise ValueError, "trying to send {0} packet through " \
+                            +"uninitialized session"
         else:
             logger.error("cannot send to sid not in session map")
             raise KeyError, "cannot send to sid not in session map"

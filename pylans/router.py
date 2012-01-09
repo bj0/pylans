@@ -101,7 +101,7 @@ class Router(object):
         # start tuntap device
         self._tuntap.start()
 
-        # configure tun/tap address
+        # configure tun/tap address (deferred)
         yield self._tuntap.configure_iface(self.network.virtual_address)
 
         # set mtu (if possible)
@@ -114,7 +114,7 @@ class Router(object):
         # start connection listener
         self.sm.start(self.network.port)
 
-        # get addresses
+        # get addresses (deferred)
         yield self.get_my_address()
 
         logger.info('router started, listening on port {0}'.format(self.network.port))
@@ -123,15 +123,6 @@ class Router(object):
         self.pinger.start()
         reactor.callLater(1, util.get_weakref_proxy(self.pm.try_old_peers))
 
-#        def start_connections(*x):
-#            self._bootstrap.start()
-#            self.pinger.start() #TODO make this more modular
-#            reactor.callLater(1, util.get_weakref_proxy(self.pm.try_old_peers))
-
-#        # when the adapter is up, start network tools
-#        d.addCallback(start_connections)
-#        
-#        return d
 
     def stop(self):
         '''Stop the router.  Stops the tun/tap device and stops listening on the
@@ -148,8 +139,8 @@ class Router(object):
 
     def relay(self, data, dst):
         if dst in self.pm:
+            self.sm.send(data, dst, self.pm[dst].address)
             logger.debug('relaying packet to {0}'.format(repr(dst)))
-            self.sm.send(data, self.pm[dst].id, self.pm[dst].address)
 
 
     def send(self, type, data, dst, ack=False, id=0, ack_timeout=None, clear=False, faddress=None):
@@ -281,7 +272,6 @@ class Router(object):
                 else:
                     packet = data[36:]
 
-                # should i use 1byte type + 3byte id, or 2byte type + 2byte id TODO
                 id = unpack('!H', data[2:4])[0]
 
 
