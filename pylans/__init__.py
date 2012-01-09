@@ -14,9 +14,9 @@ if platform.system() == 'Windows':
 
 # Find out the location of pylan's working directory, and insert it to sys.path
 basedir = os.path.dirname(os.path.realpath(__file__))
-if not os.path.exists(os.path.join(basedir, "main.py")):
+if not os.path.exists(os.path.join(basedir, "settings.py")):
     cwd = os.getcwd()
-    if os.path.exists(os.path.join(cwd, "main.py")):
+    if os.path.exists(os.path.join(cwd, "settings.py")):
         basedir = cwd
 sys.path.insert(0, basedir)
 
