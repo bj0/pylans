@@ -31,7 +31,7 @@ from twisted.internet import reactor, defer
 from util.event import Event
 from peers import PeerManager
 from mods.pinger import Pinger
-from sessions import SessionManager, SSLSessionManager
+import sessions
 import settings
 import util
 
@@ -72,9 +72,9 @@ class Router(object):
 
         # check if we are using SSL
         if settings.get_option(self.network.name + '/' + 'use_ssl', False):
-            self.sm = SSLSessionManager(self)
+            self.sm = sessions.SSLSessionManager(self)
         else:
-            self.sm = SessionManager(self)
+            self.sm = sessions.SessionManager(self)
         self.pm = PeerManager(self)
 
         # move this out of router?
