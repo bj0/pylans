@@ -240,7 +240,8 @@ class SessionManager(object):
     def handle_greet(self, type, packet, address, src_id):
         if src_id == self.id:
             logger.info('greeted self')
-            raise Exception, 'greeted self'
+#           if we block ack, won't it just keep sending?
+#            raise Exception, 'greeted self'
 
         logger.debug('handle greet')
         if (src_id not in self.session_map or self.router.pm[src_id].timeouts > 0) \
@@ -490,7 +491,7 @@ class SSLSessionManager(SessionManager, protocol.SSLPeerFactory):
             # check for valid packets
             type = struct.unpack('!1H', data[:2])[0]
             if type in [self.GREET, self.HANDSHAKE, self.HANDSHAKE_ACK,
-                        self.KEY_XCHANGE, self.KEY_XCHANGE_ACK]
+                        self.KEY_XCHANGE, self.KEY_XCHANGE_ACK, self.router.ACK]
 
                 self.connecting[address][2].send(data)
             else:
