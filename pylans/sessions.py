@@ -240,7 +240,7 @@ class SessionManager(object):
     def handle_greet(self, type, packet, address, src_id):
         if src_id == self.id:
             logger.info('greeted self')
-            return #TODO throw exception to prevent acks?
+            raise Exception, 'greeted self'
 
         logger.debug('handle greet')
         if (src_id not in self.session_map or self.router.pm[src_id].timeouts > 0) \
@@ -248,7 +248,7 @@ class SessionManager(object):
             # unknown peer not currently shaking hands, start handshake
             self.send_handshake(src_id, address, 0)
         else:
-            # check to see if we found a direct route TODO
+            # check to see if we found a direct route
             if src_id in self.router.pm:
                 pi = self.router.pm[src_id]
                 if pi.relays > 0:
@@ -433,14 +433,12 @@ class SSLSessionManager(SessionManager, protocol.SSLPeerFactory):
         
     def _connect_success(self, proto, addr):
         # called for both server and client
-#        if addr in self.connecting:
-#            del self.connecting[addr]
 
         logger.info('connection success: {0}, {1}'.format(addr, proto))
         #TODO connected but not shaking state?
 
     def connect(self, address):
-        #TODO check if already connected
+        # check if already connected
         if address not in self.connecting:
             logger.debug('trying to connect to {0}'.format(address))
             d = defer.Deferred()
@@ -448,7 +446,7 @@ class SSLSessionManager(SessionManager, protocol.SSLPeerFactory):
             self.connecting[address] = \
                  (reactor.connectSSL(address[0],address[1], self,
                   ssl.ClientContextFactory()), d)
-#                (reactor.connectSSL(address[0],address[1], self),d)
+
             # glib timeout? TODO
         else:
             logger.debug('already connected to {0}'.format(address))
@@ -488,10 +486,16 @@ class SSLSessionManager(SessionManager, protocol.SSLPeerFactory):
     def send(self, data, sid, address):
         if sid in self.session_map:
             self.session_map[sid].send(data)
-        elif address in self.connecting: #TODO handle greets/handshakes
-            #TODO check for valid packets
-#            type = struct.unpack('!1H', data[:2])[0]
-            self.connecting[address][2].send(data)
+        elif address in self.connecting: 
+            # check for valid packets
+            type = struct.unpack('!1H', data[:2])[0]
+            if type in [self.GREET, self.HANDSHAKE, self.HANDSHAKE_ACK,
+                        self.KEY_XCHANGE, self.KEY_XCHANGE_ACK]
+
+                self.connecting[address][2].send(data)
+            else:
+                logger.error("trying to send {0} packet through uninitialized session")
+                raise ValueError, "trying to send {0} packet through uninitialized session"
         else:
             logger.error("cannot send to sid not in session map")
             raise KeyError, "cannot send to sid not in session map"
