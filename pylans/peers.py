@@ -120,7 +120,9 @@ class PeerManager(object):
 
         def do_session_opened(obj, sid, relays):
             if self.sm == obj:
-                self.try_register(sid, relays=relays)
+                d = self.try_register(sid, relays=relays)
+                # close session if we can't register peer presence
+                d.addErrback(lambda *x: self.sm.close(sid))
         
         def do_session_closed(obj, sid):
             if self.sm == obj:
@@ -140,7 +142,7 @@ class PeerManager(object):
         self._my_pickle = pickle.dumps(self._self,-1)
 
         # should announce my change to my peerz
-        self.send_announce(self._self, None)
+        self.send_announce(self._self)
 
     def add_peer(self, peer):
         '''Add a peer connection'''
@@ -179,8 +181,6 @@ class PeerManager(object):
         '''Remove a peer connection'''
         if peer is not None and peer.id in self.peer_list:
             del self.peer_list[peer.id]
-#        if peer.addr in self.addr_map:
-#            del self.addr_map[peer.addr]
 
             # fire event
             event.emit('peer-removed', self, peer)
@@ -202,8 +202,9 @@ class PeerManager(object):
             opi.address = npi.address
             opi.relays = npi.relays
             opi.is_direct = (opi.relays == 0)
-
-            #relay id? TODO
+            if opi.is_direct > 0:
+                opi.relay_id = npi.relay_id
+            
             changed = True
             logger.info('peer {0} relay changed.'.format(opi.id.encode('hex')))
 
@@ -267,16 +268,16 @@ class PeerManager(object):
         logger.info('received an announce packet from {0}'.format(address))
         #packet = self.sm.decode(src_id, packet)
         pi = pickle.loads(packet)
+        pi.address = address
+        pi.relay_id = src_id
         if pi.id != self._self.id:
             if pi.id not in self.sm.session_map:
                 # init (relayed) handshake
                 self.sm.send_handshake(pi.id, address, pi.relays)
             elif pi.id not in self.peer_list:
-                pi.address = address
                 self.add_peer(pi)
                 logger.info('announce from unknown peer {0}, adding and announcing self'.format(pi.name))
             else:
-                pi.address = address
                 self.update_peer(self.peer_list[pi.id], pi)
 
     ###### Peer XChange Functions
@@ -331,11 +332,11 @@ class PeerManager(object):
             if peer.id != self._self.id:
                 peer.relays += 1
                 peer.address = from_peer.address
+                peer.relay_address = from_peer.id
 
                 if peer.id in self.peer_list:
                     self.update_peer(self.peer_list[peer.id],peer)
                 elif peer.id not in self.sm.session_map:
-                    #self.add_peer(peer)
                     self.sm.send_handshake(peer.id, peer.address, peer.relays)
                 elif peer.id not in self.peer_list:
                     self.add_peer(peer)
@@ -361,7 +362,7 @@ class PeerManager(object):
         if pid not in self.sm.session_map: # It's an (address,port) pair
             logger.error("Cannot send register to unknown session {0}".format(pid.encode('hex')))
             raise TypeError("Cannot send register to unknown session {0}".format(pid.encode('hex')))
-        addr = pid if addr is None else addr
+        addr = pid #if addr is None else addr
 
         if (pid not in self.peer_list):
             # TODO set relay
@@ -413,6 +414,7 @@ class PeerManager(object):
             self.add_peer(pi)
         else:
             pi.address = address
+            pi.relay_id = src_id
             self.update_peer(self.peer_list[pi.id], pi)
 
         # TODO set relay
@@ -439,6 +441,7 @@ class PeerManager(object):
             self.add_peer(pi)
         else:
             pi.address = address
+            pi.relay_id = src_id
             self.update_peer(self.peer_list[pi.id], pi)
 
 
