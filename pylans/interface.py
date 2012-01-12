@@ -22,7 +22,8 @@
 import logging
 import settings
 
-logging.basicConfig(level=settings.get_option('settings/loglevel', 40))
+logging.basicConfig(level=settings.get_option('settings/loglevel', 40),
+                    format='%(asctime)s:%(levelname)s:%(name)s:%(message)s')
 logger = logging.getLogger(__name__)
 global_logger = logging.getLogger()
 
