@@ -16,6 +16,8 @@
 #
 # TODO: need a pinger or something to determine when sessions are dead
 # TODO: what is the difference between a session and a peer?
+# TODO: reconnect with relayed peers?
+# TODO: periodic px?
 from twisted.internet import reactor, defer
 import hashlib, hmac
 from struct import pack, unpack
@@ -96,16 +98,21 @@ class SessionManager(object):
             raise Exception, "TODO: key-exchange"
 
     def close(self, sid):
+        # remove encryption object
         if sid in self.session_objs:
             del self.session_objs[sid]
+        # remove address map
         if sid in self.session_map:
             del self.session_map[sid]
+        # remove incomplete session
         if sid in self.shaking:
             del self.shaking[sid]
-
+         
+        # clear unreachable routes
         # addr map uses mac addresses as keys, not sids
-        # gen a list incase there are multiple addresses for an sid (there shouldn't be)
-        aslist = [k for k in self.router.addr_map if self.router.addr_map[k][-1] == sid]
+        # gen a list incase there are multiple addresses for an sid
+        aslist = [k for k in self.router.addr_map 
+                            if self.router.addr_map[k][-1] == sid]
         for x in aslist:
             logger.debug('removing addr map {0}->{1}'.format(util.decode_mac(x),sid.encode('hex')))
             del self.router.addr_map[x]
@@ -242,6 +249,7 @@ class SessionManager(object):
             logger.info('greeted self')
 #           if we block ack, won't it just keep sending?
 #            raise Exception, 'greeted self'
+            return
 
         logger.debug('handle greet')
         if (src_id not in self.session_map or self.router.pm[src_id].timeouts > 0) \
@@ -266,8 +274,7 @@ class SessionManager(object):
                     self.send_greet(address)
 
     def send_handshake(self, sid, address, relays=0):
-        if (sid not in self.session_map or self.router.pm[sid].timeouts > 0) \
-         and sid not in self.shaking:
+        if sid not in self.shaking:
             logger.info('send handshake to {0}'.format(sid.encode('hex')))
 
             nonce = os.urandom(32) #todo crypto size
@@ -282,24 +289,35 @@ class SessionManager(object):
 
 
     def handle_handshake(self, type, packet, address, src_id):
-        logger.info('got handshake packet from {0}'.format(src_id.encode('hex')))
-        if (src_id not in self.session_map or self.router.pm[src_id].timeouts > 0) \
-         and src_id not in self.shaking:
-            r, nonce, mac = packet[0], packet[1:33], packet[33:]
-            r = unpack('!B', r)[0]
 
-            # verify nonce
-            if hmac.new(self.router.network.key, nonce, hashlib.sha256).digest() != mac:
-                logger.error("hmac verification failed on handshake!")
+        r, nonce, mac = packet[0], packet[1:33], packet[33:]
+        r = unpack('!B', r)[0]
+
+        if src_id in self.shaking:
+            # if two peers try to send hs at the same time, need a way to 
+            # choose one over the other :TODO
+            logger.info('got handshake packet from id, but already shaking: {0}'\
+                        .format(src_id.encode('hex')))
+            mynonce = self.shaking[src_id][0]
+            if mynonce < nonce:
+                return
             else:
-                self.send_handshake_ack(nonce, src_id, address, r)
+                del self.shaking[src_id]
+
+        logger.info('got handshake packet from id: {0}'.format(
+                                            src_id.encode('hex')))
+
+        # verify nonce
+        if hmac.new(self.router.network.key, nonce, hashlib.sha256).digest() != mac:
+            logger.error("hmac verification failed on handshake!")
+        else:
+            self.send_handshake_ack(nonce, src_id, address, r)
+
 
     def send_handshake_ack(self, nonce, sid, address, relays=0):
         logger.info('sending handshake ack to {0}'.format(sid.encode('hex')))
         mynonce = os.urandom(32)
         self.shaking[sid] = (mynonce, relays, address)
-#        self.session_map[sid] = address
-#        self.update_map(sid, address)
         
         mac = hmac.new(self.router.network.key, nonce+mynonce, hashlib.sha256).digest()
         d = self.router.send(self.HANDSHAKE_ACK, mynonce+mac, sid, ack=True, clear=True)
@@ -332,7 +350,7 @@ class SessionManager(object):
             logger.warning('handshake with {0} timed out'.format(sid.encode('hex')))
             self.close(sid)
 
-    def handshake_fail(self, sid, x):
+    def handshake_fail(self, sid, *x):
         logger.error('handshake failed with {0}'.format(sid.encode('hex')))
         self.close(sid)
 
