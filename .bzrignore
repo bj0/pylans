@@ -10,3 +10,4 @@ _diff.diff
 pylans.komodoproject
 cert.pem
 key.pem
+pylans/crypto/python-jpake

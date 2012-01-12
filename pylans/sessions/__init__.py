@@ -23,7 +23,7 @@ import hashlib, hmac
 from struct import pack, unpack
 import os
 import util
-from crypto import Crypter
+from crypto import Crypter, jpake
 from peers import PeerInfo
 import protocol
 import logging
@@ -33,8 +33,9 @@ logger = logging.getLogger(__name__)
 class SessionManager(object):
 
     GREET = 14
-    HANDSHAKE = 15
-    HANDSHAKE_ACK = 16
+    HANDSHAKE1 = 15
+    HANDSHAKE2 = 16
+    HANDSHAKE3 = 17
     KEY_XCHANGE = 30
     KEY_XCHANGE_ACK = 31
 
@@ -44,7 +45,6 @@ class SessionManager(object):
         if proto is None:
             proto = protocol.UDPPeerProtocol(router.recv)
     
-#        proto.router = util.get_weakref_proxy(router)
         self.proto = proto
         self.port = None
 
@@ -59,8 +59,9 @@ class SessionManager(object):
         self.id = self.router.network.id
 
         router.register_handler(self.GREET, self.handle_greet)
-        router.register_handler(self.HANDSHAKE, self.handle_handshake)
-        router.register_handler(self.HANDSHAKE_ACK, self.handle_handshake_ack)
+        router.register_handler(self.HANDSHAKE1, self.handle_handshake1)
+        router.register_handler(self.HANDSHAKE2, self.handle_handshake2)
+        router.register_handler(self.HANDSHAKE3, self.handle_handshake3)
         router.register_handler(self.KEY_XCHANGE, self.handle_key_xc)
         router.register_handler(self.KEY_XCHANGE_ACK, self.handle_key_xc_ack)
 
@@ -274,79 +275,107 @@ class SessionManager(object):
                     self.send_greet(address)
 
     def send_handshake(self, sid, address, relays=0):
+        # todo make retry for fails
         if sid not in self.shaking:
-            logger.info('send handshake to {0}'.format(sid.encode('hex')))
+            logger.info('sending handshake to {0}'.format(sid.encode('hex')))
 
-            nonce = os.urandom(32) #todo crypto size
-            self.shaking[sid] = (nonce, relays, address)
+            j = jpake.JPAKE(self.router.network.key)
+            send1 = j.pack_one(j.one())
+            self.shaking[sid] = (j, relays, address)
 
             # timeout handshake
-            reactor.callLater(self.HANDSHAKE_TIMEOUT, self.handshake_timeout, sid)
-            mac = hmac.new(self.router.network.key, nonce, hashlib.sha256).digest()
+            reactor.callLater(self.HANDSHAKE_TIMEOUT, 
+                              self.handshake_timeout, sid)
  
             # don't need ack, should get handshake-ack or timeout
-            self.router.send(self.HANDSHAKE, pack('!B', relays)+nonce+mac, sid, clear=True)
+            return self.router.send(self.HANDSHAKE1, 
+                                    pack('!B', relays)+send1, 
+                                    sid, clear=True)
 
+        else:
+            logger.info('send_handshake called on {0} while already shaking'
+                        .format(sid.encode('hex')))
 
-    def handle_handshake(self, type, packet, address, src_id):
+    def handle_handshake1(self, type, packet, address, src_id):
 
-        r, nonce, mac = packet[0], packet[1:33], packet[33:]
+        logger.info('got handshake1 from {0}'.format(src_id.encode('hex')))
+        r, recv1 = packet[0], packet[1:]
         r = unpack('!B', r)[0]
 
         if src_id in self.shaking:
-            # if two peers try to send hs at the same time, need a way to 
-            # choose one over the other :TODO
-            logger.info('got handshake packet from id, but already shaking: {0}'\
-                        .format(src_id.encode('hex')))
-            mynonce = self.shaking[src_id][0]
-            if mynonce < nonce:
-                return
-            else:
-                del self.shaking[src_id]
-
-        logger.info('got handshake packet from id: {0}'.format(
-                                            src_id.encode('hex')))
-
-        # verify nonce
-        if hmac.new(self.router.network.key, nonce, hashlib.sha256).digest() != mac:
-            logger.error("hmac verification failed on handshake!")
+            j, relays, addr = self.shaking[src_id]
+            if relays < r:
+                # incoming hs1 came over more hops
+                r = relays
+                address = addr
+            elif addr != address:
+                # incoming hs1 came over less (or equal) hops
+                self.shaking[src_id][2] = address
+            
         else:
-            self.send_handshake_ack(nonce, src_id, address, r)
+            self.send_handshake(src_id, address, r)
+            j = self.shaking[src_id][0]
 
-
-    def send_handshake_ack(self, nonce, sid, address, relays=0):
-        logger.info('sending handshake ack to {0}'.format(sid.encode('hex')))
-        mynonce = os.urandom(32)
-        self.shaking[sid] = (mynonce, relays, address)
+        send2 = j.pack_two(j.two(j.unpack_one(recv1)))
+        logger.info('sending handshake2 to {0}'.format(src_id.encode('hex')))
+        return self.router.send(self.HANDSHAKE2, send2, src_id, clear=True)
         
-        mac = hmac.new(self.router.network.key, nonce+mynonce, hashlib.sha256).digest()
-        d = self.router.send(self.HANDSHAKE_ACK, mynonce+mac, sid, ack=True, clear=True)
-        d.addCallback(lambda *x: self.handshake_done(sid, nonce+mynonce, address))
-        d.addErrback(lambda *x: self.handshake_fail(sid, x))
 
-    def handle_handshake_ack(self, type, packet, address, src_id):
-        logger.info('got handshake ack from {0}'.format(src_id.encode('hex')))
+    def handle_handshake2(self, type, packet, address, src_id):
         if src_id in self.shaking:
-            nonce, mac = packet[:32], packet[32:]
-            mynonce = self.shaking[src_id][0]
-            if hmac.new(self.router.network.key, mynonce+nonce, hashlib.sha256).digest() != mac:
-                logger.error("hmac verification failed on handshake_ack!")
-                self.handshake_fail(src_id)
-                raise Exception('hmac verification failed on handshake_ack!') # prevent ack
+            logger.info('got handshake1 from {0}'.format(src_id.encode('hex')))
+            j = self.shaking[src_id][0]
+            recv2 = j.unpack_two(packet)
+            session_key = j.three(recv3)
+            hsh = hashlib.sha256(session_key).digest()
+                        
+            logger.info('sending handshake2 to {0}'.format(src_id.encode('hex')))
+            d = self.router.send(self.HANDSHAKE3, hsh, src_id, clear=True, ack=True)
+            d.addErrback(lambda *x: handshake_fail(src_id)) #TODO retrys, need this not to fail
+            
+            if len(self.shaking[src_id]) == 4: # if we already got handshake3 packet
+                packet = self.shaking[src_id][3]
+                self.shaking[src_id][3] = session_key
+                self.handle_handshake3(None, packet, None, src_id)
             else:
-                self.handshake_done(src_id, mynonce+nonce, address)
+                self.shaking[src_id] += (session_key,)
+        else:
+            logger.info('got handshake2 from {0}, but not currently shaking'.format(src_id.encode('hex')))
+        
+    def handle_handshake3(self, type, packet, address, src_id):
+        if src_id in self.shaking:
+            if len(self.shaking[src_id]) < 4: # we haven't got handshake2 yet
+                logger.warning('got handshake3 before handshake2 from {0}'.format(src_id.encode('hex')))
+#                handshake_fail(src_id)
+                self.shaking[src_id] += (packet,)
+                return
+                
+            logger.info('got handshake3 from {0}'.format(src_id.encode('hex')))
+            session_key = self.shaking[src_id][3]
+            
+            if packet == hashlib.sha256(session_key).digest():
+                handshake_done(src_id)
+            else:
+                logger.warning('handshake with {0} verification failed'.format(src_id.encode('hex')))
+                handshake_fail(src_id)
+            
+        else:
+            logger.info('got handshake3 from {0}, but not currently shaking'.format(src_id.encode('hex')))
+        
 
-    def handshake_done(self, sid, salt, address):
+    def handshake_done(self, sid):
         logger.info('handshake finished with {0}'.format(sid.encode('hex')))
         if sid in self.shaking:
             # todo - session key size?
-            session_key = hashlib.md5(self.router.network.key+salt).digest()
+            session_key = self.shaking[sid][3]
+            r = self.shaking[sid][1]
+            
             # init encryption
-            self.open(sid, session_key, relays=self.shaking[sid][1])
+            self.open(sid, session_key, relays=r)
 
 
     def handshake_timeout(self, sid):
-        if sid not in self.session_map:
+        if sid in self.shaking and sid not in self.session_map:
             logger.warning('handshake with {0} timed out'.format(sid.encode('hex')))
             self.close(sid)
 
