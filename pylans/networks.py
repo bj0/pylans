@@ -68,6 +68,8 @@ class Network(object):
             self.port = 8015
 
         if id is not None:
+            if len(id) < 16:
+                id = '0'*(16-len(id))+id
             self.id = id
         elif self.id is None:
             self.id = os.urandom(16)
@@ -286,7 +288,10 @@ class Network(object):
     @property
     def id(self):
         if self._id is None and self._get('id') is not None:
-            self._id = self._get('id').decode('hex')
+            id = self._get('id').decode('hex')
+            if len(id) < 16:
+                id = '0'*(16-len(id))+id
+            self._id = id
         return self._id
 
 
@@ -294,8 +299,11 @@ class Network(object):
     def id(self, value):
         if isinstance(value, str):
             if self.id != value:
-                self._set('id', value.encode('hex'))
-                self._id = value
+                id = value
+                if len(id) < 16:
+                    id = '0'*(16-len(id))+id
+                self._set('id', id.encode('hex'))
+                self._id = id
                 settings.save()
         else: # how to tell if it's hex or bytes?? TODO
             raise TypeError, "Bad type for ID"
