@@ -138,8 +138,8 @@ class Router(object):
         logger.info('router stopped')
 
     def relay(self, data, dst):
-        if dst in self.pm:
-            self.sm.send(data, dst, self.pm[dst].address)
+        if dst in self.sm.session_map:
+            self.sm.send(data, dst, self.sm.session_map[dst])
             logger.debug('relaying packet to {0}'.format(repr(dst)))
 
 
@@ -161,13 +161,16 @@ class Router(object):
             # send
             return self.sm.send(data, dst_id, dst)
 
+        elif dst == self.sm.id: # send to self? TODO
+            logger.info('tryong to send {0} packet to self'.format(type))
+            return
         elif dst in self.sm.session_map: # sid
             dst_id = dst
             dst = self.sm.session_map[dst]
-        elif dst in self.sm.shaking: #TODO: check for valid shaking packets
+        elif dst in self.sm.shaking: 
             dst_id = dst
             dst = self.sm.shaking[dst][2]
-        elif dst in self.pm and dst != self.pm._self.id: # don't send to self...
+        elif dst in self.pm:
             # it shouldn't really reach this point, as there shouldn't be
             # anyone in pm who's not in sm
             pi = self.pm[dst]
@@ -183,14 +186,14 @@ class Router(object):
                 dst_id = '\x00'*16 # non-routable
 
 
-        # unknown peer dst TODO: this should return an erroring deferred?
+        # unknown peer dst TODO
         elif faddress is not None:
             # got packet from an unknown id, send a greet to the address
             self.sm.try_greet(faddress)
             return #TODO does this prevent acks on greets?
         else:
             logger.error('cannot send to unknown dest {0}'.format(repr(dst)))
-            return #todo throw exception
+            raise Exception, 'cannot send to unknown dest {0}'.format(repr(dst))
 
         # want ack?
         if ack or id > 0:
@@ -210,14 +213,15 @@ class Router(object):
             #logger.debug('encoding packet {0}'.format(type))
                 type = self.ENCODED
             else:
-                logger.critical('trying to send encrypted packet ({0}) w/out session!!'.format(type))
-                return #todo throw exception?
+                logger.critical('trying to send encrypted packet ({0})'
+                                +' w/out session!!'.format(type))
+                raise Exception, 'trying to send encrypted packet ({0})' \
+                                +' w/out session!!'.format(type)
         else:
             logger.debug('sending clear packet ({0})'.format(type))
 
         data = pack('!2H', type, id) + dst_id + self.pm._self.id + data
 
-        #TODO exception handling for bad addresses
         self.sm.send(data, dst_id, dst)
 
         return d
@@ -286,10 +290,11 @@ class Router(object):
                         return # don't ack
                         
                 if id > 0: # ACK requested 
-                    logger.debug('sending ack')
+                    logger.debug('sending ack {0}'.format(id))
                     # ack to unknown sources?  - send greets!
                     self.send(self.ACK, data[2:4], src, clear=True, faddress=address)
-                logger.debug('handling {0} packet from {1}'.format(pt, src.encode('hex')))
+                logger.debug('handling {0} packet from {1}'.format(pt, 
+                                                        src.encode('hex')))
 
         # nope!
         else:
@@ -407,11 +412,11 @@ class TapRouter(Router):
             src_addr = packet[self.addr_size:self.addr_size*2]
             if src_addr not in self.addr_map: # negligible speed hit
                 self.addr_map[src_addr] = (address, src)
-                logger.warning('got new addr from packet!: {0}'.format(src_addr.encode('hex')))
+                logger.warning('got new addr from packet!: {0} (for {1})'.format(src_addr.encode('hex'), src.encode('hex')))
         else:
             # no, odd
             self.send_packet(packet)
-            logger.debug('got packet (encrypted) with different dest ip, relay packet?')
+            logger.warning('got packet (encrypted) with different dest addr, relay packet?')
 
 
 
