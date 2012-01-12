@@ -8,9 +8,9 @@ import optparse
 # make sure settings file is here
 import settings
 
-# py2exe
-if platform.system() == 'Windows':
-    __file__ = sys.argv[0]
+# py2exe TODO: fix this, it's breaking the path in windows
+#if platform.system() == 'Windows':
+#    __file__ = sys.argv[0]
 
 # Find out the location of pylan's working directory, and insert it to sys.path
 basedir = os.path.dirname(os.path.realpath(__file__))
