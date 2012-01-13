@@ -229,7 +229,7 @@ class SessionManager(object):
                 logger.debug('sending greet packet #{0}'.format(i))
                 try:
                     ret = yield self.send_greet(address, ack=True)
-                    return # stop trying if successful TODO: return address?
+                    return # stop trying if successful TODO: return address? 
                 except Exception, e:
                     logger.info('(greet) address {0} timed out'.format(address))
                     # just keep trying...
@@ -321,6 +321,7 @@ class SessionManager(object):
         return self.router.send(self.HANDSHAKE2, send2, src_id, clear=True)
         
 
+    @defer.inlineCallbacks
     def handle_handshake2(self, type, packet, address, src_id):
         if src_id in self.shaking:
             logger.info('got handshake1 from {0}'.format(src_id.encode('hex')))
@@ -329,9 +330,17 @@ class SessionManager(object):
             session_key = j.three(recv2)
             hsh = hashlib.sha256(session_key).digest()
                         
-            logger.info('sending handshake2 to {0}'.format(src_id.encode('hex')))
-            d = self.router.send(self.HANDSHAKE3, hsh, src_id, clear=True, ack=True)
-            d.addErrback(lambda *x: self.handshake_fail(src_id)) #TODO retrys, need this not to fail
+            for i in range(3): # 3 retrys
+                logger.info('sending handshake2 to {0}'.format(src_id.encode('hex')))
+                try:
+                    yield self.router.send(self.HANDSHAKE3, hsh, src_id, clear=True, ack=True)
+                    break
+                except Exception, e:
+                    logger.warning('handshake3 to {0} timed out'.format(src_id.encode('hex')))
+                    # let it retry...
+            else:
+                # all hs3 packets timed out
+                return self.handshake_fail(src_id)) 
 
             if len(self.shaking[src_id]) == 4: # if we already got handshake3 packet
                 packet = self.shaking[src_id][3]
