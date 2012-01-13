@@ -81,11 +81,11 @@ class PeerManager(object):
     PX_TRY_DELAY = 2
 
     # packet types
-    PEER_XCHANGE = 17
-    PEER_XCHANGE_ACK = 18
-    PEER_ANNOUNCE = 19
-    REGISTER = 20
-    REGISTER_ACK = 21
+    PEER_XCHANGE = 18
+    PEER_XCHANGE_ACK = 19
+    PEER_ANNOUNCE = 20
+    REGISTER = 21
+    REGISTER_ACK = 22
 
     def __init__(self, router):
         # list of peers
