@@ -18,7 +18,7 @@
 # utility functions
 
 from twisted.internet.utils import getProcessOutput
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 from inspect import ismethod, isfunction
 from new import instancemethod
 from functools import wraps
