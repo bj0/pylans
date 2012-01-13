@@ -332,9 +332,8 @@ class SessionManager(object):
             logger.info('sending handshake2 to {0}'.format(src_id.encode('hex')))
             d = self.router.send(self.HANDSHAKE3, hsh, src_id, clear=True, ack=True)
             d.addErrback(lambda *x: self.handshake_fail(src_id)) #TODO retrys, need this not to fail
-            print '??'
+
             if len(self.shaking[src_id]) == 4: # if we already got handshake3 packet
-                print 'wtf'
                 packet = self.shaking[src_id][3]
                 self.shaking[src_id][3] = session_key
                 self.handle_handshake3(None, packet, None, src_id)
