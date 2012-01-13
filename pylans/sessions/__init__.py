@@ -385,7 +385,7 @@ class SessionManager(object):
     def handshake_fail(self, sid, *x):
         logger.error('handshake failed with {0}'.format(sid.encode('hex')))
         # add a delay to prevent hammering
-        util.sleep(.2) 
+        yield util.sleep(.2) 
         self.close(sid)
 
     def close_session(self, sid):
