@@ -326,14 +326,15 @@ class SessionManager(object):
             logger.info('got handshake1 from {0}'.format(src_id.encode('hex')))
             j = self.shaking[src_id][0]
             recv2 = j.unpack_two(packet)
-            session_key = j.three(recv3)
+            session_key = j.three(recv2)
             hsh = hashlib.sha256(session_key).digest()
                         
             logger.info('sending handshake2 to {0}'.format(src_id.encode('hex')))
             d = self.router.send(self.HANDSHAKE3, hsh, src_id, clear=True, ack=True)
-            d.addErrback(lambda *x: handshake_fail(src_id)) #TODO retrys, need this not to fail
-            
+            d.addErrback(lambda *x: self.handshake_fail(src_id)) #TODO retrys, need this not to fail
+            print '??'
             if len(self.shaking[src_id]) == 4: # if we already got handshake3 packet
+                print 'wtf'
                 packet = self.shaking[src_id][3]
                 self.shaking[src_id][3] = session_key
                 self.handle_handshake3(None, packet, None, src_id)
@@ -354,10 +355,10 @@ class SessionManager(object):
             session_key = self.shaking[src_id][3]
             
             if packet == hashlib.sha256(session_key).digest():
-                handshake_done(src_id)
+                self.handshake_done(src_id)
             else:
                 logger.warning('handshake with {0} verification failed'.format(src_id.encode('hex')))
-                handshake_fail(src_id)
+                self.handshake_fail(src_id)
             
         else:
             logger.info('got handshake3 from {0}, but not currently shaking'.format(src_id.encode('hex')))
@@ -368,6 +369,7 @@ class SessionManager(object):
         if sid in self.shaking:
             # todo - session key size?
             session_key = self.shaking[sid][3]
+#            session_key = hashlib.md5(session_key).digest()
             r = self.shaking[sid][1]
             
             # init encryption
