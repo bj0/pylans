@@ -118,11 +118,15 @@ class PeerManager(object):
         router.register_handler(self.REGISTER_ACK, self.handle_reg_ack)
         router.register_handler(self.PEER_ANNOUNCE, self.handle_announce)
 
+        @defer.inlineCallbacks
         def do_session_opened(obj, sid, relays):
             if self.sm == obj:
-                d = self.try_register(sid, relays=relays)
-                # close session if we can't register peer presence
-                d.addErrback(lambda *x: self.sm.close(sid))
+                try:
+                    yield self.try_register(sid, relays=relays)
+                except Exception, e:
+                    # close session if we can't register peer presence
+                    logger.warning('try_register failed: {0}'.format(e))
+                    self.sm.close(sid)
         
         def do_session_closed(obj, sid):
             if self.sm == obj:
