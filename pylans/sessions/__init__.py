@@ -381,8 +381,11 @@ class SessionManager(object):
             logger.warning('handshake with {0} timed out'.format(sid.encode('hex')))
             self.close(sid)
 
+    @defer.inlineCallbacks
     def handshake_fail(self, sid, *x):
         logger.error('handshake failed with {0}'.format(sid.encode('hex')))
+        # add a delay to prevent hammering
+        util.sleep(.2) 
         self.close(sid)
 
     def close_session(self, sid):
