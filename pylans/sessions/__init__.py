@@ -281,7 +281,7 @@ class SessionManager(object):
 
             j = jpake.JPAKE(self.router.network.key)
             send1 = j.pack_one(j.one())
-            self.shaking[sid] = (j, relays, address)
+            self.shaking[sid] = [j, relays, address]
 
             # timeout handshake
             reactor.callLater(self.HANDSHAKE_TIMEOUT, 
@@ -340,14 +340,15 @@ class SessionManager(object):
                     # let it retry...
             else:
                 # all hs3 packets timed out
-                return self.handshake_fail(src_id)) 
+                self.handshake_fail(src_id)
+                return
 
             if len(self.shaking[src_id]) == 4: # if we already got handshake3 packet
                 packet = self.shaking[src_id][3]
                 self.shaking[src_id][3] = session_key
                 self.handle_handshake3(None, packet, None, src_id)
             else:
-                self.shaking[src_id] += (session_key,)
+                self.shaking[src_id] += [session_key,]
         else:
             logger.info('got handshake2 from {0}, but not currently shaking'.format(src_id.encode('hex')))
         
@@ -356,7 +357,7 @@ class SessionManager(object):
             if len(self.shaking[src_id]) < 4: # we haven't got handshake2 yet
                 logger.warning('got handshake3 before handshake2 from {0}'.format(src_id.encode('hex')))
 #                handshake_fail(src_id)
-                self.shaking[src_id] += (packet,)
+                self.shaking[src_id] += [packet,]
                 return
                 
             logger.info('got handshake3 from {0}'.format(src_id.encode('hex')))
