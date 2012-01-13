@@ -256,6 +256,7 @@ class _Crypter0(object):
     def decrypt(self, string):
         # create a CTR obj with the right iv, then process stream to starting spot
         r, iv = ord(string[-self.pos_sz]), string[-self.pos_sz+1:]
+
         e = aes.AES(self.key, iv=iv)
         e.process('\x00'*r)
         return e.process(string[:-self.pos_sz])
@@ -278,11 +279,11 @@ class _Crypter0(object):
 class _Crypter1(_Crypter0):
     '''aes 256 (pycryptopp) in ctr mode'''
     key_size = 32
-    block_size = 32
+    block_size = 16
 
 
 if aes is not None:
-    Crypter = _Crypter0
+    Crypter = _Crypter1
 else:
     raise ImportError, 'missing pycryptopp'
     #Crypter = AESCrypter3
@@ -297,9 +298,9 @@ if __name__ == "__main__":
 
     from time import time
     lchr = chr # local function lookups are faster than global function lookups
-    clses = [AESCrypterPP, AESCrypterPP2, AESCrypterPP3, AESCrypterPP4,
-                AESCrypter, AESCrypter2, AESCrypter3, BFCrypter]
-#    clses = [AESCrypterPP4]
+#    clses = [AESCrypterPP, AESCrypterPP2, AESCrypterPP3, AESCrypterPP4,
+#                AESCrypter, AESCrypter2, AESCrypter3, BFCrypter]
+    clses = [_Crypter0,_Crypter1]
     for cls in clses:
         e = cls(key[:cls.key_size])
         pd = []
