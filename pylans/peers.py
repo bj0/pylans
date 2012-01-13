@@ -353,11 +353,6 @@ class PeerManager(object):
         with own peer info.  Will continue to send this packet until an
         ack is received or MAX_REG_TRIES packets have been sent.'''
         
-        def sleep(secs):
-            '''Async sleep call'''
-            d = defer.Deferred()
-            reactor.callLater(secs, d.callback, None)
-            return d
 
         if pid not in self.sm.session_map: # It's an (address,port) pair
             logger.error("Cannot send register to unknown session {0}".format(pid.encode('hex')))
@@ -376,7 +371,7 @@ class PeerManager(object):
                 else:
                     logger.debug('sending REG packet #{0}'.format(i))
                     self.router.send(self.REGISTER, packet, addr)
-                    yield sleep(self.REG_TRY_DELAY)
+                    yield util.sleep(self.REG_TRY_DELAY)
 
             logger.info('(reg) address {0} timed out'.format(pid))
             raise Exception('(reg) address {0} timed out'.format(pid))

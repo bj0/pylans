@@ -123,6 +123,13 @@ def ip_to_net_host_subnet(addr_str, mask=None):
     host = add - net
     
     return (ip_ltoa(net), ip_ltoa(host), ip_ltoa(0xFFFFFFFF-mask))
+
+
+def sleep(secs):
+    '''Twisted async sleep call'''
+    d = defer.Deferred()
+    reactor.callLater(secs, d.callback, None)
+    return d
     
 def prompt(vars, message="Entering Interactive Python Interpreter", 
         prompt="pylans", exit_msg="Returning to pylans cli"):
