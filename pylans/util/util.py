@@ -133,6 +133,13 @@ def sleep(secs):
     
 def prompt(vars, message="Entering Interactive Python Interpreter", 
         prompt="pylans", exit_msg="Returning to pylans cli"):
+    '''
+        Start an interactive (i)python interpreter on the commandline.
+        This blocks, so don't call from twisted, but in a thread or from Cmd is fine.
+        
+        :param vars: variables to make available to interpreter
+        :type vars: dict
+    '''
     try:
         from IPython.Shell import IPShellEmbed
         ipshell = IPShellEmbed(argv=['-pi1','pylans:\\#>','-p','sh'],
@@ -151,25 +158,12 @@ def prompt(vars, message="Entering Interactive Python Interpreter",
         return shell.interact
 
     
-#def run_cmd(self, cmd):
-#    if isinstance(cmd, list):
-#        # command already split up for subprocess
-#        pass
-#    elif isinstance(cmd, str):
-#        # command all in one string
-#        cmd = shlex.split(cmd)
-#    else:
-#        raise ValueError, "invalid cmd parameter, require string or list"
-
-#    return sp.call(cmd)
-#    
-#def run_cmds(self, cmds):
-#    res = []
-#    for cmd in cmds:
-#        res.append(run_cmd(cmd))
-#    return res
-
 def run_cmd(cmd):
+    '''
+        Run an external command/program using twisted's getProcessOutput
+    
+        :param cmd: a string of the command to run.
+    '''
     if isinstance(cmd, list):
         # command already split up for subprocess
         pass
@@ -184,6 +178,7 @@ def run_cmd(cmd):
     
 @defer.inlineCallbacks
 def run_cmds(cmds):
+    '''Run multiple command/programs.'''
     res = []
     for cmd in cmds:
         ret = yield run_cmd(cmd)

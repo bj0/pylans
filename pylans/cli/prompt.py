@@ -224,6 +224,9 @@ class Prompt(Cmd):
 #        settings.save()
 
     def do_py(self, line):
+        # setup local vars (user_ns seems broken)
+        iface = self.iface
+        cli = self
         p = util.prompt(globals(),'IPython Interactive Console')
         p()
 
