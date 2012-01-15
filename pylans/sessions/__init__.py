@@ -86,12 +86,19 @@ class SessionManager(object):
 
     def open(self, sid, session_key, relays=0):
         if sid in self.shaking:
+            address = self.shaking[sid][2]
+            
+            # session reset
+            def do_reset():
+                logger.warning('doing session reset for {0}'.format(sid.encode('hex')))
+                self.send_handshake(sid, address, relays)
+                
             # create encryption option
-            obj = Crypter(session_key, callback=self.init_key_xc, args=(sid,))
+            obj = Crypter(session_key, callback=do_reset)
             self.session_objs[sid] = obj
             
             # update sid -> address map
-            self.update_map(sid, self.shaking[sid][2])
+            self.update_map(sid, address)
             del self.shaking[sid]
             
             util.emit_async('session-opened', self, sid, relays)
@@ -99,6 +106,7 @@ class SessionManager(object):
             raise Exception, "TODO: key-exchange"
 
     def close(self, sid):
+        logger.debug('closing session {0}'.format(sid.encode('hex')))
         # remove encryption object
         if sid in self.session_objs:
             del self.session_objs[sid]
@@ -115,7 +123,8 @@ class SessionManager(object):
         aslist = [k for k in self.router.addr_map 
                             if self.router.addr_map[k][-1] == sid]
         for x in aslist:
-            logger.debug('removing addr map {0}->{1}'.format(util.decode_mac(x),sid.encode('hex')))
+            logger.debug('removing addr map {0}->{1}'.format(
+                                util.decode_mac(x),sid.encode('hex')))
             del self.router.addr_map[x]
         util.emit_async('session-closed', self, sid)
 
