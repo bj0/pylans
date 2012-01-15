@@ -326,6 +326,7 @@ class SessionManager(object):
             j = self.shaking[src_id][0]
 
         send2 = j.pack_two(j.two(j.unpack_one(recv1)))
+        j._one = True
         logger.info('sending handshake2 to {0}'.format(src_id.encode('hex')))
         return self.router.send(self.HANDSHAKE2, send2, src_id, clear=True)
         
@@ -333,14 +334,22 @@ class SessionManager(object):
     @defer.inlineCallbacks
     def handle_handshake2(self, type, packet, address, src_id):
         if src_id in self.shaking:
-            logger.info('got handshake1 from {0}'.format(src_id.encode('hex')))
+            logger.info('got handshake2 from {0}'.format(src_id.encode('hex')))
             j = self.shaking[src_id][0]
+            
+            # make sure we got hs1 before hs2
+            if not j._one:
+                logger.warning('handshake2 arrived but never got handshake1 '
+                                +'from {0}'.format(src_id.encode('hex')))
+                self.handshake_fail(src_id)
+                return
+                
             recv2 = j.unpack_two(packet)
             session_key = j.three(recv2)
             hsh = hashlib.sha256(session_key).digest()
                         
             for i in range(3): # 3 retrys
-                logger.info('sending handshake2 to {0}'.format(src_id.encode('hex')))
+                logger.info('sending handshake3 to {0}'.format(src_id.encode('hex')))
                 try:
                     yield self.router.send(self.HANDSHAKE3, hsh, src_id, clear=True, ack=True)
                     break
