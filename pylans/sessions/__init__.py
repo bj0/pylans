@@ -290,6 +290,8 @@ class SessionManager(object):
 
             j = jpake.JPAKE(self.router.network.key)
             send1 = j.pack_one(j.one())
+            j._one = True
+            j._two = False
             self.shaking[sid] = [j, relays, address]
 
             # timeout handshake
@@ -326,7 +328,7 @@ class SessionManager(object):
             j = self.shaking[src_id][0]
 
         send2 = j.pack_two(j.two(j.unpack_one(recv1)))
-        j._one = True
+        j._two = True
         logger.info('sending handshake2 to {0}'.format(src_id.encode('hex')))
         return self.router.send(self.HANDSHAKE2, send2, src_id, clear=True)
         
@@ -338,7 +340,7 @@ class SessionManager(object):
             j = self.shaking[src_id][0]
             
             # make sure we got hs1 before hs2
-            if not j._one:
+            if not j._two:
                 logger.warning('handshake2 arrived but never got handshake1 '
                                 +'from {0}'.format(src_id.encode('hex')))
                 self.handshake_fail(src_id)
