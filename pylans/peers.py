@@ -377,8 +377,8 @@ class PeerManager(object):
                     self.router.send(self.REGISTER, packet, addr)
                     yield util.sleep(self.REG_TRY_DELAY)
 
-            logger.info('(reg) address {0} timed out'.format(pid))
-            raise Exception('(reg) address {0} timed out'.format(pid))
+            logger.warning('(reg) address {0} timed out'.format(pid.encode('hex')))
+            raise Exception('(reg) address {0} timed out'.format(pid.encode('hex')))
         else:
             logger.debug('address {0} already in peer list'.format(pid))
             defer.returnValue(self.peer_list[pid])
