@@ -35,7 +35,8 @@ PacketType.add(
 GREET       = 14,
 HANDSHAKE1  = 15,
 HANDSHAKE2  = 16,
-HANDSHAKE3  = 17)
+HANDSHAKE3  = 17,
+CLOSE       = 13)
 
 class SessionManager(object):
 
@@ -63,6 +64,7 @@ class SessionManager(object):
         router.register_handler(PacketType.HANDSHAKE1, self.handle_handshake1)
         router.register_handler(PacketType.HANDSHAKE2, self.handle_handshake2)
         router.register_handler(PacketType.HANDSHAKE3, self.handle_handshake3)
+        router.register_handler(PacketType.CLOSE, self.handle_close)
 
     
 ###### ###### ###### Protocol Stuff ###### ###### ###### 
@@ -104,6 +106,10 @@ class SessionManager(object):
         else:
             raise Exception, "TODO: key-exchange"
 
+    def handle_close(self, pt, data, addr, sid):
+        logger.info('got a close packet from {0}'.format(sid.encode('hex')))
+        self.close(sid)
+
     def close(self, sid):
         logger.debug('closing session {0}'.format(sid.encode('hex')))
         # remove encryption object
@@ -111,6 +117,8 @@ class SessionManager(object):
             del self.session_objs[sid]
         # remove address map
         if sid in self.session_map:
+            # send a close packet for the other side
+            self.router.send(PacketType.CLOSE, '', sid)
             del self.session_map[sid]
         # remove incomplete session
         if sid in self.shaking:

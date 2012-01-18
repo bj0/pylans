@@ -30,6 +30,7 @@ import threading
 import weakref
 import event
 import logging
+from binascii import hexlify, unhexlify
 
 logger = logging.getLogger(__name__)
 
