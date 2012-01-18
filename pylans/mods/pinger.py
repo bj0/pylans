@@ -70,9 +70,9 @@ class Pinger(object):
                                         ack_timeout=self.MAX_PING_TIME)
             self.ping_ack(peer, st)
         except Exception, e:
-            logger.debug('ping to {0} failed: {1}'.format(peer.name, e)
+            logger.debug('ping to {0} failed: {1}'.format(peer.name, e))
             self._ping_timeout(peer)
-        return d
+
 
     def ping_ack(self, peer, ping_time):
         dt = time() - ping_time
