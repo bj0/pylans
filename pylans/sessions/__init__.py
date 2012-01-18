@@ -27,15 +27,18 @@ from crypto import Crypter, jpake
 from peers import PeerInfo
 import protocol
 import logging
+from packets import PacketType
 
 logger = logging.getLogger(__name__)
 
+PacketType.add(
+GREET       = 14,
+HANDSHAKE1  = 15,
+HANDSHAKE2  = 16,
+HANDSHAKE3  = 17)
+
 class SessionManager(object):
 
-    GREET = 14
-    HANDSHAKE1 = 15
-    HANDSHAKE2 = 16
-    HANDSHAKE3 = 17
 
     HANDSHAKE_TIMEOUT = 3 #seconds
     def __init__(self, router, proto=None):
@@ -56,10 +59,10 @@ class SessionManager(object):
 
         self.id = self.router.network.id
 
-        router.register_handler(self.GREET, self.handle_greet)
-        router.register_handler(self.HANDSHAKE1, self.handle_handshake1)
-        router.register_handler(self.HANDSHAKE2, self.handle_handshake2)
-        router.register_handler(self.HANDSHAKE3, self.handle_handshake3)
+        router.register_handler(PacketType.GREET, self.handle_greet)
+        router.register_handler(PacketType.HANDSHAKE1, self.handle_handshake1)
+        router.register_handler(PacketType.HANDSHAKE2, self.handle_handshake2)
+        router.register_handler(PacketType.HANDSHAKE3, self.handle_handshake3)
 
     
 ###### ###### ###### Protocol Stuff ###### ###### ###### 
@@ -199,7 +202,7 @@ class SessionManager(object):
         
     def send_greet(self, address, ack=False):
         #if address not in self:
-        return self.router.send(self.GREET, '', address, ack=ack)
+        return self.router.send(PacketType.GREET, '', address, ack=ack)
 
     def handle_greet(self, type, packet, address, src_id):
         if src_id == self.id:
@@ -247,7 +250,7 @@ class SessionManager(object):
                               self.handshake_timeout, sid)
  
             # don't need ack, should get handshake-ack or timeout
-            return self.router.send(self.HANDSHAKE1, 
+            return self.router.send(PacketType.HANDSHAKE1, 
                                     pack('!B', relays)+send1, 
                                     sid, clear=True)
 
@@ -278,7 +281,7 @@ class SessionManager(object):
         send2 = j.pack_two(j.two(j.unpack_one(recv1)))
         j._two = True
         logger.info('sending handshake2 to {0}'.format(src_id.encode('hex')))
-        return self.router.send(self.HANDSHAKE2, send2, src_id, clear=True)
+        return self.router.send(PacketType.HANDSHAKE2, send2, src_id, clear=True)
         
 
     @defer.inlineCallbacks
@@ -301,7 +304,7 @@ class SessionManager(object):
             for i in range(3): # 3 retrys
                 logger.info('sending handshake3 to {0}'.format(src_id.encode('hex')))
                 try:
-                    yield self.router.send(self.HANDSHAKE3, hsh, src_id, clear=True, ack=True)
+                    yield self.router.send(PacketType.HANDSHAKE3, hsh, src_id, clear=True, ack=True)
                     break
                 except Exception, e:
                     logger.warning('handshake3 to {0} timed out'.format(src_id.encode('hex')))

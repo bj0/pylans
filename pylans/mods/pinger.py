@@ -25,6 +25,7 @@ from twisted.internet import reactor
 from twisted.internet.task import LoopingCall
 import settings
 import util
+from packets import PacketType
 
 if system() == 'Windows':   # On Windows, time() has low resolution(~1ms)
     from time import clock as time
@@ -34,12 +35,14 @@ else:
 
 logger = logging.getLogger(__name__)
 
+PacketType.add(PING=40)
+
 class Pinger(object):
 
     MAX_PING_TIME = 10.0
     MAX_TIMEOUTS = 10
 
-    PING = 40
+#    PING = 40
 #    PONG = 0x20 - 2
 
     def __init__(self, router, interval=None):
@@ -61,7 +64,7 @@ class Pinger(object):
     interval = property(lambda s: s._get('ping_interval',5.0), lambda s,v: s._set('ping_interval',v))
 
     def send_ping(self, peer):
-        d = self.router.send(self.PING, '', peer, ack=True, ack_timeout=self.MAX_PING_TIME)
+        d = self.router.send(PacketType.PING, '', peer, ack=True, ack_timeout=self.MAX_PING_TIME)
         d.addCallback(self.ping_ack, peer, time())
         d.addErrback(self._ping_timeout, peer)
         logger.debug('sending ping to {0}'.format(peer.name))

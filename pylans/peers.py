@@ -30,10 +30,20 @@ from struct import pack, unpack
 import util
 from util import event
 import settings
+from packets import PacketType
 
 import hmac, hashlib
 
 logger = logging.getLogger(__name__)
+
+PacketType.add(
+    # packet types
+PEER_XCHANGE        = 18,
+PEER_XCHANGE_ACK    = 19,
+PEER_ANNOUNCE       = 20,
+REGISTER            = 21,
+REGISTER_ACK        = 22)
+
 
 class PeerInfo(object):
     '''Represents a peer connection'''
@@ -80,13 +90,6 @@ class PeerManager(object):
     REG_TRY_DELAY = 2
     PX_TRY_DELAY = 2
 
-    # packet types
-    PEER_XCHANGE = 18
-    PEER_XCHANGE_ACK = 19
-    PEER_ANNOUNCE = 20
-    REGISTER = 21
-    REGISTER_ACK = 22
-
     def __init__(self, router):
         # list of peers
         self.peer_list = {}
@@ -112,11 +115,11 @@ class PeerManager(object):
         self.addr_map = self.router.addr_map
 
         # packet handlers
-        router.register_handler(self.PEER_XCHANGE, self.handle_px)
-        router.register_handler(self.PEER_XCHANGE_ACK, self.handle_px_ack)
-        router.register_handler(self.REGISTER, self.handle_reg)
-        router.register_handler(self.REGISTER_ACK, self.handle_reg_ack)
-        router.register_handler(self.PEER_ANNOUNCE, self.handle_announce)
+        router.register_handler(PacketType.PEER_XCHANGE, self.handle_px)
+        router.register_handler(PacketType.PEER_XCHANGE_ACK, self.handle_px_ack)
+        router.register_handler(PacketType.REGISTER, self.handle_reg)
+        router.register_handler(PacketType.REGISTER_ACK, self.handle_reg_ack)
+        router.register_handler(PacketType.PEER_ANNOUNCE, self.handle_announce)
 
         @defer.inlineCallbacks
         def do_session_opened(obj, sid, relays):
@@ -259,12 +262,12 @@ class PeerManager(object):
             peerkle = self._my_pickle
 
         if address is not None:
-            self.router.send(self.PEER_ANNOUNCE, peerkle, address)
+            self.router.send(PacketType.PEER_ANNOUNCE, peerkle, address)
             logger.info('sending announce about {0} to {1}'.format(peer.id.encode('hex'), address))
         else:
             for p in self.peer_list.values():
                 if p.id != peer.id:
-                    self.router.send(self.PEER_ANNOUNCE, peerkle, p)
+                    self.router.send(PacketType.PEER_ANNOUNCE, peerkle, p)
                     logger.info('sending announce about {0} to {1}'.format(peer.id.encode('hex'), p.id.encode('hex')))
 
 
@@ -295,7 +298,7 @@ class PeerManager(object):
 
         def send_px(i):
             if i <= self.MAX_PX_TRIES and peer.id not in self.peer_map:
-                self.router.send(self.PEER_XCHANGE, pickle.dumps(self.peer_list,-1), peer)
+                self.router.send(PacketType.PEER_XCHANGE, pickle.dumps(self.peer_list,-1), peer)
                 logger.debug('sending PX packet #{0}'.format(i))
 
                 reactor.callLater(self.PX_TRY_DELAY, send_px, i+1)
@@ -311,7 +314,7 @@ class PeerManager(object):
 
         # reply
         logger.info('received a PX packet, sending PX ACK')
-        self.router.send(self.PEER_XCHANGE_ACK, pickle.dumps(self.peer_list,-1), src_id)
+        self.router.send(PacketType.PEER_XCHANGE_ACK, pickle.dumps(self.peer_list,-1), src_id)
         self.parse_peer_list(self[src_id], peer_list)
 
 
@@ -374,7 +377,7 @@ class PeerManager(object):
                     defer.returnValue(self.peer_list[pid])
                 else:
                     logger.debug('sending REG packet #{0}'.format(i))
-                    self.router.send(self.REGISTER, packet, addr)
+                    self.router.send(PacketType.REGISTER, packet, addr)
                     yield util.sleep(self.REG_TRY_DELAY)
 
             logger.warning('(reg) address {0} timed out'.format(pid.encode('hex')))
@@ -420,7 +423,7 @@ class PeerManager(object):
         self._self.relays = pi.relays
         packet = pickle.dumps(self._self, -1)
         self._self.relays = 0
-        self.router.send(self.REGISTER_ACK, packet, src_id)
+        self.router.send(PacketType.REGISTER_ACK, packet, src_id)
 
 
     def handle_reg_ack(self, type, packet, address, src_id):

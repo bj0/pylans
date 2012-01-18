@@ -185,6 +185,54 @@ def run_cmds(cmds):
         res.append(ret)
     defer.returnValue(res)
 
+def enum(name, _type, *lst, **enums):
+    '''
+        Dynamically create enum-like class
+        
+        :param name: name of the class
+        
+        :param _type: inherited base class (like int)
+        
+        :param *lst: list of names to enumerate (ie: ONE, TWO)
+        
+        :param **enums: dict enumerations (ie: ONE=1,TWO=2)
+    '''
+    def _new(cls, k, v):
+        obj = super(T, cls).__new__(cls, v)
+        obj._name = k
+        return obj
+
+    def _repr(self):
+        return '<enum {0}={3} of type {1}({2})>'.format(self._name, name,
+                                                _type.__name__, _type(self))
+        
+    @staticmethod
+    def add(*lst, **enums):
+        vals = list(T._enums.keys())
+        for key,val in enums.items():
+            if val in vals:
+                raise ValueError, "{0}'s value {1} already assigned to {2}"\
+                                .format(key, val, T._enums[val])
+            T._enums[val] = key
+            setattr(T, key, T(key,val))
+            vals.append(val)
+        mx = max(vals+[0,])
+        for key in lst:
+            val = mx+1
+            T._enums[val] = key
+            setattr(T, key, T(key,val))
+            vals.append(val)
+            mx = val
+
+    T = type(name, (_type,), {'__new__':_new,
+                              '__repr__':_repr,
+                              'add':add})
+            
+    T._enums = {}
+    T.add(*lst, **enums)                       
+    
+    return T
+
 
 class _WeakMethod:
     """Represent a weak bound method, i.e. a method doesn't keep alive the

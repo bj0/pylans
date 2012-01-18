@@ -29,6 +29,7 @@ from struct import pack, unpack
 from tuntap import TunTap
 from twisted.internet import reactor, defer
 from util.event import Event
+from packets import PacketType
 from peers import PeerManager
 from mods.pinger import Pinger
 import sessions
@@ -37,6 +38,12 @@ import util
 
 logger = logging.getLogger(__name__)
 
+PacketType.add(
+    DATA        =   1,
+    DATA_RELAY  =   2,
+    ACK         =   3,
+    RELAY       =   4,
+    ENCODED     =   0x80 )
 
 class Router(object):
     '''The router object handles all the traffic between the virtual tun/tap
@@ -48,12 +55,6 @@ class Router(object):
     VERSION = pack('H', 1)
 
     TIMEOUT = 5 # 5s
-    # packet types
-    ENCODED = 0x80
-    DATA = 1
-    DATA_RELAY = 2
-    ACK = 3
-    RELAY = 4
 
     #USER = 0x80
 
@@ -77,6 +78,10 @@ class Router(object):
             self.sm = sessions.SessionManager(self)
         self.pm = PeerManager(self)
 
+
+#        import watcher
+#        watcher.Watcher('session_map',self.sm.__dict__)
+#        watcher.Watcher('addr_map',self.__dict__)
         # move this out of router?
         self.pinger = Pinger(self)
 
@@ -87,7 +92,7 @@ class Router(object):
         self._bootstrap = bootstrap.TrackerBootstrap(network)
 
         # add handler for message acks
-        self.register_handler(self.ACK, self.handle_ack)
+        self.register_handler(PacketType.ACK, self.handle_ack)
 
     def get_my_address(self):
         '''Get interface address (IP or MAC), return a deferred.
@@ -147,7 +152,7 @@ class Router(object):
         '''Send a packet of type with data to address.  Address should be an id
         if the peer is known, since address tuples aren't unique with relaying'''
         # shortcut for data, to speed up teh BWs
-        if type == self.DATA:
+        if type == PacketType.DATA:
             dst_id = dst[1]
             dst = dst[0]
             # encode
@@ -211,7 +216,7 @@ class Router(object):
             if dst_id in self.sm.session_map:
                 data = self.sm.encode(dst_id, pack('!H',type) + data)
             #logger.debug('encoding packet {0}'.format(type))
-                type = self.ENCODED
+                type = PacketType.ENCODED
             else:
                 logger.critical('trying to send encrypted packet ({0})'
                                 +' w/out session!!'.format(type))
@@ -263,13 +268,13 @@ class Router(object):
             # get dst and src 128-bit ids
             src = data[20:36]
 
-            if pt == self.DATA:
+            if pt == PacketType.DATA:
                 # data packets are always encrypted
                 packet = self.sm.decode(src, data[36:])
                 self.recv_packet(packet, src, address)
 
             else:
-                if pt == self.ENCODED:
+                if pt == PacketType.ENCODED:
                     packet = self.sm.decode(src, data[36:])
                     pt, packet = unpack('!H',packet[:2])[0], packet[2:]
                     #logger.debug('got encoded packet {0}'.format(pt))
@@ -292,7 +297,7 @@ class Router(object):
                 if id > 0: # ACK requested 
                     logger.debug('sending ack {0}'.format(id))
                     # ack to unknown sources?  - send greets!
-                    self.send(self.ACK, data[2:4], src, clear=True, faddress=address)
+                    self.send(PacketType.ACK, data[2:4], src, clear=True, faddress=address)
                 logger.debug('handling {0} packet from {1}'.format(pt, 
                                                         src.encode('hex')))
 
@@ -383,13 +388,13 @@ class TapRouter(Router):
 
         # if ip in peer list
         if dst in self.addr_map:
-            self.send(self.DATA, packet, self.addr_map[dst])
+            self.send(PacketType.DATA, packet, self.addr_map[dst])
 
         # or if it's a broadcast
         elif self._tuntap.is_broadcast(dst):
             #logger.debug('sending broadcast packet')
             for addr in self.addr_map.values():
-                self.send(self.DATA, packet, addr)
+                self.send(PacketType.DATA, packet, addr)
 
         # if we don't have a direct connection...
         #elif dst in self.relay_map:
@@ -449,7 +454,7 @@ class TunRouter(Router):
 
         # if ip in peer list
         if dst in self.addr_map:
-            self.send(self.DATA, packet, self.addr_map[dst])
+            self.send(PacketType.DATA, packet, self.addr_map[dst])
         else:
             logger.debug('got packet on wire to unknown destination: {0}'.format(dst.encode('hex')))
 
