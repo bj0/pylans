@@ -21,7 +21,7 @@ from platform import system
 from random import randint
 from struct import pack
 import logging
-from twisted.internet import reactor
+from twisted.internet import reactor, defer
 from twisted.internet.task import LoopingCall
 import settings
 import util
@@ -52,29 +52,35 @@ class Pinger(object):
         if interval is not None:
             self.interval = interval
 
-#        router.register_handler(self.PING, self.handle_ping)
-#        router.register_handler(self.PONG, self.handle_pong)
-
     def _get(self, prop, default):
         return settings.get_option(self.router.network.name+'/'+prop, default)
 
     def _set(self, prop, value):
         settings.set_option(self.router.network.name+'/'+prop, value)
 
-    interval = property(lambda s: s._get('ping_interval',5.0), lambda s,v: s._set('ping_interval',v))
+    interval = property(lambda s: s._get('ping_interval',5.0), 
+                        lambda s,v: s._set('ping_interval',v))
 
+    @defer.inlineCallbacks
     def send_ping(self, peer):
-        d = self.router.send(PacketType.PING, '', peer, ack=True, ack_timeout=self.MAX_PING_TIME)
-        d.addCallback(self.ping_ack, peer, time())
-        d.addErrback(self._ping_timeout, peer)
         logger.debug('sending ping to {0}'.format(peer.name))
+        try:
+            st = time()
+            yield self.router.send(PacketType.PING, '', peer, ack=True,
+                                        ack_timeout=self.MAX_PING_TIME)
+            self.ping_ack(peer, st)
+        except Exception, e:
+            logger.debug('ping to {0} failed: {1}'.format(peer.name, e)
+            self._ping_timeout(peer)
+        return d
 
-    def ping_ack(self, id, peer, ping_time):
+    def ping_ack(self, peer, ping_time):
         dt = time() - ping_time
         self.router.pm.peer_list[peer.id].ping_time = dt
         self.router.pm.peer_list[peer.id].timeouts = 0
 
-        logger.debug('received ping response from {0} with time {1}'.format(self.router.pm.peer_list[peer.id].name, dt))
+        logger.debug('received ping response from {0} with time {1}'
+                    .format(self.router.pm.peer_list[peer.id].name, dt))
 
 
     def do_pings(self):
@@ -83,7 +89,7 @@ class Pinger(object):
                 self.send_ping(peer)
 
 
-    def _ping_timeout(self, id, peer):
+    def _ping_timeout(self, peer):
         if peer.id in self.router.pm.peer_list:
             peer.timeouts += 1
             if peer.timeouts > self.MAX_TIMEOUTS:
@@ -93,9 +99,11 @@ class Pinger(object):
     def start(self):
         self.running = True
         self._lp.start(self.interval)
-        logger.info('starting pinger on {0} with {1}s interval'.format(self.router.network.name,self.interval))
+        logger.info('starting pinger on {0} with {1}s interval'
+                        .format(self.router.network.name,self.interval))
 
     def stop(self):
         self.running = False
         self._lp.stop()
-        logger.info('stopping pinger on {0} with {1}s interval'.format(self.router.network.name,self.interval))
+        logger.info('stopping pinger on {0} with {1}s interval'
+                        .format(self.router.network.name,self.interval))
