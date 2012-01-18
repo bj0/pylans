@@ -164,7 +164,7 @@ class Prompt(Cmd):
                     else:
                         print '  relay: error, could not lookup pid {0}'.format(
                                             p.relay_id.encode('hex'))
-                print 'ping_time: {0} ms'.format(p.ping_time * 1e3)
+                print 'ping_time: {0:.3f} ms'.format(p.ping_time * 1e3)
                 print 'timeouts:  {0}'.format(p.timeouts)
 
     def complete_list(self, text, line, begidx, endidx):
