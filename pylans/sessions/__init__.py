@@ -148,55 +148,6 @@ class SessionManager(object):
 
 
 
-###### ###### ###### Key XChange Stuff ###### ###### ###### 
-
-    def init_key_xc(self, obj, sid):
-        logger.info('new key xchange initiated')
-        #TODO prevent multiple key xc at the same time?
-        mynonce = os.urandom(32)
-        mac = hmac.new(self.router.network.key, mynonce, hashlib.sha256).digest()
-
-        self.router.send(self.KEY_XCHANGE, mynonce+mac, sid)
-
-    def handle_key_xc(self, type, packet, address, src_id):
-        logger.info('got new key xchange packet')
-        nonce, mac = packet[:32], packet[32:]
-
-        # verify nonce
-        if hmac.new(self.router.network.key, nonce, hashlib.sha256).digest() != mac:
-            logger.error("hmac verification failed on key xchange!")
-        else:
-            send_key_xc_ack(nonce, sid)
-
-    def send_key_xc_ack(self, nonce, sid):
-        logger.info('sending key xchange ack')
-        mynonce = os.urandom(82)
-        mac = hmac.new(self.router.network.key, nonce+mynonce, hashlib.sha256).digets()
-
-        d = self.router.send(self.KEY_XCHANGE_ACK, nonce+mynonce+mac, sid, ack=True)
-        d.addCallback(lambda *x: self.key_xc_complete(nonce+mynonce, sid))
-        d.addErrback(lambda *x: self.key_xc_fail(sid))
-
-    def handle_key_xc_ack(self, type, packet, address, src_id):
-        logger.info('got key xchange ack')
-        mynonce, nonce, mac = packet[:32], packet[32:64], packet[64:]
-
-        # verify nonce
-        if hmac.new(self.router.network.key, nonce, hashlib.sha256).digest() != mac:
-            logger.error('hmac verification failed on key xchange!')
-        else:
-            self.key_xc_complete(mynonce+nonce, src_id)
-
-    def key_xc_complete(self, salt, sid):
-        logger.info('new key xchange complete')
-        session_key = hashlib.sha256(self.router.network.key+salt).digest()
-        self.open(sid, session_key)
-
-    def key_xc_fail(self, sid):
-        logger.error('key xchange failed!')
-        #TODO re-try key xchange, or drop session??
-
-
 
 ###### ###### ###### Session Initiation/Handshake functions ###### ###### ###### 
 
@@ -272,7 +223,8 @@ class SessionManager(object):
                 pi = self.router.pm[src_id]
                 if pi.relays > 0:
                     import copy
-                    logger.info('direct connection established with {0}'.format(src_id.encode('hex')))
+                    logger.info('direct connection established with {0}'
+                                .format(src_id.encode('hex')))
 
                     # update peer
                     pn = copy.copy(pi)
@@ -370,12 +322,12 @@ class SessionManager(object):
             else:
                 self.shaking[src_id] += [session_key,]
         else:
-            logger.info('got handshake2 from {0}, but not currently shaking'.format(src_id.encode('hex')))
+            logger.warning('got handshake2 from {0}, but not currently shaking'.format(src_id.encode('hex')))
         
     def handle_handshake3(self, type, packet, address, src_id):
         if src_id in self.shaking:
             if len(self.shaking[src_id]) < 4: # we haven't got handshake2 yet
-                logger.warning('got handshake3 before handshake2 from {0}'.format(src_id.encode('hex')))
+                logger.info('got handshake3 before handshake2 from {0}'.format(src_id.encode('hex')))
 #                handshake_fail(src_id)
                 self.shaking[src_id] += [packet,]
                 return
@@ -386,11 +338,11 @@ class SessionManager(object):
             if packet == hashlib.sha256(session_key).digest():
                 self.handshake_done(src_id)
             else:
-                logger.warning('handshake with {0} verification failed'.format(src_id.encode('hex')))
+                logger.error('handshake with {0} verification failed'.format(src_id.encode('hex')))
                 self.handshake_fail(src_id)
             
         else:
-            logger.info('got handshake3 from {0}, but not currently shaking'.format(src_id.encode('hex')))
+            logger.warning('got handshake3 from {0}, but not currently shaking'.format(src_id.encode('hex')))
         
 
     def handshake_done(self, sid):
