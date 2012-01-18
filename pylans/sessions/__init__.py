@@ -36,8 +36,6 @@ class SessionManager(object):
     HANDSHAKE1 = 15
     HANDSHAKE2 = 16
     HANDSHAKE3 = 17
-    KEY_XCHANGE = 30
-    KEY_XCHANGE_ACK = 31
 
     HANDSHAKE_TIMEOUT = 3 #seconds
     def __init__(self, router, proto=None):
@@ -62,8 +60,6 @@ class SessionManager(object):
         router.register_handler(self.HANDSHAKE1, self.handle_handshake1)
         router.register_handler(self.HANDSHAKE2, self.handle_handshake2)
         router.register_handler(self.HANDSHAKE3, self.handle_handshake3)
-        router.register_handler(self.KEY_XCHANGE, self.handle_key_xc)
-        router.register_handler(self.KEY_XCHANGE_ACK, self.handle_key_xc_ack)
 
     
 ###### ###### ###### Protocol Stuff ###### ###### ###### 
