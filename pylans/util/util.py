@@ -234,6 +234,20 @@ def enum(name, _type, *lst, **enums):
     
     return T
 
+@defer.inlineCallbacks
+def retry_func(fun, args, kwargs={}, tries=3, delay=0):
+    '''Retry a deferred function until it succeeds or fails 'tries' times.'''
+    i = 1
+    while True:
+        try:
+            x = yield fun(*args, **kwargs)
+            defer.returnValue(x)
+        except Exception, e:
+            if i == tries:
+                raise
+            i += 1
+            if delay > 0:
+                yield sleep(delay)
 
 class _WeakMethod:
     """Represent a weak bound method, i.e. a method doesn't keep alive the
