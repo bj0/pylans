@@ -95,8 +95,6 @@ class PeerManager(object):
         self.peer_list = {}
         # addr to (address,port)
 #        self.addr_map = {}
-        # id's shaking hands -> nonce
-#        self.shaking_peers = {}
 
         # for display purposes
         self.peer_map = {}
@@ -138,12 +136,6 @@ class PeerManager(object):
         event.register_handler('session-opened', None, do_session_opened)
         event.register_handler('session-closed', None, do_session_closed)
 
-
-    #def clear(self):
-    #    self.peer_list = {}
-    #    self.peer_map = {}
-    #    self.addr_map = {}
-    #    self.shaking_peers = {}
 
     def _update_pickle(self):
         self._my_pickle = pickle.dumps(self._self,-1)
@@ -289,6 +281,7 @@ class PeerManager(object):
 
     ###### Peer XChange Functions
 
+    @defer.inlineCallbacks
     def try_px(self, peer):
         '''Initiate a peer exchange by sending a px packet.  The packet will be
         resent until an ack packet is recieved or MAX_PX_TRIES packets have been sent.
@@ -296,25 +289,37 @@ class PeerManager(object):
 
         logger.info('initiating a peer exchange with {0}'.format(peer.name))
 
-        def send_px(i):
-            if i <= self.MAX_PX_TRIES and peer.id not in self.peer_map:
-                self.router.send(PacketType.PEER_XCHANGE, pickle.dumps(self.peer_list,-1), peer)
+        i = 0
+        while i < self.MAX_PX_TRIES:
+            try:
                 logger.debug('sending PX packet #{0}'.format(i))
+                yield self.router.send (PacketType.PEER_XCHANGE, 
+                    pickle.dumps(self.peer_list, -1), peer.id)
+                break            # success
+            except Exception, e: # failed
+                i += 1
+                # try again after delay
+                yield util.sleep(self.PX_TRY_DELAY)
+        else:
+            logger.warning('sending PX to {0} failed.'.format(
+                                                peer.id.encode('hex')))
 
-                reactor.callLater(self.PX_TRY_DELAY, send_px, i+1)
-
-        reactor.callLater(self.PX_TRY_DELAY, send_px, 0)
 
     def handle_px(self, type, packet, address, src_id):
         '''Handle a peer exchange packet.  Load the peer list with the px packet
         and send an ack packet with own peer list.'''
 
-        #packet = self.sm.decode(src_id, packet)
         peer_list = pickle.loads(packet)
 
         # reply
-        logger.info('received a PX packet, sending PX ACK')
-        self.router.send(PacketType.PEER_XCHANGE_ACK, pickle.dumps(self.peer_list,-1), src_id)
+        logger.info('received a PX packet from {0}, sending PX ACK'.format(
+                        src_id.encode('hex')))
+        
+        util.retry_func(self.router.send, 
+                        (PacketType.PEER_XCHANGE_ACK, 
+                        pickle.dumps(self.peer_list,-1), src_id),
+                        delay=self.PX_TRY_DELAY)
+        
         self.parse_peer_list(self[src_id], peer_list)
 
 
@@ -332,7 +337,6 @@ class PeerManager(object):
     def parse_peer_list(self, from_peer, peer_list):
         '''Parse a peer list from a px packet'''
 
-#        if from_peer.id not in self.peer_map:
         self.peer_map[from_peer.id] = peer_list
 
         for peer in peer_list.values():
@@ -423,7 +427,8 @@ class PeerManager(object):
         self._self.relays = pi.relays
         packet = pickle.dumps(self._self, -1)
         self._self.relays = 0
-        self.router.send(PacketType.REGISTER_ACK, packet, src_id)
+        
+        util.retry_func(self.router.send, (PacketType.REGISTER_ACK, packet, src_id))
 
 
     def handle_reg_ack(self, type, packet, address, src_id):
