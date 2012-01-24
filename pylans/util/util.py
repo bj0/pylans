@@ -235,8 +235,10 @@ def enum(name, _type, *lst, **enums):
     return T
 
 @defer.inlineCallbacks
-def retry_func(fun, args, kwargs={}, tries=3, delay=0):
+def retry_func(fun, args, kwargs=None, tries=3, delay=0):
     '''Retry a deferred function until it succeeds or fails 'tries' times.'''
+    if kwargs is None:
+        kwargs = {}
     i = 1
     while True:
         try:
