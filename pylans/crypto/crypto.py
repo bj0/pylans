@@ -53,7 +53,8 @@ except ImportError:
 
 ## PyCrypto's CTR mode requires a custom counter
 class _Counter(object):
-    def __init__(self, n=0, maxn=0xEFFFFFFFFFFFFFFF, salt=os.urandom(8), iv=None):
+    def __init__(self, n=0, maxn=0xEFFFFFFFFFFFFFFF, salt=None, iv=None):
+        salt = salt or os.urandom(8)
         if iv is None:
             self.n = n
             self.salt = salt
@@ -227,12 +228,12 @@ class _Crypter0(object):
     '''aes 128 (pycryptopp) in ctr mode'''
     block_size = 16
     key_size = 16
-    def __init__(self, key, can_rollover=False, callback=None, args=()): #pycryptopp uses CTR mode
+    def __init__(self, key, can_rollover=False, callback=None, args=None): #pycryptopp uses CTR mode
         assert len(key) == self.key_size, "Invalid key size"
         self.key = key
         self.can_rollover = can_rollover
         self.callback = callback
-        self.args = args
+        self.args = args or ()
         self.pos_q = 0
         self.max_q = int(hexlify('\xFF'*(self.block_size-2)), 16)
         self.pos_r = 0
