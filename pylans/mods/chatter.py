@@ -17,14 +17,17 @@
 # chatter.py
 
 import logging
-import util
-from util import event
+from .. import util
+from ..util import event
+from ..packets import PacketType
+
+PacketType.add(CHAT_MSG=28)
 
 logger = logging.getLogger(__name__)
 
 class ChatterBox(object):
 
-    CHAT_MSG = 28
+#    CHAT_MSG = 28
     MAX_CHAT_RETRIES = 2
 
     def __init__(self, iface):
@@ -40,11 +43,11 @@ class ChatterBox(object):
             def handler(type, msg, addr, src_id):
                 self.handle_chat_msg(net, type, msg, addr, src_id)
 
-            net.router.register_handler(self.CHAT_MSG, handler)
+            net.router.register_handler(PacketType.CHAT_MSG, handler)
             self.handler_list[net.id] = handler
 
         def unregister_handler(net):
-            net.router.unregister_handler(self.CHAT_MSG, self.handler_list[net.id])
+            net.router.unregister_handler(PacketType.CHAT_MSG, self.handler_list[net.id])
             del self.handler_list[net.id]
 
         for net in iface.get_network_list():
@@ -73,7 +76,7 @@ class ChatterBox(object):
 
         def send_msg(err, i):
             if i < self.MAX_CHAT_RETRIES:
-                d = net.router.send(self.CHAT_MSG, line, peer, True)
+                d = net.router.send(PacketType.CHAT_MSG, line, peer, True)
                 d.addErrback(send_msg, i+1)
                 logger.debug('sending msg attempt #{0}'.format(i))
             else:
