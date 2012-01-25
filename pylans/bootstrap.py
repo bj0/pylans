@@ -22,11 +22,11 @@ from hashlib import sha1
 from struct import unpack
 import logging
 import urllib2
-import util
 from twisted.internet import reactor
 from twisted.web import client
-from util import bencode
-import settings
+from .util import bencode
+from . import util
+from . import settings
 
 
 
