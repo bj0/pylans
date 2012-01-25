@@ -22,12 +22,12 @@ from twisted.internet import reactor, defer
 import hashlib, hmac
 from struct import pack, unpack
 import os
-import util
-from crypto import Crypter, jpake
-from peers import PeerInfo
-import protocol
 import logging
-from packets import PacketType
+from .. import util
+from ..crypto import Crypter, jpake
+from ..peers import PeerInfo
+from .. import protocol
+from ..packets import PacketType
 
 logger = logging.getLogger(__name__)
 

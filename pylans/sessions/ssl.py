@@ -20,12 +20,10 @@ from twisted.internet import ssl, reactor, defer
 import hashlib, hmac
 from struct import pack, unpack
 import os
-import util
 import logging
-#from crypto import Crypter
-#from peers import PeerInfo
-import protocol
-from sessions import SessionManager
+from .. import util
+from .. import protocol
+from . import SessionManager
 
 logger = logging.getLogger(__name__)
 
