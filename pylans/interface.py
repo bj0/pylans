@@ -20,17 +20,15 @@
 # global interface "singleton" (like settings)
 
 import logging
-import settings
 
-logging.basicConfig(level=settings.get_option('settings/loglevel', 40),
-                    format='%(asctime)s:%(levelname)s:%(name)s:%(message)s')
+from . import settings
+from .mods.chatter import ChatterBox
+from .util.event import Event
+from .util import event
+from . import networks
+
 logger = logging.getLogger(__name__)
 global_logger = logging.getLogger()
-
-from mods.chatter import ChatterBox
-from util.event import Event
-from util import event
-import networks
 
 
 class Interface(object):
