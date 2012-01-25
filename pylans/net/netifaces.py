@@ -130,9 +130,11 @@ def _linux_ifaddresses(ifname=None):
     result = {}
     for addrs in ifaddrs:
         # sometimes there are entries with no addresses
-        if addrs.addr is None:
-            continue
-            
+        # -- this was preventing adapters with mac addrs but no IPs from being
+        # returned
+#        if addrs.addr is None:
+#            continue
+
         # filter
         if ifname is not None and ifname != addrs.name:
             continue
@@ -151,10 +153,13 @@ def _linux_ifaddresses(ifname=None):
         elif ifname is not None:
             result['AF_LINK'] = {'addr':':'.join(['{0:02x}'.format(x) for x in struct.unpack('!6B', mac)])}
         
-        # ip addresses
-        addr = {'address':addrs.addr[0],
-                'netmask':addrs.netmask[0],
-                'broadcast':addrs.broadcast[0] if addrs.broadcast is not None else None}
+        if addrs.addr is not None:
+            # ip addresses
+            addr = {'address':addrs.addr[0],
+                    'netmask':addrs.netmask[0],
+                    'broadcast':addrs.broadcast[0] if addrs.broadcast is not None else None}
+        else:
+            addr = {}
                 
         #if we're collecting them all...
         fam = __protocols.get(addrs.family, addrs.family)
