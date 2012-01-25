@@ -23,9 +23,10 @@ from cmd import Cmd
 import logging
 from twisted.internet import reactor
 from twisted.internet.threads import deferToThread
-import settings
-from interface import Interface
-import util
+
+from .. import settings
+from ..interface import Interface
+from .. import util
 
 logger = logging.getLogger()
 
@@ -36,17 +37,24 @@ class Prompt(Cmd):
         self.iface = iface
 
         # Events
-        iface.peer_added += lambda net, peer: logger.info('peer {0} added to network {1}'.format(peer.name, net.name))
-        iface.peer_removed += lambda net, peer: logger.info('peer {0} removed from network {1}'.format(peer.name, net.name))
-        iface.network_started += lambda net: logger.info('network {0} started'.format(net))
-        iface.network_stopped += lambda net: logger.info('network {0} stopped'.format(net))
-        iface.message_received += lambda net, peer, msg: logger.critical('{0}@{1}: {2}'.format(peer.name, net.name, msg))
+#        iface.peer_added += lambda net, peer: logger.info('peer {0} added to network {1}'.format(peer.name, net.name))
+#        iface.peer_removed += lambda net, peer: logger.info('peer {0} removed from network {1}'.format(peer.name, net.name))
+#        iface.network_started += lambda net: logger.info('network {0} started'.format(net))
+#        iface.network_stopped += lambda net: logger.info('network {0} stopped'.format(net))
+#        iface.message_received += lambda net, peer, msg: logger.critical('{0}@{1}: {2}'.format(peer.name, net.name, msg))
 
         self.previous_et = None
         self.prompt = 'pylans:> '
 
         Cmd.__init__(self)
 
+
+    def do_filter(self, line):
+        settings.FILTER = line or None
+        print 'Logging filter set to {}'.format(settings.FILTER)
+
+    def help_filter(self, line):
+        print 'filter ([string])\n set or clear current log filter text'
 
     def do_log(self, line):
         line = line.lower()
