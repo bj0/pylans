@@ -23,9 +23,9 @@ from struct import pack
 import logging
 from twisted.internet import reactor, defer
 from twisted.internet.task import LoopingCall
-import settings
-import util
-from packets import PacketType
+from .. import settings
+from .. import util
+from ..packets import PacketType
 
 if system() == 'Windows':   # On Windows, time() has low resolution(~1ms)
     from time import clock as time
