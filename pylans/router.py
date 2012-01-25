@@ -402,7 +402,8 @@ class TapRouter(Router):
         # if ip in peer list
         if dst in self.addr_map:
             self.send(PacketType.DATA, packet, self.addr_map[dst])
-            logger.debug('got a packet on the TUN/TAP wire')
+            logger.debug('got a {} byte packet on the TUN/TAP wire'
+                            .format(len(packet)))
 
         # or if it's a broadcast
         elif self._tuntap.is_broadcast(dst):
@@ -426,7 +427,8 @@ class TapRouter(Router):
         # is it ours?
         if dst == self.pm._self.addr or self._tuntap.is_broadcast(dst):
             self._tuntap.doWrite(packet)
-            logger.debug('writing packet to TUN/TAP wire')
+            logger.debug('writing {} byte packet to TUN/TAP wire'
+                            .format(len(packet)))
 
 # todo what to do about this
             src_addr = packet[self.addr_size:self.addr_size*2]
