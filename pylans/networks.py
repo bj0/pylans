@@ -20,10 +20,11 @@ from twisted.internet import defer
 import binascii
 import logging
 import os
-import util
-from util import event
-import router
-import settings
+
+from . import util
+from .util import event
+from . import router
+from . import settings
 
 #from router import Router
 
