@@ -182,11 +182,11 @@ class TwistedTTW(TunTapWindows):
         IPV4_LOW = 0x00
         IPV4_UDP = 17
         while self._running:
-            data = self._tuntap.read()
+            data = self.read()
             if data[12] == IPV4_HIGH and data[13] == IPV4_LOW and data[14+9] == IPV4_UDP:
                 logger.warning('IPV4 udp: {0}'.format(util.decode_ip(data[26:30])))
 
-            reactor.callFromThread(self.got_data, data)
+            reactor.callFromThread(self.callback, data)
 
 
     def _shell(self, cmd):

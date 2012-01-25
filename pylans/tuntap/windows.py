@@ -74,7 +74,11 @@ class TunTapWindows(TunTapBase):
     TUNMODE = 0
     TAPMODE = 1
 
-    def __init__(self, mode=self.TAPMODE, handle=None):
+    def __init__(self, mode="TAP", handle=None):
+
+        # check mode, should come in as 'TUN' or 'TAP'
+        if isinstance(mode, str):
+            mode = self.TUNMODE if mode == 'TUN' else self.TAPMODE
 
         if handle is None:
             handle, devid = self._get_tap_handle()
@@ -138,8 +142,8 @@ class TunTapWindows(TunTapBase):
 
     def configure_iface(self, **options):
 
-            logger.info('configuring interface {1} to: {0}'
-                                            .format(options, self.ifname))
+        logger.info('configuring interface {1} to: {0}'
+                                .format(options, self.ifname))
     
         # check for spurious args
         err = [arg for arg in options.keys() 
