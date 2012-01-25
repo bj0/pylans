@@ -17,8 +17,9 @@
 # windows_tuntap.py
 # TunTapDevice interface for windows
 
+from __future__ import absolute_import
 from struct import pack, calcsize
-from twisted.internet import utils
+import atexit
 import platform
 from winerror import ERROR_IO_PENDING
 import _winreg as reg
@@ -27,8 +28,9 @@ import pywintypes
 import win32event as w32e
 import win32file as w32f
 import winerror
-import util
-from net.getadaptersinfo import GetAdaptersInfo
+from . import util
+from ..net.getadaptersinfo import GetAdaptersInfo
+from . import TunTapBase
 
 logger = logging.getLogger(__name__)
 
@@ -60,27 +62,28 @@ class_key = 'SYSTEM\\CurrentControlSet\\Control\\Class\\{4D36E972-E325-11CE-BFC1
 net_key = 'SYSTEM\\CurrentControlSet\\Control\\Network\\{4D36E972-E325-11CE-BFC1-08002BE10318}'
 HKLM = reg.HKEY_LOCAL_MACHINE
 
-from twisted.python.procutils import which
+try:
+    from twisted.python.procutils import which
+except ImportError:
+    # no twisted
+    from .which import which
+
 cmd = which('netsh')[0]
 
-
-class TunTapDevice(object):
-    #IFF_TUN   = 0x0001
-    #IFF_TAP   = 0x0002
-    #IFF_NO_PI = 0x1000
-
+class TunTapWindows(TunTapBase):
     TUNMODE = 0
     TAPMODE = 1
 
-    def __init__(self, mode, handle=None):
+    def __init__(self, mode=self.TAPMODE, handle=None):
 
         if handle is None:
-            handle, devid = self.get_tap_handle()
+            handle, devid = self._get_tap_handle()
 
         if handle is None:
             raise Exception('Could not get TAP adapter handle')
 
         logger.debug('got tap handle: {0}'.format(handle))
+        
         self._handle = handle
         self.ifname = devid
         self.__idx = GetAdaptersInfo(ifname=devid)[0]['Index']
@@ -90,52 +93,102 @@ class TunTapDevice(object):
         self.overlapped_read.hEvent = w32e.CreateEvent(None,True,False,None)
         self.overlapped_write.hEvent = w32e.CreateEvent(None,True,False,None)
 
-        self.mtu = 2000
+        self.mtu = 1500
         self.mode = mode
         # mac, ip, mask, mtu
+        
+        # close device on exit
+        atexit.register(self.close)
+        
 
-        # get mac handle
-        self.mac_addr = w32f.DeviceIoControl(handle, TAP_IOCTL_GET_MAC, None, 6)
+#    def get_mac(self):
+#        # get mac handle
+#        return w32f.DeviceIoControl(handle, TAP_IOCTL_GET_MAC, None, 6)
 
+    def up(self):
         # enable dev
-        self.enable_iface()
+        self._enable_iface()
+        
+    def down(self):
+        # disable dev
+        self._disable_iface()
 
-    def netsh(self, address, netmask):
+    def set_mtu(self, mtu):
+        raise Exception('not implimented!')
+        
+    def get_mtu(self):
+        raise Exception('not implimented!')
+
+    def _shell(self, cmd):
+        return sp.call(cmd)
+
+    def _netsh(self, address, netmask):
         '''Invoke M$' netsh command to set ip address and netmask'''
         ver = platform.win32_ver()[0]
         if ver == 'XP':
-            return utils.getProcessOutputAndValue(cmd,('interface','ip','set','address',self.ifname,'static',address,netmask))
+            return self._shell((cmd,
+                'interface','ip','set','address',
+                self.ifname,'static',address,netmask))
         elif ver == '7' or ver == 'post2008Server':
-            return utils.getProcessOutputAndValue(cmd,('interface','ipv4','set','address',str(self.__idx),'static',address,netmask))
+            return self._shell((cmd,
+                'interface','ipv4','set','address',
+                str(self.__idx),'static',address,netmask))
         else:
             raise OSError, 'Unsupported version of Windows: {0}.'.format(ver)
 
-    def configure_iface(self, addr):
-        ip = addr.split('/')[0]
-        _, host, subnet = util.ip_to_net_host_subnet(addr)
+    def configure_iface(self, **options):
 
-        ipb = util.encode_ip(ip)
-        hostb = util.encode_ip(host)
-        subnetb = util.encode_ip(subnet)
+            logger.info('configuring interface {1} to: {0}'
+                                            .format(options, self.ifname))
+    
+        # check for spurious args
+        err = [arg for arg in options.keys() 
+                            if arg not in ['addr','mtu','hwaddr']]
+        if len(err) > 0:
+            logger.error('configure_iface passed unrecognized arguments: {0}'
+                    .format(err))
 
-        if self.mode == self.TUNMODE:
-            w32f.DeviceIoControl(self._handle, TAP_IOCTL_CONFIG_TUN, ipb+hostb+subnetb, 12)
-            logger.critical('WE IN TUN MODE!')
-        logger.info('configuring interface to: {0}'.format(addr))
+        if 'addr' in options:
+            addr = options['addr']
+            if '/' not in addr:
+                addr += '/32'
+                
+                
+            ip = addr.split('/')[0]
+            _, host, subnet = util.ip_to_net_host_subnet(addr)
+            ipb = util.encode_ip(ip)
+            hostb = util.encode_ip(host)
+            subnetb = util.encode_ip(subnet)
 
-        def response(ret):
-            if ret[2] != 0:
-                logger.error('error configuring address {0} on interface {1}: {2}'.format(addr, self.ifname, ret[0]))
+            # for the windows driver, the 'internal' IP address has to be set
+            if self.mode == self.TUNMODE:
+                w32f.DeviceIoControl(self._handle, TAP_IOCTL_CONFIG_TUN, 
+                                            ipb+hostb+subnetb, 12)
+                logger.critical('WE IN TUN MODE!')
+            
 
-        d = self.netsh(ip, subnet)
-        d.addCallback(response)
-        logger.info('configuring interface {1} to: {0}'.format(addr, self.ifname))
-        return d
+            def response(ret):
+                if ret[2] != 0:
+                    logger.error('error configuring address {0} on interface'
+                                +' {1}: {2}'.format(addr, self.ifname, ret[0]))
+                    raise Exception()
 
-    def enable_iface(self):
+            ret = self._netsh(ip, subnet)
+            response(ret)
+
+                
+        if 'mtu' in options:
+            mtu = options['mtu']
+            self.set_mtu(mtu)                
+        
+        if 'hwaddr' in options:
+            raise Exception('not implimented!')
+
+
+    def _enable_iface(self):
         w32f.DeviceIoControl(self._handle, TAP_IOCTL_SET_MEDIA_STATUS, pack('I',True), calcsize('I'))
 
-    def disable_iface(self):
+    def _disable_iface(self):
         w32f.DeviceIoControl(self._handle, TAP_IOCTL_SET_MEDIA_STATUS, pack('I',False), calcsize('I'))
 
     def __del__(self):
@@ -146,7 +199,7 @@ class TunTapDevice(object):
             w32f.CloseHandle(self._handle)
             self._handle = None
 
-    def get_tap_handle(self):
+    def _get_tap_handle(self):
         '''Get a file handle to an available TAP adapter'''
         def findTaps():
             '''get a list of TAP adapters'''
@@ -220,3 +273,7 @@ class TunTapDevice(object):
             size = w32f.GetOverlappedResult(self._handle, self.overlapped_write, False)
 
         return size
+        
+        
+        
+

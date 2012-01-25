@@ -16,7 +16,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# tuntap.py
 # tuntap device interface
 #
 #
@@ -37,17 +36,10 @@
 #
 # TODO: for windows: setting ip address, mtu,
 
-from twisted.internet import reactor, utils, defer
-from twisted.internet.interfaces import IReadDescriptor
-from twisted.internet.threads import deferToThread
-from zope.interface import implements
+from __future__ import absolute_import
 import logging
-import os
-import socket
-import struct
-import util
-from net.netifaces import *
-
+from . import util
+from ..net.netifaces import *
 
 
 logger = logging.getLogger(__name__)
@@ -57,7 +49,6 @@ class TunTapBase(object):
         Access to the virtual tun/tap device (Base Class).
     '''
 
-    #
 
 #    @classmethod
 #    def is_ip6_discovery(mac):
@@ -71,8 +62,9 @@ class TunTapBase(object):
         try:
             ret = ifaddresses(self.ifname)
             mac = ret['AF_LINK']['addr']
-        except (ValueError, KeyError):
-            logger.critical('unable to get MAC address for {0}'.format(self.ifname))
+        except (ValueError, KeyError), e:
+            logger.critical('unable to get MAC address for {0}:{1}'
+                    .format(self.ifname,e))
             #return None TODO: when this is none it passes it to other peers, causing exceptions, need better solution
             raise
 
@@ -84,8 +76,9 @@ class TunTapBase(object):
         try:
             ips = ifaddresses(self.ifname)['AF_INET']
             ips = [x['address'] for x in ips]
-        except (ValueError, KeyError):
-            logger.critical('unable to get IP addresses for {0}'.format(self.ifname))
+        except (ValueError, KeyError), e:
+            logger.critical('unable to get IP addresses for {0}:{1}'
+                        .format(self.ifname, e))
             return []
             #raise
 
@@ -136,218 +129,5 @@ class TunTapBase(object):
             return True
         return False
 
-class TunTapLinux(TunTapBase):
-    '''
-        Access to the virtual tun/tap device.
-    '''
-
-    # so it can be used in twisted's main loop
-    implements(IReadDescriptor)
-
-    # definitions from linux driver
-    IFF_TUN   = 0x0001
-    IFF_TAP   = 0x0002
-    IFF_NO_PI = 0x1000
-
-    # modes for settings
-    TUNMODE = IFF_TUN
-    TAPMODE = IFF_TAP
-
-    SIOCGIFHWADDR = 0x8927
-    SIOCGIFMTU = 0x8921
-    SIOCSIFMTU = 0x8922
-    TUNSETIFF = 0x400454ca
-
-    def __init__(self, router, mode):
-        # get file handle
-        f = os.open("/dev/net/tun", os.O_RDWR)
-
-        # check mode, should come in as 'TUN' or 'TAP'
-        if isinstance(mode, str):
-            mode = self.TUNMODE if mode == 'TUN' else self.TAPMODE
-
-        # ioctl call to create adapter, retuns adapter name
-        ifs = ioctl(f, self.TUNSETIFF, struct.pack("16sH", "pytun%d", mode|self.IFF_NO_PI))
-
-        # get iface name
-        self.ifname = ifs[:16].strip("\x00")
-
-        logger.info('opened tun device as interface {0}'.format(self.ifname))
-
-        self.f = f
-        self.router = util.get_weakref_proxy(router)
-        self.mode = mode
-        self.mtu = 1500 # default mtu
-
-    def __del__(self):
-        '''Make sure device is closed.'''
-        logger.info('closing tun device {0}'.format(self.ifname))
-        os.close(self.f)
-
-    def start(self):
-        '''Start monitoring tun/tap for input'''
-        # add to twisted mainloop
-        reactor.addReader(self)
-        logger.info('linux tun/tap started')
-
-    def stop(self):
-        '''Stop monitoring tun/tap for input'''
-        reactor.removeReader(self)
-        logger.info('linux tun/tap stopped')
-
-    def get_mtu(self):
-        '''Use socket ioctl call to get MTU size'''
-        s = socket.socket(type=socket.SOCK_DGRAM)
-        ifr = self.ifname + '\x00'*(32-len(self.ifname))
-        try:
-            ifs = ioctl(s, self.SIOCGIFMTU, ifr)
-            mtu = struct.unpack('<H',ifs[16:18])[0]
-        except Exception, s:
-            logger.error('socket ioctl call failed: {0}'.format(s))
-            # re-throw?
-
-        logger.debug('get_mtu: got mtu: {0}'.format(mtu))
-
-        return mtu
-
-    def set_mtu(self, mtu):
-        '''Use socket ioctl call to set MTU size'''
-        s = socket.socket(type=socket.SOCK_DGRAM)
-        ifr = struct.pack('<16sH', self.ifname, mtu) + '\x00'*14
-        try:
-            ifs = ioctl(s, self.SIOCSIFMTU, ifr)
-            self.mtu = struct.unpack('<H',ifs[16:18])[0]
-        except Exception, s:
-            logger.error('socket ioctl call failed: {0}'.format(s))
-            # re-throw?
-
-        logger.debug('set_mtu: new mtu value: {0}'.format(mtu))
-
-        return self.mtu
-
-    @defer.inlineCallbacks
-    def configure_iface(self, address, mtu=None):
-        '''
-            Configure the tun/tap interface with given address/mask (ie: '10.1.1.1/24')
-        '''
-        def response(retval):
-            if retval != 0:
-                logger.error('error configuring address {0} on interface {1}'.format(address, self.ifname))
-
-        # TODO is this right?
-        retval = yield utils.getProcessValue('/sbin/ip',
-            ('addr','add',address,'dev',self.ifname))
-        response(retval)
-        retval = yield utils.getProcessValue('/sbin/ip',
-            ('link','set',self.ifname,'up'))
-        response(retval)
-        
-
-        # set mtu
-#        if mtu is not None:
-#            mtu = self.set_mtu(mtu)
-#            logger.info('setting {0} mtu to: {1}'.format(self.ifname, mtu))
-
-        logger.info('configuring interface {1} to: {0}'.format(address, self.ifname))
 
 
-    def doRead(self):
-        '''
-            New data is coming in on the tun/tap 'wire'.  Called by twisted.
-        '''
-        data = os.read(self.f, 2000) # max mtu is 1500
-        self.router.send_packet(data)
-
-    def doWrite(self, data):
-        '''
-            Write some data out to the tun/tap 'wire'.
-        '''
-#        try:
-        os.write(self.f, data)
-#        except:
-#            import traceback
-#            traceback.print_exc()
-#            logger.warning('Got Exception trying to os.write()\nself.f: {0}\ndata: {1} ({2})'.format(
-#                        self.f, data.encode('hex'), len(data)))
-
-    def fileno(self):
-        '''Return the file identifier from os.open.  Required for twisted to
-        select() our stream.'''
-        return self.f
-
-    def logPrefix(self):
-        '''Required but not used?'''
-        return '.>'
-
-    def connectionLost(self, reason):
-        logger.warning('connectionLost called on tuntap')
-        self.stop()
-
-
-class TunTapWindows(TunTapBase):
-    TUNMODE = 0
-    TAPMODE = 1
-
-    def __init__(self, router, mode):
-        self._running = False
-
-        self._tuntap = TunTapDevice(mode)
-        self.ifname = self._tuntap.ifname
-        self.router = util.get_weakref_proxy(router)
-
-        if isinstance(mode, str):
-            mode = self.TUNMODE if mode == 'TUN' else self.TAPMODE
-
-        self.mode = mode
-
-    def configure_iface(self, addr):
-        return self._tuntap.configure_iface(addr)
-
-    def got_data(self, data):
-#        print data[12:14].encode('hex'),unpack('H',data[12:14])[0]
-#        if unpack('H',data[12:14])[0] == 0x8:
-#            print 'ipv4 packet'
-#        else:
-#            print 'other packet'
-#        print 'gotdata:','\n'.join(wrap(hexlify(data),4*2))
-        self.router.send_packet(data)
-
-    def doWrite(self, data):
-        deferToThread(self._tuntap.write, data)
-
-    def start(self):
-        self._running = True
-        self.run()
-        logger.info('windows tun/tap started')
-
-    def stop(self):
-        self._running = False
-        logger.info('windows tun/tap stopped')
-
-
-    @util.threaded
-    def run(self):
-        IPV4_HIGH = 0x08
-        IPV4_LOW = 0x00
-        IPV4_UDP = 17
-        while self._running:
-            data = self._tuntap.read()
-            if data[12] == IPV4_HIGH and data[13] == IPV4_LOW and data[14+9] == IPV4_UDP:
-                logger.warning('IPV4 udp: {0}'.format(util.decode_ip(data[26:30])))
-
-            reactor.callFromThread(self.got_data, data)
-
-import platform
-if platform.system() == 'Linux':
-    from fcntl import ioctl
-    TunTap = TunTapLinux
-    logger.info('Linux detected, using TapTunLinux')
-elif platform.system() == 'Windows':
-    from tuntap.windows_tuntap import TunTapDevice
-    TunTap = TunTapWindows
-    logger.info('Windows detected, using TapTunWindows')
-else:
-    raise OSError, "Unsupported platform for tuntap"
-
-if __name__ == '__main__':
-    pass
