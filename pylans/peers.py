@@ -27,10 +27,11 @@ import logging
 from twisted.internet import reactor, defer
 import os
 from struct import pack, unpack
-import util
-from util import event
-import settings
-from packets import PacketType
+
+from . import util
+from .util import event
+from . import settings
+from .packets import PacketType
 
 import hmac, hashlib
 

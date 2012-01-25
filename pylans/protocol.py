@@ -1,9 +1,10 @@
 from twisted.internet import reactor, defer
 from twisted.internet import protocol
 from twisted.protocols import basic
-import util
 import logging
 import struct
+
+from . import util
 
 logger = logging.getLogger(__name__)
 
