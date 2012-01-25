@@ -26,15 +26,16 @@
 import logging
 import random
 from struct import pack, unpack
-from tuntap import TunTap
+from tuntap.twisted import TwistedTunTap
 from twisted.internet import reactor, defer
-from util.event import Event
-from packets import PacketType
-from peers import PeerManager
-from mods.pinger import Pinger
-import sessions
-import settings
-import util
+
+from . import util
+from .util.event import Event
+from .packets import PacketType
+from .peers import PeerManager
+from .mods.pinger import Pinger
+from . import sessions
+from .import settings
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,7 @@ class Router(object):
     def __init__(self, network, tuntap=None):
         if tuntap is None:
             mode = network.adapter_mode
-            tuntap = TunTap(self, mode)
+            tuntap = TwistedTunTap(self.send_packet, mode=mode)
 
         logger.info('Initializing router in {0} mode.'.format('TAP' if tuntap.is_tap else 'TUN'))
 
@@ -88,7 +89,7 @@ class Router(object):
         self._tuntap = tuntap
 
         # move out of router?
-        import bootstrap
+        from . import bootstrap
         self._bootstrap = bootstrap.TrackerBootstrap(network)
 
         # add handler for message acks
@@ -107,7 +108,7 @@ class Router(object):
         self._tuntap.start()
 
         # configure tun/tap address (deferred)
-        yield self._tuntap.configure_iface(self.network.virtual_address)
+        yield self._tuntap.configure_iface(addr=self.network.virtual_address)
 
         # set mtu (if possible)
         mtu = settings.get_option(self.network.name + '/' + 'set_mtu', None)
@@ -115,12 +116,15 @@ class Router(object):
             mtu = settings.get_option(self.network.name + '/' + 'set_mtu', None)
         if mtu is not None:
             self._tuntap.set_mtu(mtu)
-            
-        # start connection listener
-        self.sm.start(self.network.port)
 
+        # bring adapter up
+        yield self._tuntap.up()
+            
         # get addresses (deferred)
         yield self.get_my_address()
+
+        # start connection listener
+        self.sm.start(self.network.port)
 
         logger.info('router started, listening on port {0}'.format(self.network.port))
 
@@ -128,7 +132,7 @@ class Router(object):
         self.pinger.start()
         reactor.callLater(1, util.get_weakref_proxy(self.pm.try_old_peers))
 
-
+    @defer.inlineCallbacks
     def stop(self):
         '''Stop the router.  Stops the tun/tap device and stops listening on the
         UDP port.'''
@@ -136,6 +140,7 @@ class Router(object):
         self._bootstrap.stop()
         self._tuntap.stop()
         # bring down iface?
+        yield self._tuntap.down()
         # todo determine states: online/offline/disabled/adapterless?
         self.pm.clear()
         self.sm.stop()
@@ -167,7 +172,7 @@ class Router(object):
             return self.sm.send(data, dst_id, dst)
 
         elif dst == self.sm.id: # send to self? TODO
-            logger.info('tryong to send {0} packet to self'.format(type))
+            logger.info('tryong to send {} packet to self'.format(type))
             return
         elif dst in self.sm.session_map: # sid
             dst_id = dst
@@ -218,12 +223,12 @@ class Router(object):
             #logger.debug('encoding packet {0}'.format(type))
                 type = PacketType.ENCODED
             else:
-                logger.critical('trying to send encrypted packet ({0})'
+                logger.critical('trying to send encrypted packet ({})'
                                 +' w/out session!!'.format(type))
-                raise Exception, 'trying to send encrypted packet ({0})' \
+                raise Exception, 'trying to send encrypted packet ({})' \
                                 +' w/out session!!'.format(type)
         else:
-            logger.debug('sending clear packet ({0})'.format(type))
+            logger.debug('sending clear packet ({})'.format(type))
 
         data = pack('!2H', type, id) + dst_id + self.pm._self.id + data
 
@@ -282,7 +287,7 @@ class Router(object):
                     packet = data[36:]
 
                 id = unpack('!H', data[2:4])[0]
-
+                pt = PacketType(pt)
 
                 if pt in self.handlers:
                     try:
@@ -314,7 +319,7 @@ class Router(object):
         '''Register a handler for a specific packet type.  Handles will be
         called as 'callback(type, data, address, src_id)'.'''
 
-        logger.debug('registering packet handler for packet type: {0}'.format(type))
+        logger.debug('registering packet handler for packet type: {}'.format(type))
 
         if type in self.handlers:
             self.handlers[type] += callback
@@ -327,7 +332,7 @@ class Router(object):
         '''Remove a registered handler for a specific packet type.'''
 
         logger.debug('unregistering packet handler for packet type: \
-                     {0}'.format(type))
+                     {}'.format(type))
 
         if type in self.handlers:
             self.handlers[type] -= callback
@@ -345,6 +350,8 @@ class TapRouter(Router):
             '''get the IP/mac addresses'''
             if ips is None:
                 ips = self._tuntap.get_ips()
+                logger.debug('tun/tap device returned the following ips: {0}'
+                                    .format(ips))
             if len(ips) > 0:
                 if self.pm._self.vip_str not in ips:
                     logger.critical('TAP addresses ({0}) don\'t contain \
@@ -357,22 +364,28 @@ class TapRouter(Router):
 
             # get mac addr
             self.pm._self.addr = self._tuntap.get_mac() #todo check if this is none?
+            logger.debug('tun/tap device returned the following mac: {0}'
+                            .format(util.decode_mac(self.pm._self.addr)))
 
             # get 'direct' addresses
-            from net.netifaces import ifaddresses
+            from .net.netifaces import ifaddresses
             addr = ifaddresses()
             for dev in addr['AF_INET']:
-                if dev not in ['lo'] and not dev.startswith('pytun'):
+                if dev not in ['lo'] and (dev != self._tuntap.ifname):
                     for address in addr['AF_INET'][dev]:
                         self.pm._self.direct_addresses.append((address['address'], 
                                                         self.network.port))
 
+            logger.debug('got the following direct_addresses: {0}'
+                                .format(self.pm._self.direct_addresses))
             self.pm._update_pickle()
 
             reactor.callLater(0, d.callback, ips)
 
         # Grap VIP, so we display the right one
         ips = self._tuntap.get_ips()
+        logger.debug('tun/tap device returned the following ips: {0}'
+                            .format(ips))
         if len(ips) == 1 and ips[0] == '0.0.0.0': # interface not ready yet?
             logger.warning('Adapter not read, delaying...')
             reactor.callLater(3, do_ips)
@@ -389,13 +402,15 @@ class TapRouter(Router):
         # if ip in peer list
         if dst in self.addr_map:
             self.send(PacketType.DATA, packet, self.addr_map[dst])
+            logger.debug('got a packet on the TUN/TAP wire')
 
         # or if it's a broadcast
         elif self._tuntap.is_broadcast(dst):
             #logger.debug('sending broadcast packet')
             for addr in self.addr_map.values():
                 self.send(PacketType.DATA, packet, addr)
-
+            logger.debug('got a bcast packet on the TUN/TAP wire')
+            
         # if we don't have a direct connection...
         #elif dst in self.relay_map:
         #    self.send(self.DATA, packet, self.relay_map[dst])
@@ -411,17 +426,19 @@ class TapRouter(Router):
         # is it ours?
         if dst == self.pm._self.addr or self._tuntap.is_broadcast(dst):
             self._tuntap.doWrite(packet)
-            logger.debug('writing packet to TAP device')
+            logger.debug('writing packet to TUN/TAP wire')
 
 # todo what to do about this
             src_addr = packet[self.addr_size:self.addr_size*2]
             if src_addr not in self.addr_map: # negligible speed hit
                 self.addr_map[src_addr] = (address, src)
-                logger.warning('got new addr from packet!: {0} (for {1})'.format(src_addr.encode('hex'), src.encode('hex')))
+                logger.warning('got new addr from packet!: {0} (for {1})'
+                            .format(src_addr.encode('hex'), src.encode('hex')))
         else:
             # no, odd
             self.send_packet(packet)
-            logger.warning('got packet (encrypted) with different dest addr, relay packet?')
+            logger.warning('got packet (encrypted)'
+                        +' with different dest addr, relay packet?')
 
 
 
