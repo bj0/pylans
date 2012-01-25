@@ -1,1 +1,1 @@
-from crypto import Crypter
+from .crypto import Crypter
