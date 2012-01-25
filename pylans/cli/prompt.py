@@ -51,7 +51,7 @@ class Prompt(Cmd):
 
     def do_filter(self, line):
         settings.FILTER = line or None
-        print 'Logging filter set to {}'.format(settings.FILTER)
+        print 'Logging filter set to {0}'.format(settings.FILTER)
 
     def help_filter(self, line):
         print 'filter ([string])\n set or clear current log filter text'

@@ -137,7 +137,7 @@ def enum(name, _type, *lst, **enums):
                 elif isinstance(x, _type):
                     return getattr(T, T._enums[x])
                 else:
-                    raise TypeError("invalid argument type, must be str or {}"
+                    raise TypeError("invalid argument type, must be str or {0}"
                                         .format(_type.__name__))
 
                     

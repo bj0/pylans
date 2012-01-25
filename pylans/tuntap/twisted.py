@@ -227,7 +227,7 @@ class TwistedTTW(TunTapWindows):
             response(ret)
 
                 
-        if mtu in options:
+        if 'mtu' in options:
             mtu = options['mtu']
             self.set_mtu(mtu)                
         

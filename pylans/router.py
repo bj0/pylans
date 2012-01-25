@@ -172,7 +172,7 @@ class Router(object):
             return self.sm.send(data, dst_id, dst)
 
         elif dst == self.sm.id: # send to self? TODO
-            logger.info('tryong to send {} packet to self'.format(type))
+            logger.info('tryong to send {0} packet to self'.format(type))
             return
         elif dst in self.sm.session_map: # sid
             dst_id = dst
@@ -223,12 +223,12 @@ class Router(object):
             #logger.debug('encoding packet {0}'.format(type))
                 type = PacketType.ENCODED
             else:
-                logger.critical('trying to send encrypted packet ({})'
+                logger.critical('trying to send encrypted packet ({0})'
                                 +' w/out session!!'.format(type))
-                raise Exception, 'trying to send encrypted packet ({})' \
+                raise Exception, 'trying to send encrypted packet ({0})' \
                                 +' w/out session!!'.format(type)
         else:
-            logger.debug('sending clear packet ({})'.format(type))
+            logger.debug('sending clear packet ({0})'.format(type))
 
         data = pack('!2H', type, id) + dst_id + self.pm._self.id + data
 
@@ -319,7 +319,7 @@ class Router(object):
         '''Register a handler for a specific packet type.  Handles will be
         called as 'callback(type, data, address, src_id)'.'''
 
-        logger.debug('registering packet handler for packet type: {}'.format(type))
+        logger.debug('registering packet handler for packet type: {0}'.format(type))
 
         if type in self.handlers:
             self.handlers[type] += callback
@@ -332,7 +332,7 @@ class Router(object):
         '''Remove a registered handler for a specific packet type.'''
 
         logger.debug('unregistering packet handler for packet type: \
-                     {}'.format(type))
+                     {0}'.format(type))
 
         if type in self.handlers:
             self.handlers[type] -= callback
@@ -402,7 +402,7 @@ class TapRouter(Router):
         # if ip in peer list
         if dst in self.addr_map:
             self.send(PacketType.DATA, packet, self.addr_map[dst])
-            logger.debug('got a {} byte packet on the TUN/TAP wire'
+            logger.debug('got a {0} byte packet on the TUN/TAP wire'
                             .format(len(packet)))
 
         # or if it's a broadcast
@@ -427,7 +427,7 @@ class TapRouter(Router):
         # is it ours?
         if dst == self.pm._self.addr or self._tuntap.is_broadcast(dst):
             self._tuntap.doWrite(packet)
-            logger.debug('writing {} byte packet to TUN/TAP wire'
+            logger.debug('writing {0} byte packet to TUN/TAP wire'
                             .format(len(packet)))
 
 # todo what to do about this
