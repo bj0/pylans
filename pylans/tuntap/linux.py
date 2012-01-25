@@ -32,6 +32,7 @@ class TunTapLinux(TunTapBase):
     def __init__(self, mode="TAP", name=None, dev='/dev/net/tun'):
     
         # open tun/tap device controller
+#        f = os.open(dev, os.O_RDWR|os.O_NONBLOCK)
         f = os.open(dev, os.O_RDWR)
 
         # check mode, should come in as 'TUN' or 'TAP'
@@ -56,6 +57,7 @@ class TunTapLinux(TunTapBase):
         logger.info('opened tun device as interface {0}'.format(self.ifname))
 
         self._f = f
+        self._file = os.fdopen(f)
         self.mode = mode
         self.mtu = 1500 # default mtu
 
@@ -164,7 +166,8 @@ class TunTapLinux(TunTapBase):
         '''
             New data is coming in on the tun/tap 'wire'.  Called by twisted.
         '''
-        return os.read(self._f, self.mtu) 
+#        return self._file.read()
+        return os.read(self._f, 5120) #TODO wat is max size, what should it be?
 
     def write(self, data):
         '''
