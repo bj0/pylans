@@ -15,9 +15,9 @@
 #
 #
 # event.py
-
+from __future__ import absolute_import
 import logging
-import util
+from . import get_weakref_proxy
 
 logger = logging.getLogger(__name__)
 
@@ -27,12 +27,12 @@ class Event:
 
     def handle(self, handler):
         '''Stores weakrefs to bound methods to allow gc'''
-        self.handlers.add(util.get_weakref_proxy(handler))
+        self.handlers.add(get_weakref_proxy(handler))
         return self
 
     def unhandle(self, handler):
         try:
-            self.handlers.remove(util.get_weakref_proxy(handler))
+            self.handlers.remove(get_weakref_proxy(handler))
         except IndexError:
             raise ValueError("Handler is not handling this event, so cannot unhandle it.")
         return self
