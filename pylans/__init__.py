@@ -47,9 +47,9 @@ def main():
     (ops, args) = op.parse_args()
     
     if ops.filter is not None:
-        settings.FILTER += ops.filter
+        settings.FILTER += [re.compile(s) for s in ops.filter]
     if ops.ignore is not None:
-        settings.IGNORE += ops.filter
+        settings.IGNORE += [re.compile(s) for s in ops.ignore]
     #exaile magic
     class FilterLogger(logging.Logger):
         class Filter(logging.Filter):
