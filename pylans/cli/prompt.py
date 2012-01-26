@@ -23,6 +23,7 @@ from cmd import Cmd
 import logging
 from twisted.internet import reactor
 from twisted.internet.threads import deferToThread
+import re
 
 from .. import settings
 from ..interface import Interface
@@ -49,13 +50,57 @@ class Prompt(Cmd):
         Cmd.__init__(self)
 
 
+    def _change_filter(self, line, lst):
+        
+        string = line.lstrip()
+        words = line.split()
+
+        if len(words) > 0:
+            cmd = words[0].lower()
+            if cmd in ['del','delete'] and ' ' in string:
+                string = string[string.find(' '):].strip()
+                try:
+                    t = [x for x in lst if x.pattern == string]
+                    lst.remove(t[0])
+                except ValueError, IndexError:
+                    print '"{0}" not found'.format(string)
+                    
+            elif cmd in ['rem','remove'] and ' ' in string:
+                string = string[string.find(' '):].strip()
+                try:
+                    t = [x for x in lst if x.pattern == string]
+                    lst.remove(t[0])
+                except ValueError, IndexError:
+                    print '"{0}" not found'.format(string)
+                    
+            elif cmd in ['clear','reset']:
+                for x in list(lst):
+                    lst.remove(x)
+                
+            elif cmd in ['add'] and ' ' in string:
+                string = string[string.find(' '):].strip()
+                lst += [re.compile(string)]
+
+            else:
+                string = line.strip()
+                lst += [re.compile(string)]
+        
     def do_filter(self, line):
-        settings.FILTER = line or None
-        print 'Logging filter set to {0}'.format(settings.FILTER)
+        self._change_filter(line, settings.FILTER)
+        print 'current filter: {0}'\
+                            .format([x.pattern for x in settings.FILTER])
 
-    def help_filter(self, line):
-        print 'filter ([string])\n set or clear current log filter text'
+    def help_filter(self):
+        print 'filter (([op]) [string])\n op = add/del/rem - add or remove text to filter\n op = clear - clear all text from filter\n no op - add string to filter'
 
+    def do_ignore(self, line):
+        self._change_filter(line, settings.IGNORE)
+        print 'current (ignore) filter: {0}'\
+                            .format([x.pattern for x in settings.IGNORE])
+
+    def help_ignore(self):
+        print 'ignore (([op]) [string])\n op = add/del/rem - add or remove text to (ignore) filter\n op = clear - clear all text from (ignore) filter\n no op - add string to (ignore) filter'
+        
     def do_log(self, line):
         line = line.lower()
 

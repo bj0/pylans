@@ -5,6 +5,7 @@ import sys
 import os
 import optparse
 import logging
+import re
 
 # make sure settings file is here
 from . import settings
@@ -21,7 +22,8 @@ from . import settings
 #        basedir = cwd
 #sys.path.insert(0, basedir)
 
-settings.FILTER = None
+settings.FILTER = []
+settings.IGNORE = []
 
 def root_check():
     try:
@@ -40,24 +42,46 @@ def main():
     op.add_option('--daemon', '-D', action='store_true', default=False, help='Run in daemon mode (no input)')
     op.add_option('--pbi', action='store_true', default=False, help='Run in daemon mode with perspective broker interface')
     op.add_option('--log-file', '-l', help='Specify log file')
-    op.add_option('--filter', '-F', type="string", help='filter log with')
+    op.add_option('--filter', '-F', action="append", type="string", help='add string to log filter')
+    op.add_option('--ignore', action="append", type='string', help='add string to log anti-filter')
     (ops, args) = op.parse_args()
     
     if ops.filter is not None:
-        settings.FILTER = ops.filter
+        settings.FILTER += ops.filter
+    if ops.ignore is not None:
+        settings.IGNORE += ops.filter
     #exaile magic
     class FilterLogger(logging.Logger):
         class Filter(logging.Filter):
             def filter(self, record):
-                if settings.FILTER is None:
-                    return True
                 msg = record.getMessage()
-                string = settings.FILTER
-                return (
-                    string in msg
-                    or string in record.name
-                    or string in record.levelname
-                    or string in record.funcName )
+                def check(s):
+                    '''function for checking if s is in record'''
+#                    return (
+#                        s in msg
+#                        or s in record.name
+#                        or s in record.levelname
+#                        or s in record.funcName )
+                    return s.search(''.join((msg,
+                                        record.name,
+                                        record.levelname,
+                                        record.funcName))) is not None
+                        
+                # first show only stuff that passes filter
+                if settings.FILTER:
+                    for s in settings.FILTER:
+                        if check(s):
+                            break
+                    else:
+                        return False
+                
+                # second, ignore stuff that passed filter if it's in ignore
+                if settings.IGNORE:
+                    for s in settings.IGNORE:
+                        if check(s):
+                            return False
+                
+                return True
                 
 
         level = logging.NOTSET
