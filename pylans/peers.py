@@ -128,6 +128,8 @@ class PeerManager(object):
                 except Exception, e:
                     # close session if we can't register peer presence
                     logger.warning('try_register failed: {0}'.format(e))
+#                    import traceback
+#                    logger.debug(traceback.format_exc())
                     self.sm.close(sid)
         
         def do_session_closed(obj, sid):
@@ -174,8 +176,11 @@ class PeerManager(object):
 
             # fire event
             event.emit('peer-added', self, peer)
-            self.send_announce(peer)
-            self.try_px(peer)
+            reactor.callLater(.1, self.send_announce, peer)
+            reactor.callLater(.1, self.try_px, peer)
+            
+#            self.send_announce(peer)
+#            self.try_px(peer)
 
     def remove_peer(self, peer):
         '''Remove a peer connection'''
@@ -318,7 +323,7 @@ class PeerManager(object):
         
         util.retry_func(self.router.send, 
                         (PacketType.PEER_XCHANGE_ACK, 
-                        pickle.dumps(self.peer_list,-1), src_id),
+                        pickle.dumps(self.peer_list,-1), src_id), dict(ack=True),
                         delay=self.PX_TRY_DELAY)
         
         self.parse_peer_list(self[src_id], peer_list)
@@ -406,6 +411,7 @@ class PeerManager(object):
         if interval > 0:
             reactor.callLater(interval, util.get_weakref_proxy(self.try_old_peers))
 #
+
     def handle_reg(self, type, packet, address, src_id):
         '''Handle incoming reg packet by adding new peer and sending ack.'''
 
@@ -428,9 +434,10 @@ class PeerManager(object):
         self._self.relays = pi.relays
         packet = pickle.dumps(self._self, -1)
         self._self.relays = 0
-        
-        util.retry_func(self.router.send, (PacketType.REGISTER_ACK, packet, src_id))
 
+        # wait until they get ours
+        util.retry_func(self.router.send, 
+            (PacketType.REGISTER_ACK, packet, src_id), dict(ack=True))
 
     def handle_reg_ack(self, type, packet, address, src_id):
         '''Handle reg ack by adding new peer'''
@@ -525,7 +532,7 @@ class PeerManager(object):
             raise TypeError('Unrecognized key type')
 
         if peer is None:
-            raise KeyError('Address {0} not in peer list.'.format(repr(item)))
+            raise KeyError('{0} not in peer list.'.format(repr(item)))
         else:
             return peer
 
