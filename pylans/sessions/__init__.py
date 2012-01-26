@@ -45,7 +45,7 @@ class SessionManager(object):
     def __init__(self, router, proto=None):
 
         if proto is None:
-            proto = protocol.UDPPeerProtocol(router.recv)
+            proto = protocol.UDPPeerProtocol(util.get_weakref_proxy(router.recv))
     
         self.proto = proto
         self.port = None
@@ -198,7 +198,8 @@ class SessionManager(object):
                     ret = yield self.send_greet(address, ack=True)
                     return # stop trying if successful TODO: return address? 
                 except Exception, e:
-                    logger.info('(greet) address {0} timed out'.format(address))
+                    logger.info('(greet) address {0} failed: {1}'
+                                    .format(address, e))
                     # just keep trying...
 
         logger.info('Could not establish connection with addresses.')
@@ -382,20 +383,6 @@ class SessionManager(object):
 
 
     ### Container Functions
-#    def get(self, item, default=None):
-#        try:
-#            return self[item]
-#        except KeyError:
-#            return default
-
-#    def __contains__(self, item):
-
-#    def __getitem__(self, item):
-
-#        else:
-#            raise KeyError, "sid not found"
-
-#    def __len__(self):
 
         
     def __eq__(self, other):
@@ -407,7 +394,8 @@ class SessionManager(object):
     def _ref(self):
         return self
         
-        
+
+from tcp import TCPSessionManager        
 try:
     from ssl import SSLSessionManager
 except ImportError:

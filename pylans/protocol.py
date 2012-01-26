@@ -34,12 +34,12 @@ class UDPPeerProtocol(protocol.DatagramProtocol):
         logger.debug('connectionRefused on UDP port')
 
 
-
-class SSLPeerProtocol(basic.Int32StringReceiver):
-
-    def __init__(self, deferred, recv_cb):
+class TCPPeerProtocol(basic.Int32StringReceiver):
+    _type = 'TCP'
+    def __init__(self, deferred, recv_cb, factory):
         self.deferred = deferred
         self.recv = recv_cb
+        self.factory = factory
 
     def connectionMade(self):
         self._peer = self.transport.getPeer()
@@ -49,24 +49,33 @@ class SSLPeerProtocol(basic.Int32StringReceiver):
             d.callback(self)
         
     def connectionLost(self, reason):
+        print 'proto connection lost'
         if self.deferred is not None:
             d, self.deferred = self.deferred, None
-            d.errback(self)
+            d.errback(reason)
+        else: #connection was already made
+            self.factory._connect_fail(self, self._peer)
 
     def send(self, data):
         self.transport.write(struct.pack('!i',len(data))+data)
-        logger.debug('sending {0} bytes on SSL port'.format(len(data)))
+        logger.debug('sending {0} bytes on {1} port'
+                        .format(len(data), self._type))
         
 #    def dataReceived(self, data):
     def stringReceived(self, data):
-        logger.debug('received {0} bytes on SSL port'.format(len(data)))
+        logger.debug('received {0} bytes on {1} port'
+                        .format(len(data), self._type))
         self.recv(data, self._peer)
         
     def close(self):
         self.transport.loseConnection()
         
-class SSLPeerFactory(protocol.ServerFactory,protocol.ClientFactory):
-    protocol = SSLPeerProtocol
+
+class SSLPeerProtocol(TCPPeerProtocol):
+    _type = 'SSL'
+
+class TCPPeerFactory(protocol.ServerFactory,protocol.ClientFactory):
+    protocol = TCPPeerProtocol
     
     def __init__(self):
         pass    
@@ -74,8 +83,11 @@ class SSLPeerFactory(protocol.ServerFactory,protocol.ClientFactory):
     def buildProtocol(self, addr):
         pass
 #
-    def clientConnectLost(self, connector, reason):
+    def clientConnectionLost(self, connector, reason):
         pass
         
     def clientConnectionFailed(self, connector, reason):
         pass
+        
+class SSLPeerFactory(TCPPeerFactory):
+    protocol = SSLPeerProtocol

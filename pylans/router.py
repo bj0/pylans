@@ -74,8 +74,13 @@ class Router(object):
 
         # check if we are using SSL
         if settings.get_option(self.network.name + '/' + 'use_ssl', False):
+            logger.info('network {0} using SSL mode'.format(self.network.name))
             self.sm = sessions.SSLSessionManager(self)
+        elif settings.get_option(self.network.name + '/' + 'use_tcp', False):
+            logger.info('network {0} using TCP mode'.format(self.network.name))
+            self.sm = sessions.TCPSessionManager(self)
         else:
+            logger.info('network {0} using UDP mode'.format(self.network.name))
             self.sm = sessions.SessionManager(self)
         self.pm = PeerManager(self)
 
@@ -231,7 +236,6 @@ class Router(object):
             logger.debug('sending clear packet ({0})'.format(type))
 
         data = pack('!2H', type, id) + dst_id + self.pm._self.id + data
-
         self.sm.send(data, dst_id, dst)
 
         return d
@@ -289,6 +293,8 @@ class Router(object):
                 id = unpack('!H', data[2:4])[0]
                 pt = PacketType(pt)
 
+                logger.debug('handling {0} packet from {1}'.format(pt, 
+                                                        src.encode('hex')))
                 if pt in self.handlers:
                     try:
                         self.handlers[pt](pt, packet, address, src)
@@ -303,8 +309,6 @@ class Router(object):
                     logger.debug('sending ack {0}'.format(id))
                     # ack to unknown sources?  - send greets!
                     self.send(PacketType.ACK, data[2:4], src, clear=True, faddress=address)
-                logger.debug('handling {0} packet from {1}'.format(pt, 
-                                                        src.encode('hex')))
 
         # nope!
         else:
