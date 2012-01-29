@@ -32,7 +32,7 @@ def root_check():
         pass
     else:
         if uid != 0:
-            sys.stderr.write('Warning: not running as root, probably wont be able to access tun device or control the adapters...')
+            sys.stderr.write('Warning: not running as root, probably wont be able to access tun device or control the adapters...\n')
 
 def main():
     root_check()
@@ -50,18 +50,14 @@ def main():
         settings.FILTER += [re.compile(s) for s in ops.filter]
     if ops.ignore is not None:
         settings.IGNORE += [re.compile(s) for s in ops.ignore]
-    #exaile magic
+        
+    #exaile's (modified) magic
     class FilterLogger(logging.Logger):
         class Filter(logging.Filter):
             def filter(self, record):
                 msg = record.getMessage()
                 def check(s):
                     '''function for checking if s is in record'''
-#                    return (
-#                        s in msg
-#                        or s in record.name
-#                        or s in record.levelname
-#                        or s in record.funcName )
                     return s.search(''.join((msg,
                                         record.name,
                                         record.levelname,
@@ -90,21 +86,17 @@ def main():
             logging.Logger.__init__(self, name)
 
             log_filter = self.Filter(name)
-#                log_filter.module = FilterLogger.module
             log_filter.level = FilterLogger.level
             self.addFilter(log_filter)
 
-#       FilterLogger.module = self.options.ModuleFilter
     logging.setLoggerClass(FilterLogger)
-
     logging.basicConfig(level=settings.get_option('settings/loglevel', 40),
         format='%(asctime)s:[%(levelname)-10s]>%(name)s:<%(funcName)s>::=> \"%(message)s\"')
 
     # needs testing TODO
     if ops.log_file is not None:
         logging.basicConfig(filename=ops.log_file)
-    
-    
+        
     if ops.gui: #needs updating TODO
         import gui.main
         gui.main.main()
