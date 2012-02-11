@@ -44,6 +44,8 @@ def main():
     op.add_option('--log-file', '-l', help='Specify log file')
     op.add_option('--filter', '-F', action="append", type="string", help='add string to log filter')
     op.add_option('--ignore', action="append", type='string', help='add string to log anti-filter')
+    op.add_option('--short', action='store_true', default=True, help='show shorter log msgs')
+    op.add_option('--long', action='store_false', dest="short", help='show full log msgs')
     (ops, args) = op.parse_args()
     
     if ops.filter is not None:
@@ -89,9 +91,14 @@ def main():
             log_filter.level = FilterLogger.level
             self.addFilter(log_filter)
 
+    if ops.short:
+        fmt = '[%(levelname)-10s]: \"%(message)s\"'
+    else:
+        fmt = '%(asctime)s:[%(levelname)-10s]>%(name)s:<%(funcName)s>::=> \"%(message)s\"'
+
     logging.setLoggerClass(FilterLogger)
     logging.basicConfig(level=settings.get_option('settings/loglevel', 40),
-        format='%(asctime)s:[%(levelname)-10s]>%(name)s:<%(funcName)s>::=> \"%(message)s\"')
+        format=fmt)
 
     # needs testing TODO
     if ops.log_file is not None:
