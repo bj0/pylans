@@ -53,7 +53,7 @@ class Router(object):
     for special packets.
 
     Packet format: TBD'''
-    VERSION = pack('H', 1)
+    __version__ = pack('!H', 2)
 
     TIMEOUT = 5 # 5s
 
@@ -64,7 +64,8 @@ class Router(object):
             mode = network.adapter_mode
             tuntap = TwistedTunTap(self.send_packet, mode=mode)
 
-        logger.info('Initializing router in {0} mode.'.format('TAP' if tuntap.is_tap else 'TUN'))
+        logger.info('Initializing router in {0} mode.'
+                        .format('TAP' if tuntap.is_tap else 'TUN'))
 
         self.handlers = {}
         self._requested_acks = {}
@@ -158,7 +159,8 @@ class Router(object):
             logger.debug('relaying packet to {0}'.format(repr(dst)))
 
 
-    def send(self, type, data, dst, ack=False, id=0, ack_timeout=None, clear=False, faddress=None):
+    def send(self, type, data, dst, ack=False, id=0, ack_timeout=None, 
+                clear=False, faddress=None):
         '''Send a packet of type with data to address.  Address should be an id
         if the peer is known, since address tuples aren't unique with relaying'''
         # shortcut for data, to speed up teh BWs
@@ -216,7 +218,8 @@ class Router(object):
                 id = random.randint(0, 0xFFFF)
             d = defer.Deferred()
             timeout = ack_timeout if ack_timeout is not None else self.TIMEOUT
-            timeout_call = reactor.callLater(timeout, util.get_weakref_proxy(self._timeout), id)
+            timeout_call = reactor.callLater(timeout, util.get_weakref_proxy
+                                                (self._timeout), id)
             self._requested_acks[id] = (d, timeout_call)
         else:
             d = None
@@ -308,7 +311,8 @@ class Router(object):
                 if id > 0: # ACK requested 
                     logger.debug('sending ack {0}'.format(id))
                     # ack to unknown sources?  - send greets!
-                    self.send(PacketType.ACK, data[2:4], src, clear=True, faddress=address)
+                    self.send(PacketType.ACK, data[2:4], src, clear=True,
+                                                            faddress=address)
 
         # nope!
         else:
@@ -344,7 +348,7 @@ class Router(object):
 class TapRouter(Router):
     addr_size = 6
 
-    SIGNATURE = 'PVA'+Router.VERSION
+    __signature__ = 'PVA'+Router.__version__
 
     def get_my_address(self, *x):
         '''Get interface address (IP/MAC)'''
@@ -452,7 +456,7 @@ class TunRouter(Router):
     '''not currently in use'''
     addr_size = 4
 
-    SIGNATURE = 'PVU'+Router.VERSION
+    __signature__ = 'PVU'+Router.__version__
 
     def get_my_address(self):
         '''Get interface address (IP)'''
@@ -460,7 +464,9 @@ class TunRouter(Router):
         if len(ips) > 0:
 #            ips = [x[0] for x in ips] # if we return (addr,mask)
             if self.pm._self.vip_str not in ips:
-                logger.critical('TUN addresses ({0}) don\'t contain configured address ({1}), taking address from adapter ({2})'.format(ips, self.pm._self.vip_str, ips[0]))
+                logger.critical('TUN addresses ({0}) don\'t contain configured'
+                            +' address ({1}), taking address from adapter ({2})'
+                            .format(ips, self.pm._self.vip_str, ips[0]))
                 self.pm._self.vip = util.encode_ip(ips[0])
                 self.pm._self.addr = self.pm._self.vip
         else:
@@ -479,7 +485,8 @@ class TunRouter(Router):
         if dst in self.addr_map:
             self.send(PacketType.DATA, packet, self.addr_map[dst])
         else:
-            logger.debug('got packet on wire to unknown destination: {0}'.format(dst.encode('hex')))
+            logger.debug('got packet on wire to unknown destination: {0}'
+                                                .format(dst.encode('hex')))
 
     def recv_packet(self, packet):
         '''Got a data packet from a peer, need to inject it into tun/tap'''
