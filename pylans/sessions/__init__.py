@@ -279,7 +279,7 @@ class SessionManager(object):
         if sig != self.router.__signature__:
             logger.warning(('got a handshake1 from peer {0} using an '+
                 'incompatible version').format(src_id.encode('hex')))
-            self.handshake_fail(src_id)
+            return self.handshake_fail(src_id)
 
         r = unpack('!B', r)[0]
 
