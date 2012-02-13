@@ -85,9 +85,9 @@ class TwistedTTL(TunTapLinux):
                                     .format(options, self.ifname))
         def response(retval):
             if retval != 0:
-                logger.error('error configuring address {0} on interface {1}'
-                                    .format(address, self.ifname))
-                raise Exception()
+                logger.error('error configuring interface {1} to: {0}'
+                                    .format(options, self.ifname))
+                raise Exception('retval={0}'.format(retval))
 
         # check for spurious args
         err = [arg for arg in options.keys() 
