@@ -76,6 +76,8 @@ class TunTapWindows(TunTapBase):
 
     def __init__(self, mode="TAP", handle=None):
 
+        self._handle = None
+
         # check mode, should come in as 'TUN' or 'TAP'
         if isinstance(mode, str):
             mode = self.TUNMODE if mode == 'TUN' else self.TAPMODE
@@ -84,6 +86,7 @@ class TunTapWindows(TunTapBase):
             handle, devid = self._get_tap_handle()
 
         if handle is None:
+            logger.critical('Could not get TAP adapter handle')
             raise Exception('Could not get TAP adapter handle')
 
         logger.debug('got tap handle: {0}'.format(handle))
