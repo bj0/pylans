@@ -105,10 +105,11 @@ class _BCounter(object):
 try:
     from cutil import Counter, BCounter
     from cutil import AESCrypterPP2
-    print 'using cython'
-except ImportError,e:
+#    print 'using cython'
+    logger.debug('using cython counters')
+except ImportError, e:
     logger.debug('could not import cython counters, using python ones')
-    print e
+#    print e
     Counter = _Counter
     BCounter = _BCounter
 
