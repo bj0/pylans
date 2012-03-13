@@ -193,10 +193,12 @@ class TunTapWindows(TunTapBase):
 
 
     def _enable_iface(self):
-        w32f.DeviceIoControl(self._handle, TAP_IOCTL_SET_MEDIA_STATUS, pack('I',True), calcsize('I'))
+        w32f.DeviceIoControl(self._handle, TAP_IOCTL_SET_MEDIA_STATUS,
+                             pack('I',True), calcsize('I'))
 
     def _disable_iface(self):
-        w32f.DeviceIoControl(self._handle, TAP_IOCTL_SET_MEDIA_STATUS, pack('I',False), calcsize('I'))
+        w32f.DeviceIoControl(self._handle, TAP_IOCTL_SET_MEDIA_STATUS, 
+                             pack('I',False), calcsize('I'))
 
     def __del__(self):
         self.close()
@@ -277,7 +279,8 @@ class TunTapWindows(TunTapBase):
 
         if err != 0: # must be IO_PENDING
             w32e.WaitForSingleObject(self.overlapped_write.hEvent, w32e.INFINITE)
-            size = w32f.GetOverlappedResult(self._handle, self.overlapped_write, False)
+            size = w32f.GetOverlappedResult(self._handle, 
+                                            self.overlapped_write, False)
 
         return size
         
