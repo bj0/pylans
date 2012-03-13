@@ -125,7 +125,12 @@ class Prompt(Cmd):
             print 'Logging threshold set to CRITICAL'
 
         else:
-            print 'Logging threshold is currently {0}'.format(logging.getLevelName(self.iface.log_level))
+            try:
+                lvl = int(line.strip())
+                self.iface.log_level = lvl
+            except:
+                print 'Logging threshold is currently {0}'\
+                        .format(logging.getLevelName(self.iface.log_level))
 
         settings.save()
         
