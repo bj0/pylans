@@ -19,7 +19,7 @@ class UDPPeerProtocol(protocol.DatagramProtocol):
         '''Send data to address'''
         try:
             self.transport.write(data, address)
-            logger.debug('sending {1} bytes on UDP port to {0}'.format(address, len(data)))
+            logger.log(0,'sending {1} bytes on UDP port to {0}'.format(address, len(data)))
         except Exception, e:
             logger.warning('UDP send threw exception:\n  {0}'.format(e))
             ##TODO this is here because UDP socket fills up and just dies
@@ -28,10 +28,10 @@ class UDPPeerProtocol(protocol.DatagramProtocol):
     def datagramReceived(self, data, address):
         '''Called by twisted when data is received from address'''
         self.recv(data, address)
-        logger.debug('received {1} bytes on UDP port from {0}'.format(address, len(data)))
+        logger.log(0,'received {1} bytes on UDP port from {0}'.format(address, len(data)))
 
     def connectionRefused(self):
-        logger.debug('connectionRefused on UDP port')
+        logger.warning('connectionRefused on UDP port')
 
 
 class TCPPeerProtocol(basic.Int32StringReceiver):
@@ -58,12 +58,12 @@ class TCPPeerProtocol(basic.Int32StringReceiver):
 
     def send(self, data):
         self.transport.write(struct.pack('!i',len(data))+data)
-        logger.debug('sending {0} bytes on {1} port'
+        logger.log(0,'sending {0} bytes on {1} port'
                         .format(len(data), self._type))
         
 #    def dataReceived(self, data):
     def stringReceived(self, data):
-        logger.debug('received {0} bytes on {1} port'
+        logger.log(0,'received {0} bytes on {1} port'
                         .format(len(data), self._type))
         self.recv(data, self._peer)
         
