@@ -26,16 +26,20 @@ settings.FILTER = []
 settings.IGNORE = []
 
 def root_check():
-    try:
-        uid = os.geteuid()
-    except:
-        pass
+    import platform
+    if platform.system() == 'Linux':
+        return os.geteuid() == 0
+    elif platform.system() == 'Windows':
+        from win32com.shell import shell
+        return shell.IsUserAnAdmin()
     else:
-        if uid != 0:
-            sys.stderr.write('Warning: not running as root, probably wont be able to access tun device or control the adapters...\n')
+        sys.stderr.write('Warning: unknown or unsupported OS\n')
+
 
 def main():
-    root_check()
+    if not root_check():
+        sys.stderr.write('Warning: not running as root, probably wont be able to access tun/tap device or control the adapters...\n')
+
 
     op = optparse.OptionParser()
     op.add_option('--gui', action='store_true', default=False, help='Run with gui (default uses cli)')
