@@ -21,7 +21,7 @@ from __future__ import absolute_import
 from struct import pack, calcsize
 import atexit
 import platform
-from winerror import ERROR_IO_PENDING
+from winerror import ERROR_IO_PENDING, ERROR_MORE_DATA
 import _winreg as reg
 import logging
 import pywintypes
@@ -257,7 +257,7 @@ class TunTapWindows(TunTapBase):
 
             return None
 
-    def read(self):
+    def read(self, size=1024*1024):
         '''Read data from TAP adapter (blocking)'''
         w32e.ResetEvent(self.overlapped_read.hEvent)
 
@@ -265,6 +265,10 @@ class TunTapWindows(TunTapBase):
         if err == ERROR_IO_PENDING:
             w32e.WaitForSingleObject(self.overlapped_read.hEvent, w32e.INFINITE)
             size = w32f.GetOverlappedResult(self._handle, self.overlapped_read, False)
+        elif err == ERROR_MORE_DATA:
+            logger.warning("ReadFile returned ERROR_MORE_DATA: {0}, {1}"
+                                    .format(type(data), len(data)))
+            return str(data) + self.read(size*2)
         else:
             # need to get size
             size = w32f.GetOverlappedResult(self._handle, self.overlapped_read, False)
