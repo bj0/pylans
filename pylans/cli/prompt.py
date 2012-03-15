@@ -301,6 +301,12 @@ class Prompt(Cmd):
 #    def emptyline(self, *args):
 #        self.do_status('')
 
+    def do_exit(self, line):
+        self.do_EOF(line)
+
+    def do_quit(self, line):
+        self.do_EOF(line)
+
     def do_EOF(self, line):
         print
         reactor.callFromThread(reactor.stop)
