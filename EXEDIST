@@ -1,0 +1,70 @@
+I am trying to make pylans as easy as possible to use.  To this end I have tried to use some of the most popular binary packing options for windows.  I haven't tested much on linux, as it's much easier to get the dependencies, but pyinstaller and cxfreeze are supposed to support linux.
+
+The ideal solution would have the following:
+ * Be buildable from linux (wine OK)
+ * Easy to setup build enviroment
+ * Produce simple, easy to use stand-alone application
+   * In the future I might make an installer, but for the time being it is more convinient to simply have a stand alone app that can be moved around and launched from anywhere
+   * This boils down to whether libraries can be packaged into a single .exe/.zip file or subdirectory
+
+Enviroment Dependencies:
+ * Python - 
+   * Python.org - stock python distribution, has windows installers.  pip can be used to install pure-python dependencies, but binary dependencies must or deps with extension modules that require compilation must be installed with a pre-built windows installer or binary egg
+   * ActivePython  - A bundled distribution of python.  ActivePython makes it easy to setup an enviroment because it comes with PyPM, a binary package manager that allows all dependencies to be installed from the command line
+
+  * Twisted - contains extension modules that require compilation, installers can be found at website
+    * zope.interface - required by twisted, can be installed using pip
+
+  * pycryptopp - extension module.  current release not available as binary, older version can be found as binary egg at: https://tahoe-lafs.org/source/tahoe-lafs/deps/tahoe-dep-eggs/
+
+  * ipython (optional) - installer available at website (requires compilation i think)
+    * pyreadline - optional requirement of ipython, can be installed with pip
+
+
+Tried so far:
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+PyInstaller 1.5.1: 
+ * not installed, scripts run from source directory (Configure.py, Makespec.py, Build.py)
+ * pyinstaller is incompatible with ActivePython!
+ * can produce a single-file executable (it extracts itself to a tempdir and executes from there, then deletes it later)
+ * can also produce a single directory, but it contains all files (no structure) which is cluttered and annoying to try and find the .exe in
+ * supports linux
+ * works under wine - it works under wine if wine's system dlls are excluded, otherwise it produces errors while on a real windows system (still runs ok on one)
+   * i had to modify the .spec file to remove binary libraries
+
+wine python /home/bjp/code/oss/pyinstaller-1.5.1/Build.py *onefile.spec
+wine python /home/bjp/code/oss/pyinstaller-1.5.1/Build.py *onedir.spec
+single file ~ 8.0M
+directory ~ 15M
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+Py2Exe: (not tested recently)
+ * Requires Windows Installer - on website
+ * does not work under wine - supposedly it produces binaries that can be fixed with some other program, never looked into it
+ * can produce single executable file, .exe + .zip, or .exe + subdirectory.  good options
+ * does not support linux
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+cx_Freeze: 4.2.3  
+SIZE: ~ 7.2M
+ * Requires Windows Installer - on website
+ * only produces a directory full of files.
+ * targetDir doesn't copy all files to output dir, so it fails to run unless copied manually
+ * works with wine
+ * supports linux?
+
+
+wine python cxfsetup.py build
+~ 7.2M
+ - ctrl+d doesn't to work
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+bbfreeze:
+ * Requires Windows Installer - on PyPI site
+ * requires modulegraph, altgraph, pefile - all installable by pip
+ * works from wine
+ * produces directory of files
+
+wine python bbsetup.py
+~13M

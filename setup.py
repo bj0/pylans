@@ -25,9 +25,10 @@ if len(sys.argv) == 1:
     sys.argv.append("py2exe")
     sys.argv.append("-q")
 
-excludes = ['Tkconstants','Tkinter','tcl',"pywin", "pywin.debugger", "pywin.debugger.dbgcon",
-             "pywin.dialogs", "pywin.dialogs.list",
-             '_imagingtk','PIL._imagingtk','ImageTk','PIL.ImageTk','FixTk']
+excludes = ['Tkconstants','Tkinter','tcl',"pywin", "pywin.debugger",
+            "pywin.debugger.dbgcon",
+            "pywin.dialogs", "pywin.dialogs.list",
+            '_imagingtk','PIL._imagingtk','ImageTk','PIL.ImageTk','FixTk']
 
 
 #
@@ -39,15 +40,15 @@ excludes = ['Tkconstants','Tkinter','tcl',"pywin", "pywin.debugger", "pywin.debu
 # depending on wx widgets you use, you might need to add
 # gdiplus.dll to the above collection
 
-py26MSdll = glob.glob(r"c:\Python26\msdlls\*.*")
+#py26MSdll = glob.glob(r"c:\Python27\msdlls\*.*")
 
 # following works from Windows XP +
 # if you need to deploy to older MS Win versions then I found that on Win2K
 # it will also work if the files are put into the application folder without
 # using a sub-folder.
-data_files = [# ("Microsoft.VC90.CRT", py26MSdll),
-               ("lib\Microsoft.VC90.CRT", py26MSdll),
-              ]
+#data_files = [# ("Microsoft.VC90.CRT", py26MSdll),
+#               ("lib\Microsoft.VC90.CRT", py26MSdll),
+data_files = []
 
 
 
@@ -56,7 +57,8 @@ options = {
                  'excludes':excludes,
                  'optimize':2,
 # these options bundle everything into the .exe/.zip file (except msvcr71.dll)
-                 'bundle_files':2, #cmd.Cmd.cmdloop() causes crashes on 'bundle_files':1
+#cmd.Cmd.cmdloop() causes crashes on 'bundle_files':1
+                 'bundle_files':2, 
                  'compressed':1}
 
 
@@ -66,9 +68,9 @@ setup(
     # The first three parameters are not required, if at least a
     # 'version' is given, then a versioninfo resource is built from
     # them and added to the executables.
-    version = "0.0.1",
+    version = "0.0.2",
     description = "Python VPN Tunnel",
-    name = "Py2PyVPN!",
+    name = "pylans!",
     data_files = data_files,
 
 
