@@ -185,7 +185,7 @@ class Prompt(Cmd):
                 print 'my addr      {0}'.format(net.router.pm._self.addr_str)
             else:
                 print 'network offline'
-
+  
     def complete_status(self, text, line, begidx, endidx):
         nets = self.iface.get_network_names()
         if not text:
@@ -196,7 +196,10 @@ class Prompt(Cmd):
     def help_status(self):
         print 'status\n display status of defined networks\n'
 
-    def do_list(self, line, ls=False):
+    def do_lt(self, line):
+        self.do_list(line, lt=True)
+
+    def do_list(self, line, ls=False, lt=False):
         line = line.strip()
         if len(line) > 0:
             nets = line.split()
@@ -204,30 +207,51 @@ class Prompt(Cmd):
         else:
             nets = self.iface.get_network_list()
 
+        def sort_key(item):
+            try:
+                return int(item.vip_str.split('.')[-1])
+            except:
+                return 1000
+
         # print info for online networks
         for net in (x for x in nets if x.router is not None and x.is_running):
-            print '========= Peers (%s) =========' % net.name
-            for p in self.iface.get_peer_list(net):
-                if not ls:
-                    print 'id:        {0}'.format(p.id.encode('hex'))
-                print 'name:      {0}'.format(p.name)
-                print 'vip:       {0}'.format(p.vip_str)
-                if not ls:
-                    print 'addr:      {0}'.format(p.addr_str)
-                    print 'address:   {0}'.format(p.address)
-                    print 'is_direct: {0}'.format(p.is_direct)
-                if not p.is_direct:
-                    rp = self.iface.get_peer_info(p.relay_id)
-                    if rp is not None:
-                        print '  relay:   {0} ({1})'.format(rp.name,
-                                                     p.relay_id.encode('hex'))
+            if lt:
+                print '========= Peers ({0}:{1}) ========='.format(
+                                    net.name, net.virtual_address)
+                print '{0:15}  {1:10}  {2:10}  {3:10}'.format(
+                        'vip', 'name', 'ping_time', 'relay')
+#                print 'vip              name          ping_time     relay'
+                for p in sorted(self.iface.get_peer_list(net), key=sort_key):
+                    if not p.is_direct:
+                        rp = self.iface.get_peer_info(p.relay_id)
+                        relay = rp.name
                     else:
-                        print '  relay: error, could not lookup pid {0}'.format(
-                                            p.relay_id.encode('hex'))
-                print 'ping_time: {0:.3f} ms'.format(p.ping_time * 1e3)
-                if not ls or p.timeouts > 0:
-                    print 'timeouts:  {0}'.format(p.timeouts)
-                print
+                        relay = '-' 
+                    print ' {0:15}  {1:10}  {2:<10.3f}  {3:10}'.format(
+                            p.vip_str, p.name, p.ping_time*1e3, relay)
+            else:
+                print '========= Peers (%s) =========' % net.name
+                for p in sorted(self.iface.get_peer_list(net), key=sort_key):
+                    if not ls:
+                        print 'id:        {0}'.format(p.id.encode('hex'))
+                    print 'name:      {0}'.format(p.name)
+                    print 'vip:       {0}'.format(p.vip_str)
+                    if not ls:
+                        print 'addr:      {0}'.format(p.addr_str)
+                        print 'address:   {0}'.format(p.address)
+                        print 'is_direct: {0}'.format(p.is_direct)
+                    if not p.is_direct:
+                        rp = self.iface.get_peer_info(p.relay_id)
+                        if rp is not None:
+                            print '  relay:   {0} ({1})'.format(rp.name,
+                                                    p.relay_id.encode('hex'))
+                        else:
+                            print '  relay: error, could not lookup pid {0}' \
+                                        .format(p.relay_id.encode('hex'))
+                    print 'ping_time: {0:.3f} ms'.format(p.ping_time * 1e3)
+                    if not ls or p.timeouts > 0:
+                        print 'timeouts:  {0}'.format(p.timeouts)
+                    print
 
     def complete_list(self, text, line, begidx, endidx):
         nets = self.iface.get_network_names()
