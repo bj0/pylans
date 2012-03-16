@@ -68,3 +68,74 @@ bbfreeze:
 
 wine python bbsetup.py
 ~13M
+
+
+
+
+
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+setting up build env:
+install wine
+ apt-get install wine1.3
+
+create wineprefix
+ mkdir ~/winepy
+
+set WINEPREFIX
+ export WINEPREFIX=~/winepy
+install python
+ wine msiexec /i python-2.7.2.msi
+
+install pywin32
+ wine pywin32-217.win32-py2.7.exe
+
+install cxFreeze
+ wine msiexec /i cx_Freeze-4.2.3.win32-py2.7.msi
+
+install bbfreeze
+ wine bbfreeze-1.0.0.win32-py2.7.exe
+
+install setuptools (for easy_install)
+ wine setuptools-0.6c11.win32-py2.7.exe
+
+add "C:\Python27\;C:\Python27\Scripts" to path
+ * for wine, that means adding a Path variable to the registry with regedit, at HKEY_CURRENT_USER\Environment
+   * should have Path = c:\windows;c:\windows\system;c:\python27;c:\python27\scripts
+
+ * can use saved .reg file:
+   wine regedit python_path.reg
+
+install pip
+ wine easy_install pip
+
+install pyreadline
+ wine pip install pyreadline
+
+install zope.interface
+ wine pip install zope.interface
+
+install twisted
+ wine Twisted-12.0.0.win32-py2.7.exe
+
+install ipython (optional)
+ wine pip install ipython
+
+install pycryptopp binary egg
+ wine easy_install https://tahoe-lafs.org/source/tahoe-lafs/deps/tahoe-dep-eggs/pycryptopp-0.5.29-py2.7-win32.egg
+
+fix zope.interface
+ * create zope/__init__.py
+
+****
+test to make sure pylans works in env
+bzr co lp:pylans
+cd pylans
+wine python pylans-launcher.py
+EOF
+edit Makefile to point to pyinstaller
+edit .spec files to point to pylans
+make
+make piconf
+make piof
+wine pidist/pylans.exe
