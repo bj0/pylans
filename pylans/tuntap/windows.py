@@ -66,7 +66,7 @@ try:
     from twisted.python.procutils import which
 except ImportError:
     # no twisted
-    from .which import which
+    from .util.which import which
 
 cmd = which('netsh')[0]
 
@@ -261,7 +261,7 @@ class TunTapWindows(TunTapBase):
         '''Read data from TAP adapter (blocking)'''
         w32e.ResetEvent(self.overlapped_read.hEvent)
 
-        (err, data) = w32f.ReadFile(self._handle, self.mtu, self.overlapped_read)
+        (err, data) = w32f.ReadFile(self._handle, size, self.overlapped_read)
         if err == ERROR_IO_PENDING:
             w32e.WaitForSingleObject(self.overlapped_read.hEvent, w32e.INFINITE)
             size = w32f.GetOverlappedResult(self._handle, self.overlapped_read, False)
