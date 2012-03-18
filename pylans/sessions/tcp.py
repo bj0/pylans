@@ -128,10 +128,14 @@ class TCPSessionManager(SessionManager, protocol.TCPPeerFactory):
         if sid in self.shaking:
             addr = self.shaking[sid][2]
             
+            # use a weakref so the closure doesn't leak memory
+            pself = util.get_weakref_proxy(self)
+            
             # session reset
             def do_reset():
-                logger.warning('doing session reset for {0}'.format(sid.encode('hex')))
-                self.send_handshake(sid, address, relays)
+                logger.warning('doing session reset for {0}'
+                                    .format(sid.encode('hex')))
+                pself.send_handshake(sid, address, relays)
                 
             # create encryption option
             obj = Crypter(session_key, callback=do_reset)
