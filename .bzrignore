@@ -11,3 +11,5 @@ pylans.komodoproject
 cert.pem
 key.pem
 pylans/crypto/python-jpake
+pylans.log
+pylans.log.1
