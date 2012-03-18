@@ -89,13 +89,15 @@ class SessionManager(object):
         if sid in self.shaking:
             address = self.shaking[sid][2]
             
+            # use a weakref so the closure doesn't leak memory
+            pself = util.get_weakref_proxy(self)
             # session reset
             def do_reset():
                 logger.warning('doing session reset for {0}'
                                             .format(sid.encode('hex')))
-                self.send_handshake(sid, address, relays)
+                pself.send_handshake(sid, address, relays)
                 
-            # create encryption option
+            # create encryption option TODO: does this prevent GC
             obj = Crypter(session_key, callback=do_reset)
             self.session_objs[sid] = obj
             
@@ -112,7 +114,7 @@ class SessionManager(object):
         self.close(sid)
 
     def close(self, sid):
-        logger.debug('closing session {0}'.format(sid.encode('hex')))
+        logger.warning('closing session {0}'.format(sid.encode('hex')))
         # remove encryption object
         if sid in self.session_objs:
             del self.session_objs[sid]
@@ -131,7 +133,7 @@ class SessionManager(object):
         aslist = [k for k in self.router.addr_map 
                             if self.router.addr_map[k][-1] == sid]
         for x in aslist:
-            logger.debug('removing addr map {0}->{1}'.format(
+            logger.warning('removing addr map {0}->{1}'.format(
                                 util.decode_mac(x),sid.encode('hex')))
             del self.router.addr_map[x]
         util.emit_async('session-closed', self, sid)
@@ -274,6 +276,7 @@ class SessionManager(object):
     def handle_handshake1(self, type, packet, address, src_id):
 
         logger.info('got handshake1 from {0}'.format(src_id.encode('hex')))
+        
         sig, r, recv1 = packet[:5], packet[5], packet[6:]
         
         if sig != self.router.__signature__:
