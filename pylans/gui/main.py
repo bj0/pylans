@@ -481,7 +481,7 @@ class MainWin(object):
 
             # add new tabs
             da = gtk.DrawingArea()
-            nb.insert_page(da, gtk.Label('Plot'), 0)
+            nb.insert_page(da, gtk.Label('Map'), 0)
             nb.set_current_page(0)
 
             def response(dialog, rid):
@@ -522,23 +522,44 @@ class MainWin(object):
                 cy = (rec.height)/2. - 15
                 r = min(rec.width,rec.height)/2. - 20
 
-                _map = net.router.pm.peer_map
-                _map[net.router.pm._self.id] = net.router.pm.peer_list
-                n = len(_map)
-                th = 2*math.pi/n
-                i = 0
+                # helpers
+                def draw_text(text):
+                    dy = 24
+                    dt = 10
+                    tx, ty, tw, th = ctx.text_extents(text)[:4]
+                    ctx.set_source_rgba(1,1,1,0.7)
+                    ctx.rectangle(x - tw/2. - dt/2., y + dy + ty - dt/2., 
+                                        tw + dt, th + dt)
+                    ctx.fill_preserve()
+                    ctx.set_source_rgba(0,0,0,1)
+                    ctx.stroke()
+                    ctx.move_to(x-tw/2., y+dy)
+                    ctx.show_text(text)
+                    ctx.stroke()
+
+                # get peer map
+                if net.is_running:
+                    _map = net.router.pm.peer_map
+                    _map[net.router.pm._self.id] = net.router.pm.peer_list
+                    dth = 2*math.pi/len(_map)
+                else:
+                    _map = []
+                    x, y = cx, cy
+                    draw_text('network offline')
+                                        
                 loc = {}
+                
                 # Determine Locations
-                for p in _map:
-                    t = th*i
+                for i,p in enumerate(_map):
+                    t = dth*i
                     x = cx+math.sin(t)*r
                     y = cy+math.cos(t)*r
                     loc[p] = (x,y)
                     i += 1
 
+                # Draw Lines
                 ctx.set_source_rgb(0,0,0)
                 ctx.set_line_width(1)
-                # Draw Lines
                 for p in _map:
                     for pc in _map[p]:
                         if pc in _map:
@@ -550,6 +571,7 @@ class MainWin(object):
                             ctx.line_to(*loc[pc])
                             ctx.stroke()
 
+                # draw text boxes
                 ctx.set_dash(())
                 for p in _map:
                     x, y = loc[p][0],loc[p][1]
@@ -567,19 +589,7 @@ class MainWin(object):
                     ctx.set_source_rgb(0,0,0)
                     ctx.stroke()
 
-                    # draw text
-                    dy = 24
-                    dt = 10
-                    tx, ty, tw, th = ctx.text_extents(net.router.pm[p].name)[:4]
-                    ctx.set_source_rgba(1,1,1,0.7)
-                    ctx.rectangle(x - tw/2. - dt/2., y + dy + ty - dt/2., 
-                                        tw + dt, th + dt)
-                    ctx.fill_preserve()
-                    ctx.set_source_rgba(0,0,0,1)
-                    ctx.stroke()
-                    ctx.move_to(x-tw/2., y+dy)
-                    ctx.show_text(net.router.pm[p].name)
-                    ctx.stroke()
+                    draw_text(net.router.pm[p].name)
 
             da.connect('expose-event', expose)
             dlg.connect('response',response)
