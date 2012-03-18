@@ -22,6 +22,7 @@ from . import settings
 #        basedir = cwd
 #sys.path.insert(0, basedir)
 
+# non-persistant global settings
 settings.FILTER = []
 settings.IGNORE = []
 settings.is_admin = True
@@ -45,14 +46,24 @@ def main():
 
 
     op = optparse.OptionParser()
-    op.add_option('--gui', action='store_true', default=False, help='Run with gui (default uses cli)')
-    op.add_option('--daemon', '-D', action='store_true', default=False, help='Run in daemon mode (no input)')
-    op.add_option('--pbi', action='store_true', default=False, help='Run in daemon mode with perspective broker interface')
-    op.add_option('--log-file', '-l', help='Specify log file')
-    op.add_option('--filter', '-F', action="append", type="string", help='add string to log filter')
-    op.add_option('--ignore', action="append", type='string', help='add string to log anti-filter')
-    op.add_option('--short', action='store_true', default=True, help='show shorter log msgs')
-    op.add_option('--long', action='store_false', dest="short", help='show full log msgs')
+    op.add_option('--gui', action='store_true', default=False, 
+                        help='Run with gui (default uses cli)')
+    op.add_option('--daemon', '-D', action='store_true', default=False, 
+                        help='Run in daemon mode (no input)')
+    op.add_option('--pbi', action='store_true', default=False, 
+                        help='Run in daemon mode with perspective broker interface')
+    op.add_option('--logfile', '-l', 
+                        help='Specify log file')
+    op.add_option('--nologfile', action='store_true', default=False,
+                        help='disable logging to file')
+    op.add_option('--filter', '-F', action="append", type="string", 
+                        help='add string to log filter')
+    op.add_option('--ignore', action="append", type='string', 
+                        help='add string to log anti-filter')
+    op.add_option('--short', action='store_true', default=True, 
+                        help='show shorter log msgs')
+    op.add_option('--long', action='store_false', dest="short", 
+                        help='show full log msgs')
     (ops, args) = op.parse_args()
     
     if ops.filter is not None:
@@ -62,6 +73,7 @@ def main():
         
     #exaile's (modified) magic
     class FilterLogger(logging.Logger):
+        '''A simple logger class that supports filtering'''
         class Filter(logging.Filter):
             def filter(self, record):
                 msg = record.getMessage()
@@ -98,18 +110,30 @@ def main():
             log_filter.level = FilterLogger.level
             self.addFilter(log_filter)
 
-    if ops.short:
-        fmt = '[%(levelname)-10s]: \"%(message)s\"'
-    else:
-        fmt = '%(asctime)s:[%(levelname)-10s]>%(name)s:<%(funcName)s>::=> \"%(message)s\"'
+    short_format = '[%(levelname)-10s]: \"%(message)s\"'
+    long_format = '%(asctime)s:[%(levelname)-10s]>%(name)s:<%(funcName)s>::=> \"%(message)s\"'
+    
+    fmt = short_format if ops.short else long_format
 
     logging.setLoggerClass(FilterLogger)
     logging.basicConfig(level=settings.get_option('settings/loglevel', 40),
         format=fmt)
 
-    # needs testing TODO
-    if ops.log_file is not None:
-        logging.basicConfig(filename=ops.log_file)
+    if not ops.nologfile:
+        from logging import handlers
+        import datetime
+
+        log_file = ops.logfile if ops.logfile is not None else 'pylans.log'
+        handler = logging.handlers.RotatingFileHandler(log_file, 
+                                                        mode='ab', 
+                                                        backupCount=3)
+        # create a new logfile each startup
+        handler.doRollover()
+        handler.setFormatter(logging.Formatter(long_format))
+        lgr = logging.getLogger()
+        lgr.addHandler(handler)
+        lgr.log(100, 'Starting logfile at %s', str(datetime.datetime.now()))
+        
         
     if ops.gui: #needs updating TODO
         import gui.main
