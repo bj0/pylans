@@ -148,7 +148,7 @@ class Router(object):
         # bring down iface?
         yield self._tuntap.down()
         # todo determine states: online/offline/disabled/adapterless?
-        self.pm.clear()
+#        self.pm.clear()
         self.sm.stop()
 
         logger.info('router stopped')
@@ -231,10 +231,10 @@ class Router(object):
             #logger.debug('encoding packet {0}'.format(type))
                 type = PacketType.ENCODED
             else:
-                logger.critical('trying to send encrypted packet ({0})'
-                                +' w/out session!!'.format(type))
-                raise Exception, 'trying to send encrypted packet ({0})' \
-                                +' w/out session!!'.format(type)
+                logger.critical(('trying to send encrypted packet ({0})'
+                                +' w/out session!!').format(type))
+                raise Exception, ('trying to send encrypted packet ({0})' 
+                                +' w/out session!!').format(type)
         else:
             logger.debug('sending clear packet ({0})'.format(type))
 
@@ -329,12 +329,8 @@ class Router(object):
 
         logger.debug('registering packet handler for packet type: {0}'.format(type))
 
-        if type in self.handlers:
-            self.handlers[type] += callback
-
-        else:
-           self.handlers[type] = Event()
-           self.handlers[type] += callback
+        handlers = self.handlers.setdefault(type, Event())
+        handlers += callback
 
     def unregister_handler(self, type, callback):
         '''Remove a registered handler for a specific packet type.'''
