@@ -6,6 +6,7 @@ import struct
 import logging
 import socket
 from . import TunTapBase
+from . import util
 
 logger = logging.getLogger(__name__)
 
@@ -63,12 +64,12 @@ class TunTapLinux(TunTapBase):
         self.mode = mode
         self.mtu = 1500 # default mtu
 
-        # close device on exit
-        atexit.register(self.close)
+        # close device on exit (use weakref to prevent keeping this object from gc)
+        atexit.register(util.get_weakref_proxy(self.close))
 
-    def __del__(self):
-        '''close device on object gc'''
-        self.close()
+#    def __del__(self):
+#        '''close device on object gc'''
+#        self.close()
 
     def close(self):
         '''Make sure device is closed.'''
