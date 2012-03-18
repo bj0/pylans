@@ -38,10 +38,11 @@ class Network(object):
         self._name = name
 #        self.name = self._name
         self._id = None
-        self.router = None
-        self.smgr = None
-        self.pmgr = None
         self._running = False
+        
+        # these links should be the only non-weak refs to these objects, 
+        # clear them on disable (and offline?)
+        self.router = None
 
         if enabled is not None:
             self.enabled = enabled
@@ -156,7 +157,8 @@ class Network(object):
             cmd_list = settings.get_option(self._name+'/pre_stop',[])
             yield util.run_cmds(cmd_list)
             
-            event.unregister_handler('peer-added', self.router.pm, self.new_connection)
+            event.unregister_handler('peer-added', self.router.pm, 
+                                     self.new_connection)
             self.router.stop()
             self._running = False
             event.emit('network-stopped', self)
