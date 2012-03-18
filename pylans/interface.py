@@ -221,9 +221,9 @@ class Interface(object):
         if self.get_network(network) is not None:
             settings.set_option(network.name+'/tracker_interval', interval)
 
-    def get_network_setting(self, setting, network=None):
+    def get_network_setting(self, setting, network=None, default=None):
         if self.get_network(network) is not None:
-            return settings.get_option(network.name+'/'+setting, None)
+            return settings.get_option(network.name+'/'+setting, default)
 
     def set_network_setting(self, setting, value, network=None):
         if self.get_network(network) is not None:
