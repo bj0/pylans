@@ -19,15 +19,11 @@
 from __future__ import absolute_import
 from twisted.internet.utils import getProcessOutput
 from twisted.internet import defer, reactor
-from inspect import ismethod, isfunction
-from new import instancemethod
-from functools import wraps
 from struct import pack, unpack
 import subprocess as sp
 import shlex
 import socket
 import threading
-import weakref
 import logging
 from binascii import hexlify, unhexlify
 
@@ -42,7 +38,11 @@ from ..tuntap.util import (
     ip_atol,
     ip_ltoa,
     ip_to_net_host_subnet,
+    get_weakref_proxy,
+    get_weakref
 )
+
+#from .weakref import get_weakref_proxy
 
 def emit_async(*x):
     reactor.callLater(0, event.emit, *x)
@@ -199,131 +199,6 @@ def retry_func(fun, args, kwargs=None, tries=3, delay=0):
             if delay > 0:
                 yield sleep(delay)
 
-class _WeakMethod:
-    """Represent a weak bound method, i.e. a method doesn't keep alive the
-    object that it is bound to. It uses WeakRef which, used on its own,
-    produces weak methods that are dead on creation, not very useful.
-    Typically, you will use the getRef() function instead of using
-    this class directly. """
-
-    def __init__(self, method, notifyDead = None):
-        """
-            The method must be bound. notifyDead will be called when
-            object that method is bound to dies.
-        """
-#        assert ismethod(method)
-
-        try:
-            if method.im_self is not None:
-                if notifyDead is None:
-                    self.objRef = weakref.ref(method.im_self)
-                else:
-                    self.objRef = weakref.ref(method.im_self, notifyDead)
-            else:
-                # unbound method
-                self.objRef = None
-            self.fun = method.im_func
-            self.cls = method.im_class
-        except AttributeError:
-            # not a method            
-            self.objRef = None
-            self.fun = method
-            self.cls = None
-
-    def is_dead(self):
-        return self.objRef is not None and self.objRef() is None
-        
-    def __call__(self):
-        if self.is_dead():
-            #raise ReferenceError, "weakref points to dead object"
-            return None
-        elif self.objRef is not None:
-            # create instancemethod for bound method
-            meth = instancemethod(self.fun, self.objRef(), self.cls)
-        else:
-            # unbound method
-            meth = self.fun
-        return meth
-
-    def __eq__(self, method2):
-        try:
-            return      self.fun      is method2.fun \
-                    and self.objRef() == method2.objRef() 
-#                    and self.objRef() is not None
-        except:
-            return False
-
-    def __hash__(self):
-        return hash(self.fun)
-
-#    def __repr__(self):
-#        dead = ''
-#        if self.objRef() is None:
-#            dead = '; DEAD'
-#        obj = '<%s at %s%s>' % (self.__class__, id(self), dead)
-#        return obj
-
-    def refs(self, weakRef):
-        """Return true if we are storing same object referred to by weakRef."""
-        return self.objRef == weakRef
-        
-class _WeakMethodProxy(_WeakMethod):
-    def __call__(self, *args, **kwargs):
-        fun = _WeakMethod.__call__(self)
-        if fun is None:
-            raise ReferenceError, "object is dead"
-        else:
-            return fun(*args, **kwargs)
-        
-    def __eq__(self, other):
-        try:
-            f1 = _WeakMethod.__call__(self)
-            f2 = _WeakMethod.__call__(other)
-            return type(f1) == type(f2) and f1 == f2
-        except:
-            return False
-            
-#    def __getattr__(self, attr):
-#        return getattr(self.objRef(), attr)
-        
-#    def __setattr__(self, attr, value):
-#        setattr(self.objRef(), attr, value)
-
-#class _WeakFunctionProxy:
-#    def __init__(self, obj):
-#        if not isfunction(obj):
-#            raise ValueError, "obj must be a function"
-#            
-#        self.objRef = weakref.ref(obj)
-#        self._hash = hash(obj)
-#        
-#    def __call__(self, *args, **kwargs):
-#        if self.objRef is not None and self.objRef is None:
-#            raise
-#        
-#    def __hash__(self):
-#        return self._hash
-
-def get_weakref_proxy(obj, notifyDead=None):
-    """
-        Get a weak reference to obj. If obj is a bound method, a _WeakMethod
-        object, that behaves like a WeakRef, is returned, if it is
-        anything else a WeakRef is returned. If obj is an unbound method,
-        a ValueError will be raised.
-    """
-    from . import event
-    if ismethod(obj) or isfunction(obj) or isinstance(obj, event.Event):
-        createRef = _WeakMethodProxy
-#    elif isfunction(obj) or isinstance(obj, e:
-##        createRef = _WeakFunctionProxy
-#        return obj # if it's a normal function, don't bother with weakrefs
-    else:
-        createRef = weakref.proxy
-
-    if notifyDead is None:
-        return createRef(obj)
-    else:
-        return createRef(obj, notifyDead)
 
 
 if __name__ == '__main__':
