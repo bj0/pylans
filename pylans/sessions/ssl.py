@@ -36,7 +36,8 @@ class SSLSessionManager(TCPSessionManager):
         if isinstance(addr, protocol.SSLPeerProtocol):
             self.session_map[sid] = addr
         else:
-            raise ValueError, "session map stores ssl connections, not {0}".format(addr)
+            raise ValueError, "session map stores ssl connections, not {0}"\
+                                    .format(addr)
 
         
     def connect(self, address):
