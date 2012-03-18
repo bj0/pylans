@@ -149,6 +149,25 @@ class PeerManager(object):
         # should announce my change to my peerz
         self.send_announce(self._self)
 
+    def get_direct_addresses(self):
+        # get 'direct' addresses
+        from .net.netifaces import ifaddresses
+        addr = ifaddresses()
+        for dev in addr['AF_INET']:
+            if (dev not in ['lo'] and 
+                    (self.router._tuntap is None or 
+                            dev != self.router._tuntap.ifname)):
+                for address in addr['AF_INET'][dev]:
+                    self._self.direct_addresses.append((address['address'], 
+                                                    self.router.network.port))
+
+        logger.info('got the following direct_addresses: {0}'
+                            .format(self._self.direct_addresses))
+        self._update_pickle()
+
+    def start(self):
+        self.get_direct_addresses()
+
     def add_peer(self, peer):
         '''Add a peer connection'''
         if peer.id not in self.peer_list:
