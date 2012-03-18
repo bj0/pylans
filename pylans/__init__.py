@@ -24,14 +24,17 @@ from . import settings
 
 settings.FILTER = []
 settings.IGNORE = []
+settings.is_admin = True
 
 def root_check():
     import platform
     if platform.system() == 'Linux':
-        return os.geteuid() == 0
+        settings.is_admin = (os.geteuid() == 0)
+        return settings.is_admin
     elif platform.system() == 'Windows':
         from win32com.shell import shell
-        return shell.IsUserAnAdmin()
+        settings.is_admin = shell.IsUserAnAdmin()
+        return settings.is_admin
     else:
         sys.stderr.write('Warning: unknown or unsupported OS\n')
 
