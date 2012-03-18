@@ -17,6 +17,7 @@
 # util.py
 # utility functions
 
+from __future__ import absolute_import
 from inspect import ismethod, isfunction
 from new import instancemethod
 from functools import wraps
@@ -28,6 +29,8 @@ import threading
 import weakref
 import logging
 from binascii import hexlify, unhexlify
+
+from .weakref import get_weakref_proxy, get_weakref
 
 logger = logging.getLogger(__name__)
 
