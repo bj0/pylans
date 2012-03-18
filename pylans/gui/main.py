@@ -144,7 +144,7 @@ class NetPage:
 
             logger.info('removed peer {0}'.format(peer.name))
 
-class MainWin:
+class MainWin(object):
     def __init__(self, iface):
 
         self.builder = gtk.Builder()
@@ -183,12 +183,27 @@ class MainWin:
 
         nws = iface.get_network_list()
 
+        self.__placeholder = None
+
         # This just makes it so disabled networks get put at the end
         nws.sort(key=lambda x: not x.enabled)
-        for nw in nws:
-            self._add_network(None, nw)
+        if len(nws) > 0:
+            for nw in nws:
+                self._add_network(None, nw)
+        else:
+            self._check_empty()
 
         self.iface = iface
+
+    @property
+    def _placeholder(self):
+        if self.__placeholder is None:
+            wgt = gtk.Alignment(xalign=0.5, yalign=0.5)
+            wgt.add(gtk.Label("No Networks."))
+            wgt.show_all()
+            self.__placeholder = wgt
+            
+        return self.__placeholder
 
     def _get_np(self, widget):
         for np in self._net_page.values():
@@ -270,7 +285,10 @@ class MainWin:
             hbox.pack_start(gtk.Label('Name:') ,False, 5, 5)
             hbox.pack_end(entry)
             dlg.vbox.pack_end(hbox, True, True, 0)
-            entry.connect('activate', lambda entry, dialog, res: dlg.response(res))
+#            entry.connect('activate', lambda entry: dlg.response(res))
+            dlg.set_default_response(gtk.RESPONSE_OK)
+            entry.set_activates_default(True)
+            entry.set_text(net.name)
 
             def response(dialog, rid):
                 if rid == gtk.RESPONSE_OK:
@@ -364,9 +382,9 @@ class MainWin:
                 # do BT and ping stuff?
                 self.iface.set_network_ping_interval(ping_interval.get_value(), 
                                                     nw)
-                self.iface.set_network_use_tracker(use_bt, nw)
-                if bt_url != '':
-                    self.iface.set_network_tracker(bt_url, nw)
+                self.iface.set_network_use_tracker(use_bt.get_active(), nw)
+                if bt_url.get_text() != '':
+                    self.iface.set_network_tracker_url(bt_url.get_text(), nw)
 
 
             dialog.destroy()
@@ -413,9 +431,11 @@ class MainWin:
             port_spinbox.set_value(net.port)
 
             enabled_cb.set_active(net.enabled)
-            bt_url.set_text(self.iface.get_network_setting('tracker', net))
+            bt_url.set_text(self.iface.get_network_setting('tracker', 
+                                                            net, default=''))
             ping_interval.set_value(
-                        self.iface.get_network_setting('ping_interval', net))
+                        self.iface.get_network_setting('ping_interval', 
+                                                        net, default=5))
             mcb.set_active(net.adapter_mode == 'TUN')
 
             # add new tabs
@@ -433,15 +453,16 @@ class MainWin:
                     net.adapter_mode = 'TAP' if mcb.get_active() == 0 else 'TUN'
                     net.enabled = enabled_cb.get_active()
 
-                    bt_url = bt_url.get_text()
+#                    bt_url = bt_url.get_text()
                     # do BT and ping stuff?
                     self.iface.set_network_setting('ping_interval',
                                                 ping_interval.get_value(), net)
                     self.iface.set_network_setting('use_tracker', 
                                                 use_bt.get_active(), net)
 
-                    if bt_url != '':
-                        self.iface.set_network_setting('tracker', bt_url, net)
+                    if bt_url.get_text() != '':
+                        self.iface.set_network_setting('tracker', 
+                                                       bt_url.get_text(), net)
 
 
                 dialog.destroy()
@@ -631,8 +652,21 @@ class MainWin:
 
                 logger.info('enabling network {0}'.format(net.name))
 
+    def _check_empty(self):
+        if len(self._netbook) == 0:
+            # notebook empty
+            if self._netbook.page_num(self._placeholder) == -1:
+                self._netbook.append_page(self._placeholder, None)
+                self._netbook.set_show_tabs(False)
+        else:
+            # notebook not empty
+            j = self._netbook.page_num(self._placeholder)
+            if j >= 0:
+                self._netbook.remove_page(j)
+                self._netbook.set_show_tabs(True)
+
     def _add_network(self, mgr, nw):
-        if nw.id not in self._net_page:
+        if nw is not None and nw.id not in self._net_page:
 
             lab = gtk.Label(nw.name)
             lab.set_angle(270)
@@ -649,12 +683,16 @@ class MainWin:
             self._netbook.set_tab_reorderable(np.widget, True)
             np.widget.show_all()
             eb.show_all()
-
+            
+        self._check_empty()
+            
     def _remove_network(self, mgr, nw):
         if nw.id in self._net_page:
             np = self._net_page[nw.id]
             self._netbook.remove_page(self._netbook.page_num(np.widget))
             del self._net_page[nw.id]
+
+        self._check_empty()
 
     def _add_peer(self, net, peer):
         self._net_page[net.id].add_peer(peer)
