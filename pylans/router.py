@@ -26,6 +26,7 @@
 import logging
 import random
 from struct import pack, unpack
+import tuntap
 from tuntap.twisted import TwistedTunTap
 from twisted.internet import reactor, defer
 
@@ -60,12 +61,16 @@ class Router(object):
     #USER = 0x80
 
     def __init__(self, network, tuntap=None):
-        if tuntap is None:
+        if tuntap is None and settings.tap_access:
             mode = network.adapter_mode
-            tuntap = TwistedTunTap(self.send_packet, mode=mode)
+            try:
+                tuntap = TwistedTunTap(self.send_packet, mode=mode)
 
-        logger.info('Initializing router in {0} mode.'
-                        .format('TAP' if tuntap.is_tap else 'TUN'))
+                logger.info('Initializing router in {0} mode.'
+                            .format('TAP' if tuntap.is_tap else 'TUN'))
+            except Exception:
+                logger.error('Could not access tun/tap device.', exc_info=True)
+                settings.tap_access = False
 
         self.handlers = {}
         self._requested_acks = {}
@@ -104,30 +109,35 @@ class Router(object):
     def get_my_address(self):
         '''Get interface address (IP or MAC), return a deferred.
         Override'''
-        pass
+        
 
     @defer.inlineCallbacks
     def start(self):
         '''Start the router.  Starts the tun/tap device and begins listening on
         the UDP port.'''
-        # start tuntap device
-        self._tuntap.start()
+        logger.info('starting router for {0}'.format(self.network.name))
+        
+        # start tuntap device if we have access
+        if self._tuntap is not None:
+            self._tuntap.start()
 
-        # configure tun/tap address (deferred)
-        yield self._tuntap.configure_iface(addr=self.network.virtual_address)
+            # configure tun/tap address (deferred)
+            yield self._tuntap.configure_iface(addr=self.network.virtual_address)
 
-        # set mtu (if possible)
-        mtu = settings.get_option(self.network.name + '/' + 'set_mtu', None)
-        if mtu is None:
+            # set mtu (if possible)
             mtu = settings.get_option(self.network.name + '/' + 'set_mtu', None)
-        if mtu is not None:
-            self._tuntap.set_mtu(mtu)
+            if mtu is None:
+                mtu = settings.get_option(self.network.name + '/' + 'set_mtu', None)
+            if mtu is not None:
+                yield self._tuntap.set_mtu(mtu)
 
-        # bring adapter up
-        yield self._tuntap.up()
-            
-        # get addresses (deferred)
-        yield self.get_my_address()
+            # bring adapter up
+            yield self._tuntap.up()
+                
+            # get addresses (deferred)
+            yield self.get_my_address()
+
+        self.pm.start()
 
         # start connection listener
         self.sm.start(self.network.port)
@@ -144,9 +154,12 @@ class Router(object):
         UDP port.'''
         self.pinger.stop()
         self._bootstrap.stop()
-        self._tuntap.stop()
-        # bring down iface?
-        yield self._tuntap.down()
+        
+        if self._tuntap is not None:
+            self._tuntap.stop()
+            # bring down iface?
+            yield self._tuntap.down()
+
         # todo determine states: online/offline/disabled/adapterless?
 #        self.pm.clear()
         self.sm.stop()
@@ -346,7 +359,7 @@ class TapRouter(Router):
 
     __signature__ = 'PVA'+Router.__version__
 
-    def get_my_address(self, *x):
+    def get_my_address(self, *x): #TODO redo this
         '''Get interface address (IP/MAC)'''
 
         d = defer.Deferred()
@@ -368,21 +381,9 @@ class TapRouter(Router):
 
             # get mac addr
             self.pm._self.addr = self._tuntap.get_mac() #todo check if this is none?
-            logger.debug('tun/tap device returned the following mac: {0}'
+            logger.info('tun/tap device returned the following mac: {0}'
                             .format(util.decode_mac(self.pm._self.addr)))
 
-            # get 'direct' addresses
-            from .net.netifaces import ifaddresses
-            addr = ifaddresses()
-            for dev in addr['AF_INET']:
-                if dev not in ['lo'] and (dev != self._tuntap.ifname):
-                    for address in addr['AF_INET'][dev]:
-                        self.pm._self.direct_addresses.append((address['address'], 
-                                                        self.network.port))
-
-            logger.debug('got the following direct_addresses: {0}'
-                                .format(self.pm._self.direct_addresses))
-            self.pm._update_pickle()
 
             reactor.callLater(0, d.callback, ips)
 
@@ -429,10 +430,13 @@ class TapRouter(Router):
         dst = packet[0:self.addr_size]
 
         # is it ours?
-        if dst == self.pm._self.addr or self._tuntap.is_broadcast(dst):
-            self._tuntap.doWrite(packet)
-            logger.log(0,'writing {0} byte packet to TUN/TAP wire'
-                            .format(len(packet)))
+        if dst == self.pm._self.addr or tuntap.TunTapBase.is_broadcast(dst):
+            if self._tuntap is not None:
+                self._tuntap.doWrite(packet)
+                logger.log(0,'writing {0} byte packet to TUN/TAP wire'
+                                .format(len(packet)))
+            else:
+                logger.log(0, 'got a tun/tap back but have no tun/tap, dropping')
 
 # todo what to do about this
             src_addr = packet[self.addr_size:self.addr_size*2]

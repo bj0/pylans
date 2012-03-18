@@ -26,6 +26,7 @@ from . import settings
 settings.FILTER = []
 settings.IGNORE = []
 settings.is_admin = True
+settings.tap_access = True
 
 def root_check():
     import platform
@@ -144,7 +145,6 @@ def main():
         from twisted.internet import reactor
         iface = Interface()
         reactor.callLater(iface.start_all_networks)
-#        iface.start_all_networks()
         reactor.run()
         
     elif ops.pbi: #needs implimenting and testing TODO
