@@ -128,6 +128,8 @@ class Network(object):
             if self._running:
                 return
                 
+            logger.info('starting network {0}'.format(self.name))
+                
             if self.router is None:
                 self.router = router.get_router(self)
 
@@ -139,8 +141,8 @@ class Network(object):
 
             yield self.router.start()
             self._running = True
-            event.emit('network-started', self)
             logger.info('network {0} started'.format(self.name))
+            event.emit('network-started', self)
 
             #TODO post-start scripts
             cmd_list = settings.get_option(self._name+'/post_start',[])
