@@ -10,7 +10,7 @@ _DEBUG_REFS = True
 
 def _debug_refs(ref):
     if _DEBUG_REFS:
-        logger.critical('weakref referant {0} died.'.format(repr(ref)))
+        logger.debug('weakref referant {0} died.'.format(repr(ref)))
     
 def _debug_refs_wrapper(f):
     def new_f(ref):

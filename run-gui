@@ -1,4 +1,0 @@
-#!/bin/bash
-
-#python -c "from vpn import settings;from gui.main import main; main()"
-python ./main.py --gui
