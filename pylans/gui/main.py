@@ -197,7 +197,7 @@ class MainWin(object):
 
         # This just makes it so disabled networks get put at the end
         # and sort by name
-        nws.sort(key=lambda x: not x.enabled, x.name)
+        nws.sort(key=lambda x: (not x.enabled, x.name))
         if len(nws) > 0:
             for nw in nws:
                 self._add_network(None, nw)
