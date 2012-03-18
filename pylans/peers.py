@@ -111,7 +111,6 @@ class PeerManager(object):
 
         self.router = util.get_weakref_proxy(router)
         self.sm = util.get_weakref_proxy(router.sm)
-        self.addr_map = self.router.addr_map
 
         # packet handlers
         router.register_handler(PacketType.PEER_XCHANGE, self.handle_px)
@@ -120,25 +119,29 @@ class PeerManager(object):
         router.register_handler(PacketType.REGISTER_ACK, self.handle_reg_ack)
         router.register_handler(PacketType.PEER_ANNOUNCE, self.handle_announce)
 
-        @defer.inlineCallbacks
-        def do_session_opened(obj, sid, relays):
-            if self.sm == obj:
-                try:
-                    yield self.try_register(sid, relays=relays)
-                except Exception, e:
-                    # close session if we can't register peer presence
-                    logger.warning('try_register failed: {0}'.format(e))
-#                    import traceback
-#                    logger.debug(traceback.format_exc())
-                    self.sm.close(sid)
-        
-        def do_session_closed(obj, sid):
-            if self.sm == obj:
-                self.remove_peer(self.get(sid))
-            
-        event.register_handler('session-opened', None, do_session_opened)
-        event.register_handler('session-closed', None, do_session_closed)
+        event.register_handler('session-opened', None, self.do_session_opened)
+        event.register_handler('session-closed', None, self.do_session_closed)
 
+
+    @property
+    def addr_map(self):
+        return self.router.addr_map
+
+    @defer.inlineCallbacks
+    def do_session_opened(self, obj, sid, relays):
+        if self.sm == obj:
+            try:
+                yield self.try_register(sid, relays=relays)
+            except Exception, e:
+                # close session if we can't register peer presence
+                logger.warning('try_register failed:', exc_info=True)
+                self.sm.close(sid)
+    
+    def do_session_closed(self, obj, sid):
+        logger.warning('do_session_closed:{},{}'.format(obj,sid.encode('hex')))
+        if self.sm == obj:
+            self.remove_peer(self.get(sid))
+        
 
     def _update_pickle(self):
         self._my_pickle = pickle.dumps(self._self,-1)
@@ -191,7 +194,8 @@ class PeerManager(object):
             event.emit('peer-removed', self, peer)
 
     def _timeout(self, peer):
-        logger.warning('peer {0} on network {1} timed out'.format(peer.name, self.router.network.name))
+        logger.warning('peer {0} on network {1} timed out'
+                            .format(peer.name, self.router.network.name))
         self.sm.close(peer.id) #TODO make this better
 #        self.remove_peer(peer)
 
@@ -261,12 +265,15 @@ class PeerManager(object):
 
         if address is not None:
             self.router.send(PacketType.PEER_ANNOUNCE, peerkle, address)
-            logger.info('sending announce about {0} to {1}'.format(peer.id.encode('hex'), address))
+            logger.info('sending announce about {0} to {1}'
+                            .format(peer.id.encode('hex'), address))
         else:
             for p in self.peer_list.values():
                 if p.id != peer.id:
                     self.router.send(PacketType.PEER_ANNOUNCE, peerkle, p)
-                    logger.info('sending announce about {0} to {1}'.format(peer.id.encode('hex'), p.id.encode('hex')))
+                    logger.info('sending announce about {0} to {1}'
+                                    .format(peer.id.encode('hex'), 
+                                            p.id.encode('hex')))
 
 
     def handle_announce(self, type, packet, address, src_id):
@@ -299,8 +306,8 @@ class PeerManager(object):
         while i < self.MAX_PX_TRIES:
             try:
                 logger.debug('sending PX packet #{0}'.format(i))
-                yield self.router.send (PacketType.PEER_XCHANGE, 
-                    pickle.dumps(self.peer_list, -1), peer.id)
+                yield self.router.send(PacketType.PEER_XCHANGE, 
+                                    pickle.dumps(self.peer_list, -1), peer.id)
                 break            # success
             except Exception, e: # failed
                 i += 1
@@ -372,8 +379,10 @@ class PeerManager(object):
         
 
         if pid not in self.sm.session_map: # It's an (address,port) pair
-            logger.error("Cannot send register to unknown session {0}".format(pid.encode('hex')))
-            raise TypeError("Cannot send register to unknown session {0}".format(pid.encode('hex')))
+            logger.error("Cannot send register to unknown session {0}"
+                                    .format(pid.encode('hex')))
+            raise TypeError("Cannot send register to unknown session {0}"
+                                    .format(pid.encode('hex')))
         addr = pid #if addr is None else addr
 
         if (pid not in self.peer_list):
@@ -401,16 +410,19 @@ class PeerManager(object):
 
         logger.info('trying to connect to previously known peers')
 
-        for pid in self.router.network.known_addresses:
-            if pid not in self:
-                addrs = self.router.network.known_addresses[pid]
-                self.sm.try_greet(addrs)
+        if self.router.network.is_running:
+            for pid in self.router.network.known_addresses:
+                if pid not in self:
+                    addrs = self.router.network.known_addresses[pid]
+                    self.sm.try_greet(addrs)
 
         # re-schedule
-        interval = settings.get_option(self.router.network.name + '/try_old_peers_interval', 60*5)
+        interval = settings.get_option(self.router.network.name + 
+                                        '/try_old_peers_interval', 60*5)
         if interval > 0:
-            reactor.callLater(interval, util.get_weakref_proxy(self.try_old_peers))
-#
+            reactor.callLater(interval, 
+                              util.get_weakref_proxy(self.try_old_peers))
+
 
     def handle_reg(self, type, packet, address, src_id):
         '''Handle incoming reg packet by adding new peer and sending ack.'''
@@ -422,7 +434,8 @@ class PeerManager(object):
             # we sent a reg to ourself?
             logger.warning('we recieved a reg from ourself...')
         elif pi.id not in self.peer_list:
-            logger.info('received a register from a new peer {0}'.format(pi.name))
+            logger.info('received a register from a new peer {0}'
+                            .format(pi.name))
             pi.address = address
             self.add_peer(pi)
         else:
@@ -451,7 +464,8 @@ class PeerManager(object):
             # yea yea...
             logger.warning('we recieved a reg ack from ourself...')
         elif pi.id not in self.peer_list:
-            logger.info('received REG ACK packet from new peer {0}'.format(pi.name))
+            logger.info('received REG ACK packet from new peer {0}'
+                            .format(pi.name))
             pi.address = address
             self.add_peer(pi)
         else:
