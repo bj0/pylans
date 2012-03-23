@@ -262,16 +262,22 @@ class TunTapWindows(TunTapBase):
         w32e.ResetEvent(self.overlapped_read.hEvent)
 
         (err, data) = w32f.ReadFile(self._handle, size, self.overlapped_read)
+        
         if err == ERROR_IO_PENDING:
+            # wait for completion
             w32e.WaitForSingleObject(self.overlapped_read.hEvent, w32e.INFINITE)
-            size = w32f.GetOverlappedResult(self._handle, self.overlapped_read, False)
-        elif err == ERROR_MORE_DATA:
-            logger.warning("ReadFile returned ERROR_MORE_DATA: {0}, {1}"
-                                    .format(type(data), len(data)))
-            return str(data) + self.read(size*2)
-        else:
+
+        try:
             # need to get size
             size = w32f.GetOverlappedResult(self._handle, self.overlapped_read, False)
+        except w32f.error, e:
+            if e[0] == 234: # ERROR_MORE_DATA
+                logger.warning("ReadFile returned ERROR_MORE_DATA (size={0})"
+                                    .format(size))
+                return str(data) + self.read(size*2)
+                
+            else:
+                raise
 
         return str(data[:size])
 
