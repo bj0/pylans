@@ -224,7 +224,10 @@ class Prompt(Cmd):
                 for p in sorted(self.iface.get_peer_list(net), key=sort_key):
                     if not p.is_direct:
                         rp = self.iface.get_peer_info(p.relay_id)
-                        relay = rp.name
+                        if rp is not None:
+                            relay = rp.name
+                        else:
+                            relay = '??{0}'.format(p.relay_id.encode('hex'))
                     else:
                         relay = '-' 
                     print ' {0:15}  {1:10}  {2:<10.3f}  {3:10}'.format(
