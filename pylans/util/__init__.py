@@ -44,6 +44,8 @@ from ..tuntap.util import (
 
 #from .weakref import get_weakref_proxy
 
+from .ipshell import shell
+
 def emit_async(*x):
     reactor.callLater(0, event.emit, *x)
     
@@ -52,32 +54,6 @@ def sleep(secs):
     d = defer.Deferred()
     reactor.callLater(secs, d.callback, None)
     return d
-    
-def prompt(vars, message="Entering Interactive Python Interpreter", 
-        prompt="pylans", exit_msg="Returning to pylans cli"):
-    '''
-        Start an interactive (i)python interpreter on the commandline.
-        This blocks, so don't call from twisted, but in a thread or from Cmd is fine.
-        
-        :param vars: variables to make available to interpreter
-        :type vars: dict
-    '''
-    try:
-        from IPython.Shell import IPShellEmbed
-        ipshell = IPShellEmbed(argv=['-pi1','pylans:\\#>','-p','sh'],
-            banner=message,exit_msg=exit_msg)
-        return  ipshell
-    except ImportError:
-        ## this doesn't quite work right, in that it doesn't go to the right env
-        ## so we just fail.
-        import code
-        import rlcompleter
-        import readline
-        readline.parse_and_bind("tab: complete")
-        # calling this with globals ensures we can see the environment
-        print message
-        shell = code.InteractiveConsole(vars)
-        return shell.interact
 
     
 def run_cmd(cmd):

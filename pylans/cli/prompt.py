@@ -319,7 +319,7 @@ class Prompt(Cmd):
         # setup local vars (user_ns seems broken)
         iface = self.iface
         cli = self
-        p = util.prompt(globals(),'IPython Interactive Console')
+        p = util.shell(globals())
         p()
 
     def help_py(self):
