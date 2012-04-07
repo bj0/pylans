@@ -169,7 +169,7 @@ class Router(object):
     def relay(self, data, dst):
         if dst in self.sm.session_map:
             self.sm.send(data, dst, self.sm.session_map[dst])
-            logger.log(0,'relaying packet to {0}'.format(repr(dst)))
+            logger.trace('relaying packet to {0}'.format(repr(dst)))
 
 
     def send(self, type, data, dst, ack=False, id=0, ack_timeout=None, 
@@ -258,7 +258,7 @@ class Router(object):
 
     def handle_ack(self, type, data, address, src):
         id = unpack('!H', data)[0]
-        logger.log(0,'got ack with id {0}'.format(id))
+        logger.trace('got ack with id {0}'.format(id))
 
         if id in self._requested_acks:
             d, timeout_call = self._requested_acks[id]
@@ -322,7 +322,7 @@ class Router(object):
                         return # don't ack
                         
                 if id > 0: # ACK requested 
-                    logger.log(0,'sending ack {0}'.format(id))
+                    logger.trace('sending ack {0}'.format(id))
                     # ack to unknown sources?  - send greets!
                     self.send(PacketType.ACK, data[2:4], src, clear=True,
                                                             faddress=address)
@@ -407,7 +407,7 @@ class TapRouter(Router):
         # if ip in peer list
         if dst in self.addr_map:
             self.send(PacketType.DATA, packet, self.addr_map[dst])
-            logger.log(0,'got a {0} byte packet on the TUN/TAP wire'
+            logger.trace('got a {0} byte packet on the TUN/TAP wire'
                             .format(len(packet)))
 
         # or if it's a broadcast
@@ -415,7 +415,7 @@ class TapRouter(Router):
             #logger.debug('sending broadcast packet')
             for addr in self.addr_map.values():
                 self.send(PacketType.DATA, packet, addr)
-            logger.log(0,'got a bcast packet on the TUN/TAP wire')
+            logger.trace('got a bcast packet on the TUN/TAP wire')
             
         # if we don't have a direct connection...
         #elif dst in self.relay_map:
@@ -433,10 +433,10 @@ class TapRouter(Router):
         if dst == self.pm._self.addr or tuntap.TunTapBase.is_broadcast(dst):
             if self._tuntap is not None:
                 self._tuntap.doWrite(packet)
-                logger.log(0,'writing {0} byte packet to TUN/TAP wire'
+                logger.trace('writing {0} byte packet to TUN/TAP wire'
                                 .format(len(packet)))
             else:
-                logger.log(0, 'got a tun/tap back but have no tun/tap, dropping')
+                logger.trace( 'got a tun/tap back but have no tun/tap, dropping')
 
 # todo what to do about this
             src_addr = packet[self.addr_size:self.addr_size*2]
