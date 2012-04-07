@@ -76,6 +76,7 @@ class Router(object):
         self._requested_acks = {}
         self.addr_map = {}
 
+        # store weakref so we can be gc'd
         self.network = util.get_weakref_proxy(network)
 
         # check if we are using SSL
@@ -94,12 +95,12 @@ class Router(object):
 #        import watcher
 #        watcher.Watcher('session_map',self.sm.__dict__)
 #        watcher.Watcher('addr_map',self.__dict__)
-        # move this out of router?
+        # move this out of router?TODO
         self.pinger = Pinger(self)
 
         self._tuntap = tuntap
 
-        # move out of router?
+        # move out of router?TODO
         from . import bootstrap
         self._bootstrap = bootstrap.TrackerBootstrap(network)
 
@@ -168,14 +169,17 @@ class Router(object):
 
     def relay(self, data, dst):
         if dst in self.sm.session_map:
-            self.sm.send(data, dst, self.sm.session_map[dst])
             logger.trace('relaying packet to {0}'.format(repr(dst)))
+            self.sm.send(data, dst, self.sm.session_map[dst])
 
 
     def send(self, type, data, dst, ack=False, id=0, ack_timeout=None, 
                 clear=False, faddress=None):
         '''Send a packet of type with data to address.  Address should be an id
-        if the peer is known, since address tuples aren't unique with relaying'''
+        if the peer is known, since address tuples aren't unique with relaying
+        
+        Return deferred for supporting acks
+        '''
         # shortcut for data, to speed up teh BWs
         if type == PacketType.DATA:
             dst_id = dst[1]
@@ -185,14 +189,15 @@ class Router(object):
                 data = self.sm.encode(dst_id, data)
             except KeyError, s:
                 logger.critical('failed to encode data packet: {0}'.format(s))
-                return
+                return #TODO
+                
             # pack
             data = pack('!2H', type, id) + dst_id + self.pm._self.id + data
             # send
             return self.sm.send(data, dst_id, dst)
 
         elif dst == self.sm.id: # send to self? TODO
-            logger.info('tryong to send {0} packet to self'.format(type))
+            logger.info('trying to send {0} packet to self'.format(type))
             return
         elif dst in self.sm.session_map: # sid
             dst_id = dst

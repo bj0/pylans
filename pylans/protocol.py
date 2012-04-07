@@ -18,8 +18,9 @@ class UDPPeerProtocol(protocol.DatagramProtocol):
     def send(self, data, address):
         '''Send data to address'''
         try:
-            self.transport.write(data, address)
             logger.trace('sending {1} bytes on UDP port to {0}'.format(address, len(data)))
+            self.transport.write(data, address)
+            
         except Exception, e:
             logger.warning('UDP send threw exception:\n  {0}'.format(e))
             ##TODO this is here because UDP socket fills up and just dies
