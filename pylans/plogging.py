@@ -1,13 +1,16 @@
 from __future__ import absolute_import
 import logging
 
-short_format = '[%(levelname)-10s]: \"%(message)s\"'
-long_format = '%(asctime)s:[%(levelname)-10s]>%(name)s:<%(funcName)s>::=> \"%(message)s\"'
+short_format = \
+'[%(levelname)-10s]: \"%(message)s\"'
+long_format = \
+'%(asctime)s:[%(levelname)-10s]>%(name)s:<%(funcName)s>::=> \"%(message)s\"'
 
 #exaile's (modified) magic
 class FilterLogger(logging.Logger):
     '''A simple logger class that supports filtering'''
-    class Filter(logging.Filter):
+    class ReFilter(logging.Filter):
+        '''A regex based filter for logging'''
         def filter(self, record):
             msg = record.getMessage()
             def check(s):
@@ -39,17 +42,17 @@ class FilterLogger(logging.Logger):
     def __init__(self, name):
         logging.Logger.__init__(self, name)
 
-        log_filter = self.Filter(name)
+        log_filter = self.ReFilter(name)
         log_filter.level = FilterLogger.level
         self.addFilter(log_filter)
         logging.addLevelName(100, 'ALWAYS')
         logging.addLevelName(5, 'TRACE')
 
-    def always(self, msg):
-        self.log(100, msg)
+    def always(self, *args, **kwargs):
+        self.log(100, *args, **kwargs)
 
-    def trace(self, msg):
-        self.log(5, msg)
+    def trace(self, *args, **kwargs):
+        self.log(5, *args, **kwargs)
         
 
 def short():
