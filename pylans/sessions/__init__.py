@@ -38,9 +38,11 @@ HANDSHAKE2  = 16,
 HANDSHAKE3  = 17,
 CLOSE       = 13)
 
+class UnknownSessionError(Exception): pass
+
+class ArgumentError(Exception): pass
+
 class SessionManager(object):
-
-
     HANDSHAKE_TIMEOUT = 3 #seconds
     def __init__(self, router, proto=None):
 
@@ -114,7 +116,12 @@ class SessionManager(object):
         self.close(sid)
 
     def close(self, sid):
-        logger.warning('closing session {0}'.format(sid.encode('hex')))
+        p = self.router.pm.get(sid, None)
+        if p is None:
+            logger.info('closing session {0}'.format(sid.encode('hex')))
+        else: 
+            logger.info('closing sesson from {0}'.format(p.name))
+            
         # remove encryption object
         if sid in self.session_objs:
             del self.session_objs[sid]
@@ -133,7 +140,7 @@ class SessionManager(object):
         aslist = [k for k in self.router.addr_map 
                             if self.router.addr_map[k][-1] == sid]
         for x in aslist:
-            logger.warning('removing addr map {0}->{1}'.format(
+            logger.debug('removing addr map {0}->{1}'.format(
                                 util.decode_mac(x),sid.encode('hex')))
             del self.router.addr_map[x]
         util.emit_async('session-closed', self, sid)
@@ -143,8 +150,9 @@ class SessionManager(object):
             sid = sid.id
 
         if sid not in self.session_objs:
-            logger.error('unknown session id: {0}'.format(sid.encode('hex')))
-            raise KeyError, "unknown session id: {0}".format(sid.encode('hex'))
+            logger.warning('unknown session id: {0}'.format(sid.encode('hex')))
+            raise UnknownSessionError, "unknown session id: {0}"
+                                            .format(sid.encode('hex'))
         return self.session_objs[sid].encrypt(data)
 
     def decode(self, sid, data):
@@ -152,8 +160,9 @@ class SessionManager(object):
             sid = sid.id
 
         if sid not in self.session_objs:
-            logger.error('unknown session id: {0}'.format(sid.encode('hex')))
-            raise KeyError, "unknown session id: {0}".format(sid.encode('hex'))
+            logger.warning('unknown session id: {0}'.format(sid.encode('hex')))
+            raise UnknownSessionError, "unknown session id: {0}"
+                                            .format(sid.encode('hex'))
         return self.session_objs[sid].decrypt(data)
 
 
@@ -192,7 +201,7 @@ class SessionManager(object):
             logger.error('try_greet called with incorrect parameter: {0}'
                                             .format(addrs))
             #return
-            raise Exception('try_greet called with incorrect parameter: {0}'
+            raise ArgumentError('try_greet called with incorrect parameter: {0}'
                                             .format(addrs))
 
         for address in addrs:
@@ -363,7 +372,7 @@ class SessionManager(object):
             if packet == hashlib.sha256(session_key).digest():
                 self.handshake_done(src_id)
             else:
-                logger.error('handshake with {0} verification failed'
+                logger.warning('handshake with {0} verification failed'
                                                 .format(src_id.encode('hex')))
                 self.handshake_fail(src_id)
             
@@ -391,7 +400,7 @@ class SessionManager(object):
 
     @defer.inlineCallbacks
     def handshake_fail(self, sid, *x):
-        logger.error('handshake failed with {0}'.format(sid.encode('hex')))
+        logger.warning('handshake failed with {0}'.format(sid.encode('hex')))
         # add a delay to prevent hammering
         yield util.sleep(.2)
         self.close(sid)
