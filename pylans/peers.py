@@ -138,7 +138,7 @@ class PeerManager(object):
                 self.sm.close(sid)
     
     def do_session_closed(self, obj, sid):
-        logger.warning('do_session_closed:{},{}'.format(obj,sid.encode('hex')))
+        logger.debug('do_session_closed:{},{}'.format(obj,sid.encode('hex')))
         if self.sm == obj:
             self.remove_peer(self.get(sid))
         
