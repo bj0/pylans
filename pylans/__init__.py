@@ -81,7 +81,7 @@ def main():
                                                         backupCount=3)
         # create a new logfile each startup
         handler.doRollover()
-        handler.setFormatter(logging.Formatter(long_format))
+        handler.setFormatter(logging.Formatter(plogging.long_format))
         lgr = logging.getLogger()
         lgr.addHandler(handler)
         lgr.log(100, 'Starting logfile at %s', str(datetime.datetime.now()))
