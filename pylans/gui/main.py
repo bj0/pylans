@@ -41,10 +41,12 @@ logger = logging.getLogger(__name__)
 def resource_path(res):
     path, file = os.path.split(res)
     if getattr(sys, 'frozen', False):
+        exe = getattr( sys, 'executable', __file__)
+        my_path = os.path.dirname( os.path.realpath( exe ) )
         return os.path.join(
             os.environ.get(
                 "_MEIPASS2",
-                os.path.abspath(".")
+                my_path
             ),
             file
         )
