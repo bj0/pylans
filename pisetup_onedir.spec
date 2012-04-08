@@ -57,6 +57,8 @@ bins = include
 #print 'AB',[x for x in a.binaries]
 #exit()
 
+# add data files
+datas += [('main.ui','pylans\\gui\\main.ui','DATA')]
 
 coll = COLLECT( exe1,
                 exe2,
