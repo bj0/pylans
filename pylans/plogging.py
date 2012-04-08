@@ -78,3 +78,12 @@ settings.IGNORE = []
 logging.basicConfig(level=settings.get_option('settings/loglevel', 40),
     format=long_format)
 
+def _new_exc_handler(exc_type, exc_value, exc_traceback):
+    '''log unhandled exceptions'''
+    import traceback
+    logger = logging.getLogger('unhandled exception')
+    logger.always(traceback.format_exception(exc_type, exc_value, exc_traceback)
+        
+    _exc_handler(exc_type, exc_value, exc_traceback)
+    
+_exc_handler, sys.excepthook = sys.excepthook ,_new_exc_handler
