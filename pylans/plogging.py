@@ -82,7 +82,7 @@ def _new_exc_handler(exc_type, exc_value, exc_traceback):
     '''log unhandled exceptions'''
     import traceback
     logger = logging.getLogger('unhandled exception')
-    logger.always(traceback.format_exception(exc_type, exc_value, exc_traceback))
+    logger.always(''.join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
         
     _exc_handler(exc_type, exc_value, exc_traceback)
     
