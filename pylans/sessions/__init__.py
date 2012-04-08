@@ -151,8 +151,8 @@ class SessionManager(object):
 
         if sid not in self.session_objs:
             logger.warning('unknown session id: {0}'.format(sid.encode('hex')))
-            raise UnknownSessionError, "unknown session id: {0}"
-                                            .format(sid.encode('hex'))
+            raise UnknownSessionError("unknown session id: {0}"
+                                            .format(sid.encode('hex')))
         return self.session_objs[sid].encrypt(data)
 
     def decode(self, sid, data):
@@ -161,8 +161,8 @@ class SessionManager(object):
 
         if sid not in self.session_objs:
             logger.warning('unknown session id: {0}'.format(sid.encode('hex')))
-            raise UnknownSessionError, "unknown session id: {0}"
-                                            .format(sid.encode('hex'))
+            raise UnknownSessionError("unknown session id: {0}"
+                                            .format(sid.encode('hex')))
         return self.session_objs[sid].decrypt(data)
 
 
