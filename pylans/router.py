@@ -262,6 +262,7 @@ class Router(object):
         return d
 
     def handle_ack(self, type, data, address, src):
+        '''called when we get an ack packet'''
         id = unpack('!H', data)[0]
         logger.trace('got ack with id {0}'.format(id))
 
@@ -272,6 +273,7 @@ class Router(object):
             d.callback(id)
 
     def _timeout(self, id):
+        '''called when we don't get an expected ack packet in time'''
         if id in self._requested_acks:
             d = self._requested_acks[id][0]
             del self._requested_acks[id]
@@ -294,6 +296,7 @@ class Router(object):
 
         # ours?
         if dst == self.pm._self.id or dst == '\x00'*16:
+            # packet type
             pt = unpack('!H', data[:2])[0]
             # get dst and src 128-bit ids
             src = data[20:36]
@@ -307,23 +310,20 @@ class Router(object):
                 if pt == PacketType.ENCODED:
                     packet = self.sm.decode(src, data[36:])
                     pt, packet = unpack('!H',packet[:2])[0], packet[2:]
-                    #logger.debug('got encoded packet {0}'.format(pt))
                 else:
                     packet = data[36:]
 
                 id = unpack('!H', data[2:4])[0]
                 pt = PacketType(pt)
 
-                logger.debug('handling {0} packet from {1}'.format(pt, 
+                logger.trace('handling {0} packet from {1}'.format(pt, 
                                                         src.encode('hex')))
                 if pt in self.handlers:
                     try:
                         self.handlers[pt](pt, packet, address, src)
                     except Exception, e:
-#                        import traceback
                         logger.error('packet handler for packet type {1} raised\
-                            exception:\n {0}'.format(e, pt), exc_info=True)
-#                        logger.debug(traceback.format_exc())
+                            exception: {0}'.format(e, pt), exc_info=True)
                         return # don't ack
                         
                 if id > 0: # ACK requested 
