@@ -16,6 +16,7 @@ excludes = ['_gtkagg', '_tkagg', 'bsddb', 'curses', 'email', 'pywin.debugger',
 bbFreeze_Class = Freezer('bbdist', includes=includes, excludes=excludes)
  
 bbFreeze_Class.addScript("pylans-launcher.py")
+bbFreeze_Class.addScript("pylans-launcher.pyw", gui_only=True)
  
 bbFreeze_Class.use_compression = True
 bbFreeze_Class.include_py = True

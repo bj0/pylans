@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 #if platform.system() == 'Windows':
 #    __file__ = sys.argv[0]
 
+
+# non-persistant global settings
 settings.is_admin = True
 settings.tap_access = True
 
