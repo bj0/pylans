@@ -24,6 +24,7 @@ import gtk
 import gobject
 import logging
 import math
+import sys
 from gtk import glade
 from twisted.internet import reactor, defer
 from twisted.python import failure, log, util
@@ -36,6 +37,19 @@ from ..interface import Interface
 from ..mods.chatter import ChatterBox
 
 logger = logging.getLogger(__name__)
+
+def resource_path(res):
+    path, file = os.path.split(res)
+    if getattr(sys, 'frozen', False):
+        return os.path.join(
+            os.environ.get(
+                "_MEIPASS2",
+                os.path.abspath(".")
+            ),
+            file
+        )
+    else:
+        return res
 
 def find_iter(model, obj, col):
 
@@ -156,7 +170,7 @@ class MainWin(object):
     def __init__(self, iface):
 
         self.builder = gtk.Builder()
-        self.builder.add_from_file('pylans/gui/main.ui')
+        self.builder.add_from_file(resource_path('pylans/gui/main.ui'))
 
         # get objects from xml
         self.get_objects()
@@ -254,7 +268,7 @@ class MainWin(object):
     def on_view_log(self, widget):
         '''open up textview widget to display log'''
         builder = gtk.Builder()
-        builder.add_from_file('pylans/gui/main.ui')
+        builder.add_from_file(resource_path('pylans/gui/main.ui'))
 
         win = builder.get_object('log_window')
         leb = builder.get_object('log_level_eb')
@@ -350,7 +364,7 @@ class MainWin(object):
     def on_create(self, *x):
         '''create network clicked'''
         builder = gtk.Builder()
-        builder.add_from_file('pylans/gui/main.ui')
+        builder.add_from_file(resource_path('pylans/gui/main.ui'))
 
         dlg = builder.get_object('new_dialog')
         
@@ -439,7 +453,7 @@ class MainWin(object):
             net = np.net
 
             builder = gtk.Builder()
-            builder.add_from_file('pylans/gui/main.ui')
+            builder.add_from_file(resource_path('pylans/gui/main.ui'))
 
             dlg = builder.get_object('new_dialog')
             dlg.set_default_size(400,dlg.get_size()[1])
