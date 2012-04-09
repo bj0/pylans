@@ -39,6 +39,7 @@ from ..mods.chatter import ChatterBox
 logger = logging.getLogger(__name__)
 
 def resource_path(res):
+    '''path to resource is different if we're frozen with pyinstaller'''
     path, file = os.path.split(res)
     if getattr(sys, 'frozen', False):
         exe = getattr( sys, 'executable', __file__)
