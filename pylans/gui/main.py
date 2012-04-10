@@ -184,6 +184,7 @@ class MainWin(object):
         self.builder.connect_signals(self)
 #        self._selection = self._peer_treeview.get_selection()
 
+        self._main_window.set_title("pylans")
         self._main_window.set_default_size(200,400)
 
         # logging
