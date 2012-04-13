@@ -123,6 +123,9 @@ class Prompt(Cmd):
         elif line.startswith('crit'):
             self.iface.log_level = logging.CRITICAL
             print 'Logging threshold set to CRITICAL'
+            
+        elif line.startswith('tra'):
+            self.iface.log_level = 5
 
         else:
             try:
