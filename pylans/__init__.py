@@ -84,15 +84,16 @@ def main():
         # fix permissions rw-rw-rw-
         try:
             os.fchmod(handler.stream.fileno(),438)
-        except OSError:
+        except:
             pass
         # create a new logfile each startup
         handler.doRollover()
         # fix permissions
         try:
             os.fchmod(handler.stream.fileno(),438)
-        except OSError:
+        except:
             pass
+            
         handler.setFormatter(logging.Formatter(plogging.long_format))
         lgr = logging.getLogger()
         lgr.addHandler(handler)
