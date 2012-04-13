@@ -193,7 +193,8 @@ class PeerManager(object):
                 self.addr_map[peer.addr] = (peer.address, peer.id)
             elif peer.address != self.addr_map[peer.addr][0]:
                 # what to do if the addresses are diff?
-                logger.critical('multiple addresses for mac:{0}'.format(peer.addr_str))
+                logger.critical('multiple addresses for mac:{0}'
+                        .format(peer.addr_str))
                 self.addr_map[peer.addr] = (peer.address, peer.id)
 
             # fire event
@@ -222,6 +223,11 @@ class PeerManager(object):
     def update_peer(self, opi, npi):
         changed = False
         if (opi.relays >= npi.relays and opi.address != npi.address):
+
+            logger.info('peer {0} relay changed: {1}->{2}, {3}->{4}'
+                              .format(opi.name, opi.relays,npi.relays,
+                                      opi.address, npi.address))
+
             # point addr_map at better relay
             self.addr_map[opi.addr] = (npi.address, npi.id)
             #self.sm.session_map[npi.id] = npi.address
@@ -234,33 +240,37 @@ class PeerManager(object):
                 opi.relay_id = npi.relay_id
             
             changed = True
-            logger.info('peer {0} relay changed.'.format(opi.id.encode('hex')))
 
         if opi.addr != npi.addr:
+            logger.info('peer {0} addr changed: {1}->{2}'
+                        .format(opi.name, op.addr_str, npi.addr_str))
             # check for collision? TODO
             if opi.addr in self.addr_map:
                 self.addr_map[npi.addr] = self.addr_map[opi.addr]
                 del self.addr_map[opi.addr]
             opi.addr = npi.addr #todo check if this is None?
             changed = True
-            logger.info('peer {0} addr changed.'.format(opi.id.encode('hex')))
 
         if opi.vip != npi.vip:
+            logger.info('peer {0} vip changed: {1}->{2}'
+                            .format(opi.name, opi.vip_str, npi.vip_str))
             # check for collision TODO
             opi.vip = npi.vip
             changed = True
-            logger.info('peer {0} vip changed.'.format(opi.id.encode('hex')))
 
         if opi.name != npi.name:
+            logger.info('peer {0} name changed to {1}'
+                    .format(opi.name, npi.name))
             opi.name = npi.name
             changed = True
-            logger.info('peer {0} name changed.'.format(opi.id.encode('hex')))
 
         if set(opi.direct_addresses) != set(npi.direct_addresses):
             # combine direct_addresses (w/out dupes)
-            opi.direct_addresses = list(set(opi.direct_addresses).union(set(npi.direct_addresses)))
+            opi.direct_addresses = \
+                list(set(opi.direct_addresses).union(set(npi.direct_addresses)))
             changed = True
-            logger.info('peer {0} good addresses changed. ({1})'.format(opi.id.encode('hex'), opi.direct_addresses))
+            logger.info('peer {0} good addresses changed: ({1})'
+                .format(opi.name, opi.direct_addresses))
             # try to DC
             reactor.callLater(1, self.sm.try_greet, opi.direct_addresses)
 
