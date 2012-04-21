@@ -111,10 +111,10 @@ class EventManager(object):
                         if not cb.valid:
                             handlers -= cb
                     
-                    event.fire(obj, *args, **kwargs)
-
-                    logger.info('event {0} emitted to {1} handlers'
+                    logger.info('emitting event {0} to {1} handlers'
                                 .format(type, len(event)))
+
+                    event.fire(obj, *args, **kwargs)
 
             # fire to object specific handlers
             event = self._handlers.get(type, {}).get(id(obj), None)
