@@ -103,14 +103,29 @@ class NetPage(object):
 
         self.view = gtk.TreeView(self.model)
 
+        def sort_by_ip(model, iter1, iter2):
+            '''sort function for ip column of treeview'''
+            ip1 = int(model.get_value(iter1, 1).split('.')[-1])
+            ip2 = int(model.get_value(iter2, 1).split('.')[-1])
+            return cmp(ip1,ip2)
+        
         cr = gtk.CellRendererText()
         col = gtk.TreeViewColumn('Name',cr,text=0)
+        col.set_resizable(True)
+        col.set_clickable(True)
+        col.set_sort_column_id(0)
         self.view.append_column(col)
 
         cr = gtk.CellRendererText()
-        col = gtk.TreeViewColumn('IP',cr,text=1)
+        col = gtk.TreeViewColumn('Address',cr,text=1)
+        col.set_resizable(True)
+        col.set_clickable(True)
+        col.set_sort_column_id(1)
         self.view.append_column(col)
 
+        self.model.set_sort_column_id(1, gtk.SORT_ASCENDING)
+        self.model.set_sort_func(1, sort_by_ip)
+        
         self.label_eb.add(self.label)
         self.widget.pack_start(self.label_eb, False, False, 0)
         self.widget.pack_end(self.view, True, True, 0)
