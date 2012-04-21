@@ -243,7 +243,7 @@ class PeerManager(object):
 
         if opi.addr != npi.addr:
             logger.info('peer {0} addr changed: {1}->{2}'
-                        .format(opi.name, op.addr_str, npi.addr_str))
+                        .format(opi.name, opi.addr_str, npi.addr_str))
             # check for collision? TODO
             if opi.addr in self.addr_map:
                 self.addr_map[npi.addr] = self.addr_map[opi.addr]
@@ -431,7 +431,8 @@ class PeerManager(object):
             logger.warning('(reg) address {0} timed out'.format(pid.encode('hex')))
             raise Exception('(reg) address {0} timed out'.format(pid.encode('hex')))
         else:
-            logger.debug('address {0} already in peer list'.format(pid))
+            logger.info('{0} ({1}) already in peer list'
+                        .format(self.peer_list[pid].name, pid.encode('hex')))
             defer.returnValue(self.peer_list[pid])
 
     def try_old_peers(self):
