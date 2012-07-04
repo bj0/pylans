@@ -21,20 +21,12 @@ gtk2reactor.install()
 
 import os
 import gtk
-import gobject
 import logging
 import math
 import sys
-from gtk import glade
-from twisted.internet import reactor, defer
-from twisted.python import failure, log, util
-from twisted.spread import pb
-from twisted.cred.credentials import UsernamePassword
-from twisted.internet import error as netError
+from twisted.internet import reactor
 
-from .. import util
 from ..interface import Interface
-from ..mods.chatter import ChatterBox
 
 logger = logging.getLogger(__name__)
 
@@ -199,6 +191,8 @@ class MainWin(object):
         self.builder.connect_signals(self)
 #        self._selection = self._peer_treeview.get_selection()
 
+        self._main_window.set_icon_from_file("pylans/gui/pylans-icon.png")
+#        self._main_window.set_icon_from_file("pylans/gui/connected.png")
         self._main_window.set_title("pylans")
         self._main_window.set_default_size(200,400)
 
@@ -275,7 +269,7 @@ class MainWin(object):
             def menu_pos(menu, user_data=None):
                 r = widget.get_allocation()
                 (x,y) = widget.window.get_origin()
-                return (x+r.x, y+r.y, False)
+                return (x+r.x, y+r.y-3*25, False)
 
             self._main_menu.popup(None, None, menu_pos, 
                                     event.button, event.time)
@@ -658,7 +652,6 @@ class MainWin(object):
                     self.iface.connect_to_address(addr, net)
                 dialog.destroy()
 
-            time = None
             dialog = gtk.MessageDialog(
                         None,
                         gtk.DIALOG_MODAL | gtk.DIALOG_DESTROY_WITH_PARENT,
