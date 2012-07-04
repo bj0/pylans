@@ -14,11 +14,12 @@ for new handhsake version: 3 options
 
 
 TODO:
+connection/peer history? persistant?
+separate log lvl for file and console: requires changing interface's log level setter
 periodically try to DC relay peers?
 should we try hole punching NATs?
 
-convert to TAP: ethernet packets, with mac addresses?
-* Done
+tun not currently worked on/working
 
 TAP:
  iperf from dev to naz: 17.8
@@ -80,89 +81,4 @@ Packet Format:
 
 Routing relay packets:
   Reg/Announce/Peer exchange packets contain .relay field, which are used to assign a 'relay' address to peers that don't have direct connections.  Whenever  packet comes in with info about a peer containing a better relay field, the source of that packet is used as the new relay address.  There is probably a better way to do this.
-
-
-
-encryption chat:
-23:16 <      warner> | what I'd explore is to use the master key in a MAC-and-encrypt mode to establish a session key for each direction
-23:16 < bj0> but don't you eventually have a chance of salt collision?
-23:16 <      warner> | true, you have to evaluate that chance too
-23:17 < bj0> that would probably be easier than using an RSA key
-23:17 <      warner> | but you can probably use salts less frequently
-23:17 <      warner> | so picture this:
-23:18 <      warner> | when A connects to B, it computes a single-use salt X, uses the master key M to produce an HMAC(X), then sends both 
-          X and HMAC(X) to B
-23:18 <      warner> | B checks the HMAC (since it knows M too), then computes K=HASH(X,M)
-23:19 <      warner> | everything that A sends to B will be encrypted with AES(key=K), with an IV that starts with 0 and increments until 
-          it hits 2^64
-23:19 <      warner> | then the connection is dropped and allowed to reconnect (with a new random X)
-23:19 <      warner> | B->A does the same thing, but with a different random X
-23:19 <      warner> | K and X are both 64 bits
-23:20 <      warner> | let's see, actually K=XOR(X,M) is probably ok. (zooko or davidsarah would probably have better notions about that 
-          than me)
-23:20 < bj0> well it rarelly happens, so the price of hashing isn't important
-23:21 <      warner> | yeah, that's a good argument, the same one we use in tahoe: hash everything
-23:21 <      warner> | er, "when in doubt, hash"
-23:21 <      warner> | re-using the same salt X would be bad, so let's estimate the rate of that happening
-23:21 <      warner> | it's a birthday paradox in a 2^64 bit field, so it's roughly a 50% chance when you have 2^32 trials
-23:22 <      warner> | er, what's the AES key size? it's actually 128 bits, right?
-23:22 < bj0> i think so
-23:22 < bj0> actually it can be 128 or 32 i think
-23:22 < bj0> oh wait no
-23:22 < bj0> 128 or 256
-23:22 < bj0> heh
-23:22 <      warner> | yeah, AES-128 has a 128-bit key
-23:22 <      warner> | and a 128-bit block size
-23:23 <      warner> | AES-256 has a 256-bit key and a 128-bit block
-23:23 <      warner> | ok, so sizeof(X)==sizeof(M)==sizeof(K)== 128 bits
-23:23 <      warner> | so it's a birthday paradox in a 2^128 bit field, so 50% at 2^64 trials
-23:23 < bj0> so almost 10^20 connections
-23:24 < bj0> 10^19 and some change
-23:24 <      warner> | say you've got.. 1024 nodes (10 bits), rebooting every 30 minutes (about 16 bits per year)
-23:24 <      warner> | so then you've got 64-10-16 = 2^38 years before you've hit 50% chance of collision
-23:24 <      warner> | that's a comfortable margin :)
-23:25 <      warner> | let's see, universe is about 10^9 years, so that's about 256x the age of the universe
-23:25 <      warner> | yeah, that's comfortable :)
-08:06 < warner> bj0: BTW, don't use that crypto scheme I suggested. It'd be too easy for an MitM to do a replay attack.
-08:08 < bj0> lol :b
-08:09 < bj0> how would they do a replay 
-08:09 <      warner> | MitM copies one session
-08:10 <      warner> | then next time, they send the same salt, so the recipient computes the same key, then they resend the previous 
-          traffic
-08:10 <      warner> | the fix for that is to make the session-setup phase bidirectional
-08:11 <      warner> | the receiving side provides a salt too, and both salts are mixed together with the master key to produce the 
-          session key
-
-
-
-12:22 <  davidsarah> | I don't think it's necessary to understand that example in detail. the general rule is that a machine of size 2^x, 
-          working against 2^y keys, with probability of success 2^-p, can break a key size of x+y+p
-12:23 <      CIA-25> | pycryptopp: zooko@zooko.com * pycryptopp/: misc/build_helpers/show-tool-versions.py: capture cl.exe's stderr rather 
-          than stdout
-12:23 <  davidsarah> | well, a really conservative bound on success probability would be 2^-50 or so
-12:23 <  davidsarah> | which is unlikely enough to never happen in the lifetime of most systems
-12:24 < bj0> how do you translate that into real time though?
--------------------------------------------------------------------------------------------------------------------------------------------
-12:24 <       zooko> | Dcoder: could you connect your buildslave 
-          http://tahoe-lafs.org/buildbot-pycryptopp/builders/Dcoder%20Win7-64%20py2.6 ?
-12:25 <      Dcoder> | certainyl
-12:25 <  davidsarah> | (I mistated the general rule above. it should be that a machine of size 2^x working for time 2^t against 2^y keys, 
-          with probability of success 2^-p can break an x+t+y+p bit key)
-12:26 <  davidsarah> | can find some key of size x+t+y+p bits, I mean
-12:27 < bj0> is t in seconds, or 'time of AES computations'
-12:27 <  davidsarah> | number of AES computations
-12:28 < bj0> because p depends on t, no?
-12:28 <  davidsarah> | (assuming that the size of the machine is measured in terms of AES keysearch circuits, for a completely generic 
-          attack)
-12:29 <  davidsarah> | x+t+y+p is the key size
-12:29 <       zooko> | Dcoder: thanks.
-12:29 <       zooko> | cl: Microsoft (R) C/C++ Optimizing Compiler Version 15.00.30729.01 for x64 Copyright (C) Microsoft Corporation.  
-          All rights reserved.  
-12:29 <       zooko> | Hi nejucomo!
-12:29 <  davidsarah> | 2^y is the number of keys for which ciphertext (for example) is available
-12:30 < bj0> yea
-12:30 <  davidsarah> | the attacker can choose x, then run the attack for time t and get a success probability of 2^-(key size - x - y - t)
-12:31 < bj0> what is realistic x and t through?
-12:31 < bj0> though*
-12:31 <  davidsarah> | well, is your attacker an intelligence agency, or a botnet controller, or a spotty teenager?
 
