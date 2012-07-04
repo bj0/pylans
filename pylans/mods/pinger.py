@@ -66,8 +66,8 @@ class Pinger(object):
         logger.debug('sending ping to {0}'.format(peer.name))
         try:
             st = time()
-            yield self.router.send(PacketType.PING, '', peer, ack=True,
-                                        ack_timeout=self.MAX_PING_TIME)
+            yield self.router.send(PacketType.PING, '', peer.id, clear=True, 
+                                    ack=True, ack_timeout=self.MAX_PING_TIME)
             self.ping_ack(peer, st)
         except Exception, e:
             logger.debug('ping to {0} failed: {1}'.format(peer.name, e))

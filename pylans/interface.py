@@ -33,7 +33,6 @@ global_logger = logging.getLogger()
 
 class Interface(object):
 
-
     def __init__(self, mgr=None):
 
         if mgr is None:
