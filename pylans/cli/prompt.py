@@ -131,6 +131,7 @@ class Prompt(Cmd):
             try:
                 lvl = int(line.strip())
                 self.iface.log_level = lvl
+            except: pass
             finally:
                 print 'Logging threshold is currently {0}'\
                         .format(logging.getLevelName(self.iface.log_level))
