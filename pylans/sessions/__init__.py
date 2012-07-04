@@ -85,7 +85,7 @@ class SessionManager(object):
         Send data to address
         '''
         self.proto.send(data, address)
-        if(sid != None)
+        if(sid != None):
             self.keep_alives[sid] = time.time()
 
     def start(self, port):

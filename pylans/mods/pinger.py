@@ -86,11 +86,11 @@ class Pinger(object):
     def do_pings(self):
         if self.running:
             for peer in self.router.pm.peer_list.values():
-                dt = (time.time() - self.sm.keep_alives.get(peer.id, 0))
+                dt = (time() - self.router.sm.keep_alives.get(peer.id, 0))
                 if( dt > self.interval):
                     self.send_ping(peer)
                 else:
-                    ping_ack(peer, self.sm.keep_alives.get(peer.id, 0))
+                    self.ping_ack(peer, self.router.sm.keep_alives.get(peer.id, 0))
 
     def _ping_timeout(self, peer):
         if peer.id in self.router.pm.peer_list:
