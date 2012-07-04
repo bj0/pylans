@@ -111,7 +111,7 @@ class SessionManager(object):
             # session reset
             def do_reset():
                 logger.warning('doing session reset for {0}'
-                                            .format(sid.encode('hex')))
+                                            , sid.encode('hex'))
                 pself.send_handshake(sid, address, relays)
                 
             # create encryption option TODO: does this prevent GC
@@ -130,7 +130,7 @@ class SessionManager(object):
         '''
         Handle incoming close packet
         '''
-        logger.info('got a close packet from {0}'.format(sid.encode('hex')))
+        logger.info('got a close packet from {0}', sid.encode('hex'))
         self.close(sid)
 
     def close(self, sid):
@@ -139,9 +139,9 @@ class SessionManager(object):
         '''
         p = self.router.pm.get(sid, None)
         if p is None:
-            logger.info('closing session {0}'.format(sid.encode('hex')))
+            logger.info('closing session {0}', sid.encode('hex'))
         else: 
-            logger.info('closing sesson from {0}'.format(p.name))
+            logger.info('closing sesson from {0}', p.name)
             
         # remove encryption object
         if sid in self.session_objs:
@@ -163,8 +163,8 @@ class SessionManager(object):
         aslist = [k for k in self.router.addr_map 
                             if self.router.addr_map[k][-1] == sid]
         for x in aslist:
-            logger.debug('removing addr map {0}->{1}'.format(
-                                util.decode_mac(x),sid.encode('hex')))
+            logger.debug('removing addr map {0}->{1}', 
+                                util.decode_mac(x),sid.encode('hex'))
             del self.router.addr_map[x]
         util.emit_async('session-closed', self, sid)
 
@@ -176,7 +176,7 @@ class SessionManager(object):
             sid = sid.id
 
         if sid not in self.session_objs:
-            logger.warning('unknown session id: {0}'.format(sid.encode('hex')))
+            logger.warning('unknown session id: {0}', sid.encode('hex'))
             raise UnknownSessionError("unknown session id: {0}"
                                             .format(sid.encode('hex')))
         return self.session_objs[sid].encrypt(data)
@@ -189,7 +189,7 @@ class SessionManager(object):
             sid = sid.id
 
         if sid not in self.session_objs:
-            logger.warning('unknown session id: {0}'.format(sid.encode('hex')))
+            logger.warning('unknown session id: {0}', sid.encode('hex'))
             raise UnknownSessionError("unknown session id: {0}"
                                             .format(sid.encode('hex')))
         return self.session_objs[sid].decrypt(data)
@@ -228,21 +228,21 @@ class SessionManager(object):
 
         elif not isinstance(addrs, list):
             logger.error('try_greet called with incorrect parameter: {0}'
-                                            .format(addrs))
+                                            , addrs)
             #return
             raise ArgumentError('try_greet called with incorrect parameter: {0}'
                                             .format(addrs))
 
         for address in addrs:
-            logger.info('sending greet to {0}'.format(address))
+            logger.info('sending greet to {0}', address)
             for i in range(3):
-                logger.debug('sending greet packet #{0}'.format(i))
+                logger.debug('sending greet packet #{0}', i)
                 try:
                     ret = yield self.send_greet(address, ack=True)
                     return # stop trying if successful TODO: return address? 
                 except Exception, e:
                     logger.info('(greet) address {0} failed: {1}'
-                                    .format(address, e))
+                                    , address, e)
                     # just keep trying...
 
         logger.info('Could not establish connection with addresses.')
@@ -277,7 +277,7 @@ class SessionManager(object):
                 if pi.relays > 0:
                     import copy
                     logger.info('direct connection established with {0}'
-                                .format(src_id.encode('hex')))
+                                , src_id.encode('hex'))
 
                     # update peer
                     pn = copy.copy(pi)
@@ -292,7 +292,7 @@ class SessionManager(object):
         '''Send handshake packet to session id or address'''
         # todo make retry for fails
         if sid not in self.shaking:
-            logger.info('sending handshake to {0}'.format(sid.encode('hex')))
+            logger.info('sending handshake to {0}', sid.encode('hex'))
 
             j = jpake.JPAKE(self.router.network.key)
             send1 = j.pack_one(j.one())
@@ -312,17 +312,17 @@ class SessionManager(object):
 
         else:
             logger.info('send_handshake called on {0} while already shaking'
-                        .format(sid.encode('hex')))
+                        , sid.encode('hex'))
 
     def handle_handshake1(self, type, packet, address, src_id):
         '''Handle first handshake packet'''
-        logger.info('got handshake1 from {0}'.format(src_id.encode('hex')))
+        logger.info('got handshake1 from {0}', src_id.encode('hex'))
         
         sig, r, recv1 = packet[:5], packet[5], packet[6:]
         
         if sig != self.router.__signature__:
             logger.warning(('got a handshake1 from peer {0} using an '+
-                'incompatible version').format(src_id.encode('hex')))
+                'incompatible version'), src_id.encode('hex'))
             return self.handshake_fail(src_id)
 
         r = unpack('!B', r)[0]
@@ -343,7 +343,7 @@ class SessionManager(object):
 
         send2 = j.pack_two(j.two(j.unpack_one(recv1)))
         j._two = True
-        logger.info('sending handshake2 to {0}'.format(src_id.encode('hex')))
+        logger.info('sending handshake2 to {0}', src_id.encode('hex'))
         return self.router.send(PacketType.HANDSHAKE2, send2, src_id, clear=True)
         
 
@@ -351,13 +351,13 @@ class SessionManager(object):
     def handle_handshake2(self, type, packet, address, src_id):
         '''Handle second handshake packet'''
         if src_id in self.shaking:
-            logger.info('got handshake2 from {0}'.format(src_id.encode('hex')))
+            logger.info('got handshake2 from {0}', src_id.encode('hex'))
             j = self.shaking[src_id][0]
             
             # make sure we got hs1 before hs2
             if not j._two:
                 logger.warning('handshake2 arrived but never got handshake1 '
-                                +'from {0}'.format(src_id.encode('hex')))
+                                +'from {0}', src_id.encode('hex'))
                 self.handshake_fail(src_id)
                 return
                 
@@ -366,14 +366,14 @@ class SessionManager(object):
             hsh = hashlib.sha256(session_key).digest()
                         
             for i in range(3): # 3 retrys
-                logger.info('sending handshake3 to {0}'.format(src_id.encode('hex')))
+                logger.info('sending handshake3 to {0}', src_id.encode('hex'))
                 try:
                     yield self.router.send(PacketType.HANDSHAKE3, hsh, src_id, 
                                                 clear=True, ack=True)
                     break
                 except Exception, e:
                     logger.warning('handshake3 to {0} timed out'
-                                        .format(src_id.encode('hex')))
+                                        , src_id.encode('hex'))
                     # let it retry...
             else:
                 # all hs3 packets timed out
@@ -388,36 +388,36 @@ class SessionManager(object):
                 self.shaking[src_id] += [session_key,]
         else:
             logger.warning(('got handshake2 from {0}, but not currently'+
-                                ' shaking').format(src_id.encode('hex')))
+                                ' shaking'), src_id.encode('hex'))
         
     def handle_handshake3(self, type, packet, address, src_id):
         '''Handle third handshake packet'''
         if src_id in self.shaking:
             if len(self.shaking[src_id]) < 4: # we haven't got handshake2 yet
                 logger.info('got handshake3 before handshake2 from {0}'
-                                                .format(src_id.encode('hex')))
+                                                , src_id.encode('hex'))
 #                handshake_fail(src_id)
                 self.shaking[src_id] += [packet,]
                 return
                 
-            logger.info('got handshake3 from {0}'.format(src_id.encode('hex')))
+            logger.info('got handshake3 from {0}', src_id.encode('hex'))
             session_key = self.shaking[src_id][3]
             
             if packet == hashlib.sha256(session_key).digest():
                 self.handshake_done(src_id)
             else:
                 logger.warning('handshake with {0} verification failed'
-                                                .format(src_id.encode('hex')))
+                                                , src_id.encode('hex'))
                 self.handshake_fail(src_id)
             
         else:
             logger.warning(('got handshake3 from {0}, but not currently'+
-                            ' shaking').format(src_id.encode('hex')))
+                            ' shaking'), src_id.encode('hex'))
         
 
     def handshake_done(self, sid):
         '''Called when a handshake finishes (successfully)'''
-        logger.info('handshake finished with {0}'.format(sid.encode('hex')))
+        logger.info('handshake finished with {0}', sid.encode('hex'))
         if sid in self.shaking:
             # todo - session key size?
             session_key = self.shaking[sid][3]
@@ -431,13 +431,13 @@ class SessionManager(object):
     def handshake_timeout(self, sid):
         '''Called when a handshake times out'''
         if sid in self.shaking and sid not in self.session_map:
-            logger.warning('handshake with {0} timed out'.format(sid.encode('hex')))
+            logger.warning('handshake with {0} timed out', sid.encode('hex'))
             self.close(sid)
 
     @defer.inlineCallbacks
     def handshake_fail(self, sid, *x):
         '''Called when a handshake fails'''
-        logger.warning('handshake failed with {0}'.format(sid.encode('hex')))
+        logger.warning('handshake failed with {0}', sid.encode('hex'))
         # add a delay to prevent hammering
         yield util.sleep(.2)
         self.close(sid)

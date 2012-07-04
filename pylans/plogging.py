@@ -59,28 +59,35 @@ class FilterLogger(logging.Logger):
         logging.addLevelName(5, 'TRACE')
 
     def always(self, *args, **kwargs):
-        self.log(100, BaceMessage(*args, **kwargs))
+        self.log(100, *args, **kwargs)
 
     def trace(self, *args, **kwargs):
-        self.log(5, BaceMessage(*args, **kwargs))
+        if self.level > 5:
+            self.log(5, BraceMessage(*args, **kwargs))
 
     def warning(self, *args, **kwargs):
-        super(FilterLogger, self).warning(BraceMessage(*args, **kwargs))
+        if self.level > logging.WARNING:
+            super(FilterLogger, self).warning(BraceMessage(*args, **kwargs))
         
     def warn(self, *args, **kwargs):
-        super(FilterLogger, self).warn(BraceMessage(*args, **kwargs))
+        if self.level > logging.WARNING:
+            super(FilterLogger, self).warn(BraceMessage(*args, **kwargs))
 
     def error(self, *args, **kwargs):
-        super(FilterLogger, self).error(BraceMessage(*args, **kwargs))
+        if self.level > logging.ERROR:
+            super(FilterLogger, self).error(BraceMessage(*args, **kwargs))
         
     def debug(self, *args, **kwargs):
-        super(FilterLogger, self).debug(BraceMessage(*args, **kwargs))
+        if self.level > logging.DEBUG:
+            super(FilterLogger, self).debug(BraceMessage(*args, **kwargs))
         
     def fatal(self, *args, **kwargs):
-        super(FilterLogger, self).fatal(BraceMessage(*args, **kwargs))
+        if self.level > logging.FATAL:
+            super(FilterLogger, self).fatal(BraceMessage(*args, **kwargs))
         
     def critical(self, *args, **kwargs):
-        super(FilterLogger, self).critical(BraceMessage(*args, **kwargs))
+        if self.level > logging.CRITICAL:
+            super(FilterLogger, self).critical(BraceMessage(*args, **kwargs))
         
         
 

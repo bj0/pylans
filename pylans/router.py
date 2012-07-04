@@ -66,8 +66,8 @@ class Router(object):
             try:
                 tuntap = TwistedTunTap(self.send_packet, mode=mode)
 
-                logger.info('Initializing router in {0} mode.'
-                            .format('TAP' if tuntap.is_tap else 'TUN'))
+                logger.info('Initializing router in {0} mode.',
+                            'TAP' if tuntap.is_tap else 'TUN')
             except Exception:
                 logger.error('Could not access tun/tap device.', exc_info=True)
                 settings.tap_access = False
@@ -81,13 +81,13 @@ class Router(object):
 
         # check if we are using SSL
         if settings.get_option(self.network.name + '/' + 'use_ssl', False):
-            logger.info('network {0} using SSL mode'.format(self.network.name))
+            logger.info('network {0} using SSL mode', self.network.name)
             self.sm = sessions.SSLSessionManager(self)
         elif settings.get_option(self.network.name + '/' + 'use_tcp', False):
-            logger.info('network {0} using TCP mode'.format(self.network.name))
+            logger.info('network {0} using TCP mode', self.network.name)
             self.sm = sessions.TCPSessionManager(self)
         else:
-            logger.info('network {0} using UDP mode'.format(self.network.name))
+            logger.info('network {0} using UDP mode', self.network.name)
             self.sm = sessions.SessionManager(self)
         self.pm = PeerManager(self)
 
@@ -116,7 +116,7 @@ class Router(object):
     def start(self):
         '''Start the router.  Starts the tun/tap device and begins listening on
         the UDP port.'''
-        logger.info('starting router for {0}'.format(self.network.name))
+        logger.info('starting router for {0}', self.network.name)
         
         # start tuntap device if we have access
         if self._tuntap is not None:
@@ -143,7 +143,7 @@ class Router(object):
         # start connection listener
         self.sm.start(self.network.port)
 
-        logger.info('router started, listening on port {0}'.format(self.network.port))
+        logger.info('router started, listening on port {0}', self.network.port)
 
         self._bootstrap.start()
         self.pinger.start()
@@ -169,7 +169,7 @@ class Router(object):
 
     def relay(self, data, dst):
         if dst in self.sm.session_map:
-            logger.trace('relaying packet to {0}'.format(repr(dst)))
+            logger.trace('relaying packet to {0}', repr(dst))
             self.sm.send(data, dst, self.sm.session_map[dst])
 
 
@@ -188,7 +188,7 @@ class Router(object):
             try:
                 data = self.sm.encode(dst_id, data)
             except KeyError, s:
-                logger.critical('failed to encode data packet: {0}'.format(s))
+                logger.critical('failed to encode data packet: {0}', s)
                 return #TODO
                 
             # pack
@@ -197,7 +197,7 @@ class Router(object):
             return self.sm.send(data, dst_id, dst)
 
         elif dst == self.sm.id: # send to self? TODO
-            logger.info('trying to send {0} packet to self'.format(type))
+            logger.info('trying to send {0} packet to self', type)
             return
         elif dst in self.sm.session_map: # sid
             dst_id = dst
@@ -227,7 +227,7 @@ class Router(object):
             self.sm.try_greet(faddress)
             return #TODO does this prevent acks on greets?
         else:
-            logger.error('cannot send to unknown dest {0}'.format(repr(dst)))
+            logger.error('cannot send to unknown dest {0}', repr(dst))
             raise Exception, 'cannot send to unknown dest {0}'.format(repr(dst))
 
         # want ack?
@@ -246,15 +246,15 @@ class Router(object):
         if data != '' and not clear:
             if dst_id in self.sm.session_map:
                 data = self.sm.encode(dst_id, pack('!H',type) + data)
-            #logger.debug('encoding packet {0}'.format(type))
+            #logger.debug('encoding packet {0}', type)
                 type = PacketType.ENCODED
             else:
                 logger.critical(('trying to send encrypted packet ({0})'
-                                +' w/out session!!').format(type))
+                                +' w/out session!!'), type)
                 raise Exception, ('trying to send encrypted packet ({0})' 
                                 +' w/out session!!').format(type)
         else:
-            logger.debug('sending clear packet ({0})'.format(type))
+            logger.debug('sending clear packet ({0})', type)
 
         data = pack('!2H', type, id) + dst_id + self.pm._self.id + data
         self.sm.send(data, dst_id, dst)
@@ -264,7 +264,7 @@ class Router(object):
     def handle_ack(self, type, data, address, src):
         '''called when we get an ack packet'''
         id = unpack('!H', data)[0]
-        logger.trace('got ack with id {0}'.format(id))
+        logger.trace('got ack with id {0}', id)
 
         if id in self._requested_acks:
             d, timeout_call = self._requested_acks[id]
@@ -316,18 +316,18 @@ class Router(object):
                 id = unpack('!H', data[2:4])[0]
                 pt = PacketType(pt)
 
-                logger.trace('handling {0} packet from {1}'.format(pt, 
-                                                        src.encode('hex')))
+                logger.trace('handling {0} packet from {1}', pt, 
+                                                        src.encode('hex'))
                 if pt in self.handlers:
                     try:
                         self.handlers[pt](pt, packet, address, src)
                     except Exception, e:
                         logger.error('packet handler for packet type {1} raised\
-                            exception: {0}'.format(e, pt), exc_info=True)
+                            exception: {0}', e, pt, exc_info=True)
                         return # don't ack
                         
                 if id > 0: # ACK requested 
-                    logger.trace('sending ack {0}'.format(id))
+                    logger.trace('sending ack {0}', id)
                     # ack to unknown sources?  - send greets!
                     self.send(PacketType.ACK, data[2:4], src, clear=True,
                                                             faddress=address)
@@ -345,7 +345,7 @@ class Router(object):
         '''Register a handler for a specific packet type.  Handles will be
         called as 'callback(type, data, address, src_id)'.'''
 
-        logger.debug('registering packet handler for packet type: {0}'.format(type))
+        logger.debug('registering packet handler for packet type: {0}', type)
 
         handlers = self.handlers.setdefault(type, Event())
         handlers += callback
@@ -354,7 +354,7 @@ class Router(object):
         '''Remove a registered handler for a specific packet type.'''
 
         logger.debug('unregistering packet handler for packet type: \
-                     {0}'.format(type))
+                     {0}', type)
 
         if type in self.handlers:
             self.handlers[type] -= callback
@@ -373,13 +373,13 @@ class TapRouter(Router):
             if ips is None:
                 ips = self._tuntap.get_ips()
                 logger.debug('tun/tap device returned the following ips: {0}'
-                                    .format(ips))
+                                    , ips)
             if len(ips) > 0:
                 if self.pm._self.vip_str not in ips:
                     logger.critical('TAP addresses ({0}) don\'t contain \
                                     configured address ({1}), taking address\
-                                    from adapter ({2})'.format(ips,
-                                            self.pm._self.vip_str, ips[0]))
+                                    from adapter ({2})', ips,
+                                            self.pm._self.vip_str, ips[0])
                     self.pm._self.vip = util.encode_ip(ips[0])
             else:
                 logger.critical('TAP adapater has no addresses')
@@ -387,7 +387,7 @@ class TapRouter(Router):
             # get mac addr
             self.pm._self.addr = self._tuntap.get_mac() #todo check if this is none?
             logger.info('tun/tap device returned the following mac: {0}'
-                            .format(util.decode_mac(self.pm._self.addr)))
+                            , util.decode_mac(self.pm._self.addr))
 
 
             reactor.callLater(0, d.callback, ips)
@@ -395,7 +395,7 @@ class TapRouter(Router):
         # Grap VIP, so we display the right one
         ips = self._tuntap.get_ips()
         logger.debug('tun/tap device returned the following ips: {0}'
-                            .format(ips))
+                            , ips)
         if len(ips) == 1 and ips[0] == '0.0.0.0': # interface not ready yet?
             logger.warning('Adapter not read, delaying...')
             reactor.callLater(3, do_ips)
@@ -413,7 +413,7 @@ class TapRouter(Router):
         if dst in self.addr_map:
             self.send(PacketType.DATA, packet, self.addr_map[dst])
             logger.trace('got a {0} byte packet on the TUN/TAP wire'
-                            .format(len(packet)))
+                            , len(packet))
 
         # or if it's a broadcast
         elif self._tuntap.is_broadcast(dst):
@@ -427,7 +427,7 @@ class TapRouter(Router):
         #    self.send(self.DATA, packet, self.relay_map[dst])
         else:
             logger.debug('got packet on wire to unknown destination: \
-                         {0}'.format(dst.encode('hex')))
+                         {0}', dst.encode('hex'))
 
     def recv_packet(self, packet, src, address):
         '''Got a data packet from a peer, need to inject it into tun/tap'''
@@ -438,8 +438,8 @@ class TapRouter(Router):
         if dst == self.pm._self.addr or tuntap.TunTapBase.is_broadcast(dst):
             if self._tuntap is not None:
                 self._tuntap.doWrite(packet)
-                logger.trace('writing {0} byte packet to TUN/TAP wire'
-                                .format(len(packet)))
+                logger.trace('writing {0} byte packet to TUN/TAP wire',
+                                len(packet))
             else:
                 logger.trace( 'got a tun/tap back but have no tun/tap, dropping')
 
@@ -448,7 +448,7 @@ class TapRouter(Router):
             if src_addr not in self.addr_map: # negligible speed hit
                 self.addr_map[src_addr] = (address, src)
                 logger.warning('got new addr from packet!: {0} (for {1})'
-                            .format(src_addr.encode('hex'), src.encode('hex')))
+                            , src_addr.encode('hex'), src.encode('hex'))
         else:
             # no, odd
             self.send_packet(packet)
@@ -471,7 +471,7 @@ class TunRouter(Router):
             if self.pm._self.vip_str not in ips:
                 logger.critical('TUN addresses ({0}) don\'t contain configured'
                             +' address ({1}), taking address from adapter ({2})'
-                            .format(ips, self.pm._self.vip_str, ips[0]))
+                            , ips, self.pm._self.vip_str, ips[0])
                 self.pm._self.vip = util.encode_ip(ips[0])
                 self.pm._self.addr = self.pm._self.vip
         else:
@@ -491,7 +491,7 @@ class TunRouter(Router):
             self.send(PacketType.DATA, packet, self.addr_map[dst])
         else:
             logger.debug('got packet on wire to unknown destination: {0}'
-                                                .format(dst.encode('hex')))
+                                                , dst.encode('hex'))
 
     def recv_packet(self, packet):
         '''Got a data packet from a peer, need to inject it into tun/tap'''
