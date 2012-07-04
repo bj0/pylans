@@ -1,4 +1,3 @@
-#TODO exc_info=True broken by BraceMessage
 from __future__ import absolute_import
 import logging
 
@@ -6,16 +5,6 @@ short_format = \
 '[%(levelname)-10s]: \"%(message)s\"'
 long_format = \
 '%(asctime)s:[%(levelname)-10s]>%(name)s:<%(funcName)s>::=> \"%(message)s\"'
-
-class BraceMessage(object):
-    '''BraceMessage from logutils'''
-    def __init__(self, fmt, *args, **kwargs):
-        self.fmt = fmt
-        self.args = args
-        self.kwargs = kwargs
-
-    def __str__(self):
-        return self.fmt.format(*self.args, **self.kwargs)
 
 #exaile's (modified) magic
 class FilterLogger(logging.Logger):
@@ -59,36 +48,40 @@ class FilterLogger(logging.Logger):
         logging.addLevelName(100, 'ALWAYS')
         logging.addLevelName(5, 'TRACE')
 
-    def always(self, *args, **kwargs):
-        self.log(100, *args, **kwargs)
+    def always(self, fmt, *args, **kwargs):
+        self.log(100, fmt.format(*args), **kwargs)
 
-    def trace(self, *args, **kwargs):
-        if self.level > 5:
-            self.log(5, BraceMessage(*args, **kwargs))
+    def trace(self, fmt, *args, **kwargs):
+        if global_logger.level <= 5:
+            self.log(5, fmt.format(*args), **kwargs)
 
-    def warning(self, *args, **kwargs):
-        if self.level > logging.WARNING:
-            super(FilterLogger, self).warning(BraceMessage(*args, **kwargs))
+    def debug(self, fmt, *args, **kwargs):
+        if global_logger.level <= logging.DEBUG:
+            super(FilterLogger, self).debug(fmt.format(*args), **kwargs)
         
-    def warn(self, *args, **kwargs):
-        if self.level > logging.WARNING:
-            super(FilterLogger, self).warn(BraceMessage(*args, **kwargs))
+    def info(self, fmt, *args, **kwargs):
+        if global_logger.level <= logging.INFO:
+            super(FilterLogger, self).info(fmt.format(*args), **kwargs)
 
-    def error(self, *args, **kwargs):
-        if self.level > logging.ERROR:
-            super(FilterLogger, self).error(BraceMessage(*args, **kwargs))
+    def warning(self, fmt, *args, **kwargs):
+        if global_logger.level <= logging.WARNING:
+            super(FilterLogger, self).warning(fmt.format(*args), **kwargs)
         
-    def debug(self, *args, **kwargs):
-        if self.level > logging.DEBUG:
-            super(FilterLogger, self).debug(BraceMessage(*args, **kwargs))
+    def warn(self, fmt, *args, **kwargs):
+        if global_logger.level <= logging.WARNING:
+            super(FilterLogger, self).warn(fmt.format(*args), **kwargs)
+
+    def error(self, fmt, *args, **kwargs):
+        if global_logger.level <= logging.ERROR:
+            super(FilterLogger, self).error(fmt.format(*args), **kwargs)
         
-    def fatal(self, *args, **kwargs):
-        if self.level > logging.FATAL:
-            super(FilterLogger, self).fatal(BraceMessage(*args, **kwargs))
+    def fatal(self, fmt, *args, **kwargs):
+        if global_logger.level <= logging.FATAL:
+            super(FilterLogger, self).fatal(fmt.format(*args), **kwargs)
         
-    def critical(self, *args, **kwargs):
-        if self.level > logging.CRITICAL:
-            super(FilterLogger, self).critical(BraceMessage(*args, **kwargs))
+    def critical(self, fmt, *args, **kwargs):
+        if global_logger.level <= logging.CRITICAL:
+            super(FilterLogger, self).critical(fmt.format(*args), **kwargs)
         
         
 
@@ -107,6 +100,8 @@ logging.setLoggerClass(FilterLogger)
 
 # settings instantiates a logger (so we setLoggerClass first)
 from . import settings
+
+global_logger = logging.getLogger()
 
 # non-persistant global settings
 settings.FILTER = []
