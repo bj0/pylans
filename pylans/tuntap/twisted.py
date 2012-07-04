@@ -82,11 +82,11 @@ class TwistedTTL(TunTapLinux):
     def configure_iface(self, **options):
 
         logger.info('configuring interface {1} to: {0}'
-                                    .format(options, self.ifname))
+                                    , options, self.ifname)
         def response(retval):
             if retval != 0:
                 logger.error('error configuring interface {1} to: {0}'
-                                    .format(options, self.ifname))
+                                    ,options, self.ifname)
                 raise Exception('retval={0}'.format(retval))
 
         # check for spurious args
@@ -94,7 +94,7 @@ class TwistedTTL(TunTapLinux):
                             if arg not in ['addr','mtu','hwaddr']]
         if len(err) > 0:
             logger.error('configure_iface passed unrecognized arguments: {0}'
-                    .format(err))
+                    , err)
 
         if 'addr' in options:
             addr = options['addr']
@@ -134,8 +134,8 @@ class TwistedTTL(TunTapLinux):
 #        except:
 #            import traceback
 #            traceback.print_exc()
-#            logger.warning('Got Exception trying to os.write()\nself.f: {0}\ndata: {1} ({2})'.format(
-#                        self.f, data.encode('hex'), len(data)))
+#            logger.warning('Got Exception trying to os.write()\nself.f: {0}\ndata: {1} ({2})', 
+#                        self.f, data.encode('hex'), len(data))
 
     def fileno(self):
         '''Return the file identifier from os.open.  Required for twisted to
@@ -187,7 +187,7 @@ class TwistedTTW(TunTapWindows):
                     and data[13] == IPV4_LOW \
                     and data[14+9] == IPV4_UDP:
                 logger.warning('IPV4 udp: {0}'
-                                    .format(util.decode_ip(data[26:30])))
+                                    , util.decode_ip(data[26:30]))
 
             reactor.callFromThread(self.callback, data)
 
@@ -199,7 +199,7 @@ class TwistedTTW(TunTapWindows):
     def configure_iface(self, **options):
 
         logger.info('configuring interface {1} to: {0}'
-                                        .format(options, self.ifname))
+                                        , options, self.ifname)
     
         if 'addr' in options:
             addr = options['addr']
@@ -223,7 +223,7 @@ class TwistedTTW(TunTapWindows):
             def response(ret):
                 if ret[2] != 0:
                     logger.error('error configuring address {0} on interface'
-                                +' {1}: {2}'.format(addr, self.ifname, ret[0]))
+                                +' {1}: {2}', addr, self.ifname, ret[0])
                     raise Exception()
 
             ret = yield self._netsh(ip, subnet)
