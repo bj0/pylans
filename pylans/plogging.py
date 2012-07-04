@@ -6,6 +6,16 @@ short_format = \
 long_format = \
 '%(asctime)s:[%(levelname)-10s]>%(name)s:<%(funcName)s>::=> \"%(message)s\"'
 
+class BraceMessage(object):
+    '''BraceMessage from logutils'''
+    def __init__(self, fmt, *args, **kwargs):
+        self.fmt = fmt
+        self.args = args
+        self.kwargs = kwargs
+
+    def __str__(self):
+        return self.fmt.format(*self.args, **self.kwargs)
+
 #exaile's (modified) magic
 class FilterLogger(logging.Logger):
     '''A simple logger class that supports filtering'''
@@ -49,10 +59,29 @@ class FilterLogger(logging.Logger):
         logging.addLevelName(5, 'TRACE')
 
     def always(self, *args, **kwargs):
-        self.log(100, *args, **kwargs)
+        self.log(100, BaceMessage(*args, **kwargs))
 
     def trace(self, *args, **kwargs):
-        self.log(5, *args, **kwargs)
+        self.log(5, BaceMessage(*args, **kwargs))
+
+    def warning(self, *args, **kwargs):
+        super(FilterLogger, self).warning(BraceMessage(*args, **kwargs))
+        
+    def warn(self, *args, **kwargs):
+        super(FilterLogger, self).warn(BraceMessage(*args, **kwargs))
+
+    def error(self, *args, **kwargs):
+        super(FilterLogger, self).error(BraceMessage(*args, **kwargs))
+        
+    def debug(self, *args, **kwargs):
+        super(FilterLogger, self).debug(BraceMessage(*args, **kwargs))
+        
+    def fatal(self, *args, **kwargs):
+        super(FilterLogger, self).fatal(BraceMessage(*args, **kwargs))
+        
+    def critical(self, *args, **kwargs):
+        super(FilterLogger, self).critical(BraceMessage(*args, **kwargs))
+        
         
 
 def short():
