@@ -75,12 +75,23 @@ class Pinger(object):
 
 
     def ping_ack(self, peer, ping_time):
+        '''
+        Called when we get an ACK from our ping
+        '''
         dt = time() - ping_time
-        self.router.pm.peer_list[peer.id].ping_time = dt
-        self.router.pm.peer_list[peer.id].timeouts = 0
-
+            
         logger.debug('received ping response from {0} with time {1}'
                     .format(self.router.pm.peer_list[peer.id].name, dt))
+                    
+        self.set_timestamp(peer, dt)
+
+    def set_timestamp(self, peer, dt=None):
+        '''
+        Set peer ping time and timeouts.
+        '''
+        if dt is not None:
+            self.router.pm.peer_list[peer.id].ping_time = dt
+        self.router.pm.peer_list[peer.id].timeouts = 0
 
 
     def do_pings(self):
@@ -90,7 +101,8 @@ class Pinger(object):
                 if( dt > self.interval):
                     self.send_ping(peer)
                 else:
-                    self.ping_ack(peer, self.router.sm.keep_alives.get(peer.id, 0))
+                    logger.debug('activity {0:.3}s ago, skipping ping', dt)
+                    self.set_timestamp(peer)
 
     def _ping_timeout(self, peer):
         if peer.id in self.router.pm.peer_list:
