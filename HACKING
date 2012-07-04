@@ -65,9 +65,21 @@ revno: 103
 restructure: (w/SSL) revno 119
 165 Mbs
 restructure: (w/oSSL) revno 120
-191 Mbs
-revno 120:
-150 Mbs
+205 Mbs
+revno 121: 210 Mbs
+revno 123: 197 Mbs
+revno 124: 208 Mbs
+revno 130: 194 Mbs
+revno 150: 191 Mbs
+revno 175: 185 Mbs
+revno 190: 185 Mbs
+revno 191: 153 Mbs (read size changed from 5120B to 1024*1024B)
+revno 200: 163 Mbs
+revno 220: 158 Mbs
+revno 250: 150 Mbs
+revno 262: 150 Mbs
+revno 263: 177 Mbs (read size back to 5120B)
+revno 266: 197 Mbs (introduce lazy log evals)
 
 
 announces are kinda numerous when a new peer gets added.  there is an announce when a new peer is added as a relay from an announce and then a second announce if we can direct-connect to them.  This could end up causing a lot of unnecessary announces.

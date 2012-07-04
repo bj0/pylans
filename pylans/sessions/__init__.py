@@ -23,6 +23,8 @@ import hashlib, hmac
 from struct import pack, unpack
 import os
 import logging
+import time
+
 from .. import util
 from ..crypto import Crypter, jpake
 from ..peers import PeerInfo
@@ -59,6 +61,7 @@ class SessionManager(object):
         self.session_map = {}
         # sid -> (nonce, relays, address) for handshake
         self.shaking = {}
+        self.keep_alives = {}
 
         self.id = self.router.network.id
 
@@ -82,6 +85,8 @@ class SessionManager(object):
         Send data to address
         '''
         self.proto.send(data, address)
+        if(sid != None)
+            self.keep_alives[sid] = time.time()
 
     def start(self, port):
         '''
@@ -121,6 +126,8 @@ class SessionManager(object):
             # update sid -> address map
             self.update_map(sid, address)
             del self.shaking[sid]
+            
+            self.keep_alives[sid] = time.time()
             
             util.emit_async('session-opened', self, sid, relays)
         else:
