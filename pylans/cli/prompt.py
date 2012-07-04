@@ -38,13 +38,13 @@ class Prompt(Cmd):
         self.iface = iface
 
         # Events
-#        iface.peer_added += lambda net, peer: logger.info('peer {0} added to network {1}'.format(peer.name, net.name))
-#        iface.peer_removed += lambda net, peer: logger.info('peer {0} removed from network {1}'.format(peer.name, net.name))
+        iface.peer_added += lambda net, peer: logger.warning('peer {0} added to network {1}'.format(peer.name, net.name))
+        iface.peer_removed += lambda net, peer: logger.warning('peer {0} removed from network {1}'.format(peer.name, net.name))
 #        iface.network_started += lambda net: logger.info('network {0} started'.format(net))
 #        iface.network_stopped += lambda net: logger.info('network {0} stopped'.format(net))
 #        iface.message_received += lambda net, peer, msg: logger.critical('{0}@{1}: {2}'.format(peer.name, net.name, msg))
 
-        self.previous_et = None
+        #self.previous_et = None
         self.prompt = 'pylans:> '
 
         Cmd.__init__(self)
@@ -131,7 +131,7 @@ class Prompt(Cmd):
             try:
                 lvl = int(line.strip())
                 self.iface.log_level = lvl
-            except:
+            finally:
                 print 'Logging threshold is currently {0}'\
                         .format(logging.getLevelName(self.iface.log_level))
 
@@ -141,6 +141,11 @@ class Prompt(Cmd):
         print 'log ([level])\n set or display current log level\n'
 
     def do_connect(self, line):
+        '''
+        connect <ip> <port> [<network>] 
+        
+        connect to the specified ip:port with the provided or current network
+        '''
         try:
             line = line.split()
             ip, port = line[0:2]
@@ -153,10 +158,18 @@ class Prompt(Cmd):
 
             net = self.iface.get_network(network)
             if net is None:
-                print 'No network specified.'
-            else:
-                print 'Trying to connect to %s @ %d' % (ip, port)
-                reactor.callFromThread(self.iface.connect_to_address, (ip, port), network)
+                print 'No network specified, using first active.'
+                nets = [x for x in self.iface.get_network_list() if x.is_running]
+                
+                if len(nets) < 1:
+                    print 'No active networks found.'
+                    return
+                    
+                net = nets[0]
+
+            print 'Trying to connect to %s @ %d' % (ip, port)
+            reactor.callFromThread(self.iface.connect_to_address, 
+                                                    (ip, port), net)
 
         except ValueError:
             print 'Invalid arguments.'
@@ -223,7 +236,6 @@ class Prompt(Cmd):
                                     net.name, net.virtual_address)
                 print '{0:15}  {1:10}  {2:10}  {3:10}'.format(
                         'vip', 'name', 'ping_time', 'relay')
-#                print 'vip              name          ping_time     relay'
                 for p in sorted(self.iface.get_peer_list(net), key=sort_key):
                     if not p.is_direct:
                         rp = self.iface.get_peer_info(p.relay_id)
