@@ -81,6 +81,7 @@ revno 262: 150 Mbs
 revno 263: 177 Mbs (read size back to 5120B)
 revno 266: 197 Mbs (introduce lazy log evals)
 revno 269: 203 Mbs
+revno 272: 202 Mbs
 
 
 announces are kinda numerous when a new peer gets added.  there is an announce when a new peer is added as a relay from an announce and then a second announce if we can direct-connect to them.  This could end up causing a lot of unnecessary announces.

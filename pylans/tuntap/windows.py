@@ -257,7 +257,7 @@ class TunTapWindows(TunTapBase):
 
             return None
 
-    def read(self, size=1024*1024):
+    def read(self, size=1024*5):
         '''Read data from TAP adapter (blocking)'''
         w32e.ResetEvent(self.overlapped_read.hEvent)
 
