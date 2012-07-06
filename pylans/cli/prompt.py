@@ -246,8 +246,13 @@ class Prompt(Cmd):
                             relay = '??{0}'.format(p.relay_id.encode('hex'))
                     else:
                         relay = '-' 
-                    print ' {0:15}  {1:10}  {2:<10.3f}  {3:10}'.format(
-                            p.vip_str, p.name, p.ping_time*1e3, relay)
+                        
+                    to = ''
+                    if( p.timeouts > 0 ):
+                        to = '({0})'.format(p.timeouts)
+                        
+                    print (' {0:15}  {1:10}  {2:<7.2f} {4:5} {3:10}'
+                        .format(p.vip_str, p.name, p.ping_time*1e3, relay, to))
             else:
                 print '========= Peers (%s) =========' % net.name
                 for p in sorted(self.iface.get_peer_list(net), key=sort_key):
