@@ -254,7 +254,8 @@ class Router(object):
                 raise Exception, ('trying to send encrypted packet ({0})' 
                                 +' w/out session!!').format(type)
         else:
-            logger.debug('sending clear packet ({0})', type)
+            logger.debug('sending clear packet ({0}) to {1} ({2})', 
+                            type, dst, dst_id.encode('hex'))
 
         data = pack('!2H', type, id) + dst_id + self.pm._self.id + data
         self.sm.send(data, dst_id, dst)
@@ -327,10 +328,15 @@ class Router(object):
                         return # don't ack
                         
                 if id > 0: # ACK requested 
-                    logger.trace('sending ack {0}', id)
-                    # ack to unknown sources?  - send greets!
-                    self.send(PacketType.ACK, data[2:4], src, clear=True,
-                                                            faddress=address)
+                    logger.trace('sending ack {0} for {1}', id, pt)
+
+                    # we don't want to send ACKs to pings from unknown connections
+                    # or it will keep one sided connections open, preventing 
+                    # reconnection and spamming unknown ID exceptions
+                    if( pt != PacketType.PING or src in self.sm.session_map ):
+                        # ack to unknown sources?  - send greets!
+                        self.send(PacketType.ACK, data[2:4], src, clear=True,
+                                                                faddress=address)
 
         # nope!
         else:
