@@ -97,18 +97,21 @@ class Pinger(object):
     def do_pings(self):
         if self.running:
             for peer in self.router.pm.peer_list.values():
-                dt = (time() - self.router.sm.keep_alives.get(peer.id, 0))
-                if( dt > self.interval):
-                    self.send_ping(peer)
-                else:
-                    logger.debug('activity {0:.3}s ago, skipping ping', dt)
-                    self.set_timestamp(peer)
+                self.send_ping(peer)
 
     def _ping_timeout(self, peer):
+        '''
+        Ping timed out.
+        '''
         if peer.id in self.router.pm.peer_list:
-            peer.timeouts += 1
-            if peer.timeouts > self.MAX_TIMEOUTS:
-                self.router.pm._timeout(peer)
+            dt = (time() - self.router.sm.keep_alives.get(peer.id, 0))
+            if(dt > self.interval):
+                peer.timeouts += 1
+                if peer.timeouts > self.MAX_TIMEOUTS:
+                    self.router.pm._timeout(peer)
+            else:
+                logger.debug('activity {0:.3}s ago, ignoring timeout', dt)
+                self.set_timestamp(peer)
 
 
     def start(self):
