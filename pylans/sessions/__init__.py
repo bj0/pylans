@@ -23,7 +23,11 @@ import hashlib, hmac
 from struct import pack, unpack
 import os
 import logging
-import time
+
+if system() == 'Windows':   # On Windows, time() has low resolution(~1ms)
+    from time import clock as time
+else:
+    from time import time
 
 from .. import util
 from ..crypto import Crypter, jpake
@@ -85,8 +89,6 @@ class SessionManager(object):
         Send data to address
         '''
         self.proto.send(data, address)
-        if(sid != None):
-            self.keep_alives[sid] = time.time()
 
     def start(self, port):
         '''
@@ -199,6 +201,8 @@ class SessionManager(object):
             logger.warning('unknown session id: {0}', sid.encode('hex'))
             raise UnknownSessionError("unknown session id: {0}"
                                             .format(sid.encode('hex')))
+
+        self.keep_alives[sid] = time.time()
         return self.session_objs[sid].decrypt(data)
 
 

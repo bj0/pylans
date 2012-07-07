@@ -385,7 +385,7 @@ class PeerManager(object):
             if peer.id != self._self.id:
                 peer.relays += 1
                 peer.address = from_peer.address
-                peer.relay_address = from_peer.id
+                #peer.relay_address = from_peer.id
 
                 if peer.id in self.peer_list:
                     self.update_peer(self.peer_list[peer.id],peer)
