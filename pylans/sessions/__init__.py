@@ -130,7 +130,7 @@ class SessionManager(object):
             self.update_map(sid, address)
             del self.shaking[sid]
             
-            self.keep_alives[sid] = time.time()
+            self.keep_alives[sid] = time()
             
             util.emit_async('session-opened', self, sid, relays)
         else:
@@ -203,7 +203,7 @@ class SessionManager(object):
             raise UnknownSessionError("unknown session id: {0}"
                                             .format(sid.encode('hex')))
 
-        self.keep_alives[sid] = time.time()
+        self.keep_alives[sid] = time()
         return self.session_objs[sid].decrypt(data)
 
 
