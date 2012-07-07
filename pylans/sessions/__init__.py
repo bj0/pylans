@@ -23,6 +23,7 @@ import hashlib, hmac
 from struct import pack, unpack
 import os
 import logging
+from platform import system
 
 if system() == 'Windows':   # On Windows, time() has low resolution(~1ms)
     from time import clock as time
