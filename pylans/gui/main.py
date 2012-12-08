@@ -97,9 +97,13 @@ class NetPage(object):
 
         def sort_by_ip(model, iter1, iter2):
             '''sort function for ip column of treeview'''
-            ip1 = int(model.get_value(iter1, 1).split('.')[-1])
-            ip2 = int(model.get_value(iter2, 1).split('.')[-1])
-            return cmp(ip1,ip2)
+            try:
+                ip1 = int((model.get_value(iter1, 1) or '0').split('.')[-1])
+                ip2 = int((model.get_value(iter2, 1) or '0').split('.')[-1])
+                return cmp(ip1,ip2)
+            except:
+                pass
+            return 0
         
         cr = gtk.CellRendererText()
         col = gtk.TreeViewColumn('Name',cr,text=0)
@@ -191,7 +195,8 @@ class MainWin(object):
         self.builder.connect_signals(self)
 #        self._selection = self._peer_treeview.get_selection()
 
-        self._main_window.set_icon_from_file("pylans/gui/pylans-icon.png")
+        self._main_window.set_icon_from_file(
+            resource_path("pylans/gui/pylans-icon.png"))
 #        self._main_window.set_icon_from_file("pylans/gui/connected.png")
         self._main_window.set_title("pylans")
         self._main_window.set_default_size(200,400)
