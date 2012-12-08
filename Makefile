@@ -21,9 +21,10 @@ piof:
 	wine python ${PYINST}/pyinstaller.py *onefile.spec
 
 piod:
-	rm -rf build pidist/pylans
+	rm -rf build pidist/pylans pidist/pylans.7z
 	source /home/bjp/env-pylans.sh ;\
 	wine python ${PYINST}/pyinstaller.py *onedir.spec
+	cd pidist; 7z a pylans.7z pylans
 
 cx:
 	rm -rf build cxdist
