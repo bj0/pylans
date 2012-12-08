@@ -20,6 +20,8 @@ Enviroment Dependencies:
   * ipython (optional) - installer available at website (requires compilation i think)
     * pyreadline - optional requirement of ipython, can be installed with pip
 
+For the GUI (Optional):
+ * pygtk - has installer or installed by pypm
 
 Tried so far:
 -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -65,6 +67,7 @@ bbfreeze:
  * requires modulegraph, altgraph, pefile - all installable by pip
  * works from wine
  * produces directory of files
+ * depends on altgraph (pip install) and pefile (pip install)
 
 wine python bbsetup.py
 ~13M
