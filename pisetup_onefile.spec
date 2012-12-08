@@ -1,6 +1,6 @@
 # -*- mode: python -*-
 a = Analysis([os.path.join(HOMEPATH,'support\\_mountzlib.py'), os.path.join(HOMEPATH,'support\\useUnicode.py'), 'pylans-launcher.py'],
-             pathex=['Z:\\home\\bjp\\code\\python\\twisted\\pylans.master'])
+             pathex=['Z:\\home\\bjp\\pylans'])
 pyz = PYZ(a.pure)
 
 excludes = ['_tkinter',
@@ -28,6 +28,11 @@ a.binaries = include
 #print 'AB',[x[0] for x in a.binaries if 'system' in x[1]]
 #print 'AB',[x for x in a.binaries]
 #exit()
+
+# add data files
+a.datas += [('main.ui', 'pylans\\gui\\main.ui', 'DATA')]
+a.datas += [('menu.png','pylans\\gui\\menu.png','DATA')]
+a.datas += [('pylans-icon.png','pylans\\gui\\pylans-icon.png','DATA')]
 
 exe = EXE( pyz,
           a.scripts,

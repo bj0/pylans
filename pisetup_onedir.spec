@@ -59,6 +59,8 @@ bins = include
 
 # add data files
 datas += [('main.ui','pylans\\gui\\main.ui','DATA')]
+datas += [('menu.png','pylans\\gui\\menu.png','DATA')]
+datas += [('pylans-icon.png','pylans\\gui\\pylans-icon.png','DATA')]
 
 coll = COLLECT( exe1,
                 exe2,
