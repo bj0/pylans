@@ -16,7 +16,8 @@ def root_check():
 
 def elevate():
     import sys
-    if getattr(sys, 'frozen', False):
+    froz = getattr(sys, 'frozen', False)
+    if froz:
         exe = getattr( sys, 'executable', __file__)
     else:
         exe = __file__
@@ -30,18 +31,24 @@ def elevate():
                 
     elif platform.system() == 'Windows':
         import win32api
-        win32api.ShellExecute( 0, # parent window
+        args = [ 0, # parent window
             "runas", # need this to force UAC to act
             "C:\\python27\\pythonw.exe", 
             exe, 
             my_path, # base dir
-            1 ) # window visibility - 1: visible, 0: background
+            1 ] # window visibility - 1: visible, 0: background
+        
+        if froz:
+            args[2] = exe
+            args[3] = None
 	
+        win32api.ShellExecute(*args)
 	
 if __name__ == '__main__':
 	
     if not root_check():
-        exit(elevate())
+        import sys
+        sys.exit(elevate())
 
     import pylans
     import sys
