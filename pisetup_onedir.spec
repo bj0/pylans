@@ -2,7 +2,7 @@
 import sys
 import os
 
-def do_script(name, exename):
+def do_script(name, exename, console=True):
     path = os.path.dirname( os.path.realpath( __file__ ) )
     
     a = Analysis([os.path.join(HOMEPATH,'support\\_mountzlib.py'), os.path.join(HOMEPATH,'support\\useUnicode.py'), name],
@@ -16,7 +16,7 @@ def do_script(name, exename):
               debug=False,
               strip=False,
               upx=True,
-              console=True )
+              console=console )
               
     return exe, a
 
@@ -34,7 +34,7 @@ excludes = ['_tkinter',
             ]
 
 exe1, a1 = do_script('pylans-launcher.py','pylans.exe')
-exe2, a2 = do_script('pylans-launcher.pyw','pylans-gui.exe')
+exe2, a2 = do_script('pylans-launcher.pyw','pylans-gui.exe',False)
 
 bins = a1.binaries + a2.binaries
 zips = a1.zipfiles + a2.zipfiles
