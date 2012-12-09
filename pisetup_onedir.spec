@@ -16,7 +16,7 @@ def do_script(name, exename, console=True):
               debug=False,
               strip=False,
               upx=True,
-              icon='pylans\\gui\\pylans-icon.png',
+              icon='pylans\\gui\\pylans-icon.ico',
               console=console )
               
     return exe, a
