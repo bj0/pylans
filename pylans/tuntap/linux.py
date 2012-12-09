@@ -165,7 +165,7 @@ class TunTapLinux(TunTapBase):
         return self.mtu
 
 
-    def read(self, size=1024*5):
+    def read(self, size=1024*10):
         '''
             New data is coming in on the tun/tap 'wire'.  Called by twisted.
         '''

@@ -57,31 +57,31 @@ class FilterLogger(logging.Logger):
 
     def debug(self, fmt, *args, **kwargs):
         if global_logger.level <= logging.DEBUG:
-            super(FilterLogger, self).debug(fmt.format(*args), **kwargs)
+            logging.Logger.debug(self, fmt.format(*args), **kwargs)
         
     def info(self, fmt, *args, **kwargs):
         if global_logger.level <= logging.INFO:
-            super(FilterLogger, self).info(fmt.format(*args), **kwargs)
+            logging.Logger.info(self, fmt.format(*args), **kwargs)
 
     def warning(self, fmt, *args, **kwargs):
         if global_logger.level <= logging.WARNING:
-            super(FilterLogger, self).warning(fmt.format(*args), **kwargs)
+            logging.Logger.warning(self, fmt.format(*args), **kwargs)
         
     def warn(self, fmt, *args, **kwargs):
         if global_logger.level <= logging.WARNING:
-            super(FilterLogger, self).warn(fmt.format(*args), **kwargs)
+            logging.Logger.warn(self, fmt.format(*args), **kwargs)
 
     def error(self, fmt, *args, **kwargs):
         if global_logger.level <= logging.ERROR:
-            super(FilterLogger, self).error(fmt.format(*args), **kwargs)
+            logging.Logger.error(self, fmt.format(*args), **kwargs)
         
     def fatal(self, fmt, *args, **kwargs):
         if global_logger.level <= logging.FATAL:
-            super(FilterLogger, self).fatal(fmt.format(*args), **kwargs)
+            logging.Logger.fatal(self, fmt.format(*args), **kwargs)
         
     def critical(self, fmt, *args, **kwargs):
         if global_logger.level <= logging.CRITICAL:
-            super(FilterLogger, self).critical(fmt.format(*args), **kwargs)
+            logging.Logger.critical(self, fmt.format(*args), **kwargs)
         
         
 
