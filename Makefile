@@ -1,19 +1,14 @@
-PYINST=/home/bjp/download/pyinstaller
+PYINST=../pyinstaller-2.0
 
 SHELL := /bin/bash
 
 none:
 	@echo build options: 
-	@echo  piconf   - configure pyinstaller \(required once\)
 	@echo  piof     - pyinstaller --onefile 
 	@echo  piod     - pyinstaller --onedir
 	@echo  cx       - cxfreeze
 	@echo  bb       - bbfreeze
 	@echo  piupdate - update pyinstaller from git repo
-
-piconf:
-	source /home/bjp/env-pylans.sh ;\
-	wine python ${PYINST}/Configure.py
 
 piof: 
 	rm -rf build pydist/pylans.exe
