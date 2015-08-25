@@ -49,39 +49,39 @@ class FilterLogger(logging.Logger):
         logging.addLevelName(5, 'TRACE')
 
     def always(self, fmt, *args, **kwargs):
-        self.log(100, fmt.format(*args), **kwargs)
+        self.log(100, str(fmt).format(*args), **kwargs)
 
     def trace(self, fmt, *args, **kwargs):
         if global_logger.level <= 5:
-            self.log(5, fmt.format(*args), **kwargs)
+            self.log(5, str(fmt).format(*args), **kwargs)
 
     def debug(self, fmt, *args, **kwargs):
         if global_logger.level <= logging.DEBUG:
-            logging.Logger.debug(self, fmt.format(*args), **kwargs)
+            logging.Logger.debug(self, str(fmt).format(*args), **kwargs)
         
     def info(self, fmt, *args, **kwargs):
         if global_logger.level <= logging.INFO:
-            logging.Logger.info(self, fmt.format(*args), **kwargs)
+            logging.Logger.info(self, str(fmt).format(*args), **kwargs)
 
     def warning(self, fmt, *args, **kwargs):
         if global_logger.level <= logging.WARNING:
-            logging.Logger.warning(self, fmt.format(*args), **kwargs)
+            logging.Logger.warning(self, str(fmt).format(*args), **kwargs)
         
     def warn(self, fmt, *args, **kwargs):
         if global_logger.level <= logging.WARNING:
-            logging.Logger.warn(self, fmt.format(*args), **kwargs)
+            logging.Logger.warn(self, str(fmt).format(*args), **kwargs)
 
     def error(self, fmt, *args, **kwargs):
         if global_logger.level <= logging.ERROR:
-            logging.Logger.error(self, fmt.format(*args), **kwargs)
+            logging.Logger.error(self, str(fmt).format(*args), **kwargs)
         
     def fatal(self, fmt, *args, **kwargs):
         if global_logger.level <= logging.FATAL:
-            logging.Logger.fatal(self, fmt.format(*args), **kwargs)
+            logging.Logger.fatal(self, str(fmt).format(*args), **kwargs)
         
     def critical(self, fmt, *args, **kwargs):
         if global_logger.level <= logging.CRITICAL:
-            logging.Logger.critical(self, fmt.format(*args), **kwargs)
+            logging.Logger.critical(self, str(fmt).format(*args), **kwargs)
         
         
 
