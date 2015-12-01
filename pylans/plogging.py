@@ -119,8 +119,6 @@ class FilterLogger(logging.Logger):
                 pass
             logging.Logger.critical(self, fmt, **kwargs)
 
-
-
 def short():
     '''switch to short logging format'''
     logging.getLogger().handlers[0].setFormatter(

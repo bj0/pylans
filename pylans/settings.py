@@ -158,7 +158,7 @@ class SettingsManager(RawConfigParser):
             value = self.get(section, key)
             value = self._str_to_val(value)
         except ValueError, s:
-            logger.warning(s)
+            logger.warning("get failed for {}/{}: {}".format(section,key,s))
             value = default
         except NoSectionError:
             value = default
