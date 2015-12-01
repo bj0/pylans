@@ -90,7 +90,7 @@ class TunTapWindows(TunTapBase):
             raise Exception('Could not get TAP adapter handle')
 
         logger.debug('got tap handle: {0}'.format(handle))
-        
+
         self._handle = handle
         self.ifname = devid
         self.__idx = GetAdaptersInfo(ifname=devid)[0]['Index']
@@ -103,10 +103,10 @@ class TunTapWindows(TunTapBase):
         self.mtu = 1500
         self.mode = mode
         # mac, ip, mask, mtu
-        
+
         # close device on exit
         atexit.register(self.close)
-        
+
 
 #    def get_mac(self):
 #        # get mac handle
@@ -115,14 +115,14 @@ class TunTapWindows(TunTapBase):
     def up(self):
         # enable dev
         self._enable_iface()
-        
+
     def down(self):
         # disable dev
         self._disable_iface()
 
     def set_mtu(self, mtu):
         raise Exception('not implimented!')
-        
+
     def get_mtu(self):
         raise Exception('not implimented!')
 
@@ -147,9 +147,9 @@ class TunTapWindows(TunTapBase):
 
         logger.info('configuring interface {1} to: {0}'
                                 .format(options, self.ifname))
-    
+
         # check for spurious args
-        err = [arg for arg in options.keys() 
+        err = [arg for arg in options.keys()
                             if arg not in ['addr','mtu','hwaddr']]
         if len(err) > 0:
             logger.error('configure_iface passed unrecognized arguments: {0}'
@@ -159,8 +159,8 @@ class TunTapWindows(TunTapBase):
             addr = options['addr']
             if '/' not in addr:
                 addr += '/32'
-                
-                
+
+
             ip = addr.split('/')[0]
             _, host, subnet = util.ip_to_net_host_subnet(addr)
             ipb = util.encode_ip(ip)
@@ -169,10 +169,10 @@ class TunTapWindows(TunTapBase):
 
             # for the windows driver, the 'internal' IP address has to be set
             if self.mode == self.TUNMODE:
-                w32f.DeviceIoControl(self._handle, TAP_IOCTL_CONFIG_TUN, 
+                w32f.DeviceIoControl(self._handle, TAP_IOCTL_CONFIG_TUN,
                                             ipb+hostb+subnetb, 12)
                 logger.critical('WE IN TUN MODE!')
-            
+
 
             def response(ret):
                 if ret[2] != 0:
@@ -183,11 +183,11 @@ class TunTapWindows(TunTapBase):
             ret = self._netsh(ip, subnet)
             response(ret)
 
-                
+
         if 'mtu' in options:
             mtu = options['mtu']
-            self.set_mtu(mtu)                
-        
+            self.set_mtu(mtu)
+
         if 'hwaddr' in options:
             raise Exception('not implimented!')
 
@@ -197,7 +197,7 @@ class TunTapWindows(TunTapBase):
                              pack('I',True), calcsize('I'))
 
     def _disable_iface(self):
-        w32f.DeviceIoControl(self._handle, TAP_IOCTL_SET_MEDIA_STATUS, 
+        w32f.DeviceIoControl(self._handle, TAP_IOCTL_SET_MEDIA_STATUS,
                              pack('I',False), calcsize('I'))
 
     def __del__(self):
@@ -261,8 +261,20 @@ class TunTapWindows(TunTapBase):
         '''Read data from TAP adapter (blocking)'''
         w32e.ResetEvent(self.overlapped_read.hEvent)
 
-        (err, data) = w32f.ReadFile(self._handle, size, self.overlapped_read)
-        
+        try:
+            (err, data) = w32f.ReadFile(self._handle, size, self.overlapped_read)
+        except pywintypes.error as e:
+            if e[0] == 995:
+                print('adapter not ready')
+                import time
+                time.sleep(200)
+            else:
+                print('except',type(e),e)
+            return ''
+        except Exception as e:
+            print('execpt',type(e),e)
+            return ''
+
         if err == ERROR_IO_PENDING:
             # wait for completion
             w32e.WaitForSingleObject(self.overlapped_read.hEvent, w32e.INFINITE)
@@ -275,7 +287,7 @@ class TunTapWindows(TunTapBase):
                 logger.warning("ReadFile returned ERROR_MORE_DATA (size={0})"
                                     .format(size))
                 return str(data) + self.read(size*2)
-                
+
             else:
                 raise
 
@@ -289,11 +301,7 @@ class TunTapWindows(TunTapBase):
 
         if err != 0: # must be IO_PENDING
             w32e.WaitForSingleObject(self.overlapped_write.hEvent, w32e.INFINITE)
-            size = w32f.GetOverlappedResult(self._handle, 
+            size = w32f.GetOverlappedResult(self._handle,
                                             self.overlapped_write, False)
 
         return size
-        
-        
-        
-

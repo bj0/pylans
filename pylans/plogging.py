@@ -19,7 +19,7 @@ class FilterLogger(logging.Logger):
                                     record.name,
                                     record.levelname,
                                     record.funcName))) is not None
-                    
+
             # first show only stuff that passes filter
             if settings.FILTER:
                 for s in settings.FILTER:
@@ -27,15 +27,15 @@ class FilterLogger(logging.Logger):
                         break
                 else:
                     return False
-            
+
             # second, ignore stuff that passed filter if it's in ignore
             if settings.IGNORE:
                 for s in settings.IGNORE:
                     if check(s):
                         return False
-            
+
             return True
-            
+
 
     level = logging.NOTSET
 
@@ -49,41 +49,77 @@ class FilterLogger(logging.Logger):
         logging.addLevelName(5, 'TRACE')
 
     def always(self, fmt, *args, **kwargs):
-        self.log(100, fmt.format(*args), **kwargs)
+        try:
+            fmt = fmt.format(*args)
+        except:
+            pass
+        self.log(100, fmt, **kwargs)
 
     def trace(self, fmt, *args, **kwargs):
         if global_logger.level <= 5:
-            self.log(5, fmt.format(*args), **kwargs)
+            try:
+                fmt = fmt.format(*args)
+            except:
+                pass
+            self.log(5, fmt, **kwargs)
 
     def debug(self, fmt, *args, **kwargs):
         if global_logger.level <= logging.DEBUG:
-            logging.Logger.debug(self, fmt.format(*args), **kwargs)
-        
+            try:
+                fmt = fmt.format(*args)
+            except:
+                pass
+            logging.Logger.debug(self, fmt, **kwargs)
+
     def info(self, fmt, *args, **kwargs):
         if global_logger.level <= logging.INFO:
-            logging.Logger.info(self, fmt.format(*args), **kwargs)
+            try:
+                fmt = fmt.format(*args)
+            except:
+                pass
+            logging.Logger.info(self, fmt, **kwargs)
 
     def warning(self, fmt, *args, **kwargs):
         if global_logger.level <= logging.WARNING:
-            logging.Logger.warning(self, fmt.format(*args), **kwargs)
-        
+            try:
+                fmt = fmt.format(*args)
+            except:
+                pass
+            logging.Logger.warning(self, fmt, **kwargs)
+
     def warn(self, fmt, *args, **kwargs):
         if global_logger.level <= logging.WARNING:
-            logging.Logger.warn(self, fmt.format(*args), **kwargs)
+            try:
+                fmt = fmt.format(*args)
+            except:
+                pass
+            logging.Logger.warn(self, fmt, **kwargs)
 
     def error(self, fmt, *args, **kwargs):
         if global_logger.level <= logging.ERROR:
-            logging.Logger.error(self, fmt.format(*args), **kwargs)
-        
+            try:
+                fmt = fmt.format(*args)
+            except:
+                pass
+            logging.Logger.error(self, fmt, **kwargs)
+
     def fatal(self, fmt, *args, **kwargs):
         if global_logger.level <= logging.FATAL:
-            logging.Logger.fatal(self, fmt.format(*args), **kwargs)
-        
+            try:
+                fmt = fmt.format(*args)
+            except:
+                pass
+            logging.Logger.fatal(self, fmt, **kwargs)
+
     def critical(self, fmt, *args, **kwargs):
         if global_logger.level <= logging.CRITICAL:
-            logging.Logger.critical(self, fmt.format(*args), **kwargs)
-        
-        
+            try:
+                fmt = fmt.format(*args)
+            except:
+                pass
+            logging.Logger.critical(self, fmt, **kwargs)
+
+
 
 def short():
     '''switch to short logging format'''
@@ -114,10 +150,10 @@ def _new_exc_handler(exc_type, exc_value, exc_traceback):
     '''log unhandled exceptions'''
     import traceback
     logger = logging.getLogger('unhandled exception')
-    logger.always(''.join(traceback.format_exception(exc_type, exc_value, 
+    logger.always(''.join(traceback.format_exception(exc_type, exc_value,
                                                         exc_traceback)))
-        
+
     _exc_handler(exc_type, exc_value, exc_traceback)
-    
-import sys    
+
+import sys
 _exc_handler, sys.excepthook = sys.excepthook ,_new_exc_handler

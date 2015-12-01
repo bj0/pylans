@@ -9,23 +9,23 @@ from . import util
 logger = logging.getLogger(__name__)
 
 
-class TunTapUnsupported: 
+class TunTapUnsupported:
     def __init__(*x,**y):
         raise OSError, "cannot use this device on this platform"
-        
+
 import platform
 if platform.system() == 'Linux':
     logger.info('Linux detected, using TapTunLinux')
     from .linux import TunTapLinux
-    
+
     class TunTapWindows(TunTapUnsupported): pass
-    
+
 elif platform.system() == 'Windows':
     logger.info('Windows detected, using TapTunWindows')
     from .windows import TunTapWindows
 
     class TunTapLinux(TunTapUnsupported): pass
-        
+
 else:
     raise OSError, "Unsupported platform for tuntap"
 
@@ -41,8 +41,8 @@ class TwistedTTL(TunTapLinux):
     def __init__(self, callback, **kwargs):
         '''
             initialize tun/tap device.
-            
-            callback(data) - function that gets called with data when something is 
+
+            callback(data) - function that gets called with data when something is
             read on the tun/tap wire.
         '''
         self.callback = callback
@@ -69,14 +69,14 @@ class TwistedTTL(TunTapLinux):
         ret = yield self._shell(('/sbin/ip','link','set',self.ifname,'up'))
         if ret != 0:
             raise Exception()
-    
+
     @defer.inlineCallbacks
     def down(self):
         '''bring down interface'''
         ret = yield self._shell(('/sbin/ip','link','set',self.ifname,'down'))
         if ret != 0:
             raise Exception()
-    
+
 
     @defer.inlineCallbacks
     def configure_iface(self, **options):
@@ -90,7 +90,7 @@ class TwistedTTL(TunTapLinux):
                 raise Exception('retval={0}'.format(retval))
 
         # check for spurious args
-        err = [arg for arg in options.keys() 
+        err = [arg for arg in options.keys()
                             if arg not in ['addr','mtu','hwaddr']]
         if len(err) > 0:
             logger.error('configure_iface passed unrecognized arguments: {0}'
@@ -101,22 +101,22 @@ class TwistedTTL(TunTapLinux):
             if '/' not in addr:
                 addr = addr+'/32'
 
-            ret = yield self._shell(    
+            ret = yield self._shell(
                         ('/sbin/ip','addr','add',addr,'dev',self.ifname))
             response(ret)
-                
+
         if 'mtu' in options:
             mtu = options['mtu']
-            self.set_mtu(mtu)                
-        
+            self.set_mtu(mtu)
+
         if 'hwaddr' in options:
             hwaddr = options['hwaddr']
-            
+
             ret = yield self._shell(
                 ('/sbin/ip','link','set','dev',self.ifname,'address',hwaddr))
             response(ret)
-            
-        
+
+
 
     def doRead(self):
         '''
@@ -134,7 +134,7 @@ class TwistedTTL(TunTapLinux):
 #        except:
 #            import traceback
 #            traceback.print_exc()
-#            logger.warning('Got Exception trying to os.write()\nself.f: {0}\ndata: {1} ({2})', 
+#            logger.warning('Got Exception trying to os.write()\nself.f: {0}\ndata: {1} ({2})',
 #                        self.f, data.encode('hex'), len(data))
 
     def fileno(self):
@@ -157,7 +157,7 @@ class TwistedTTL(TunTapLinux):
 class TwistedTTW(TunTapWindows):
     '''
         Class for using the tun/tap device in twisted.
-        
+
         In windows, we can't have the file descriptor, so twisted can't use it
         in select().  Instead, we have to create a thread that polls the device
         and returns data when it's available.
@@ -183,6 +183,8 @@ class TwistedTTW(TunTapWindows):
         IPV4_UDP = 17
         while self._running:
             data = self.read()
+            if not data:
+                continue
             if data[12] == IPV4_HIGH \
                     and data[13] == IPV4_LOW \
                     and data[14+9] == IPV4_UDP:
@@ -200,13 +202,13 @@ class TwistedTTW(TunTapWindows):
 
         logger.info('configuring interface {1} to: {0}'
                                         , options, self.ifname)
-    
+
         if 'addr' in options:
             addr = options['addr']
             if '/' not in addr:
                 addr += '/32'
-                
-                
+
+
             ip = addr.split('/')[0]
             _, host, subnet = util.ip_to_net_host_subnet(addr)
             ipb = util.encode_ip(ip)
@@ -215,10 +217,10 @@ class TwistedTTW(TunTapWindows):
 
             # for the windows driver, the 'internal' IP address has to be set
             if self.mode == self.TUNMODE:
-                w32f.DeviceIoControl(self._handle, TAP_IOCTL_CONFIG_TUN, 
+                w32f.DeviceIoControl(self._handle, TAP_IOCTL_CONFIG_TUN,
                                             ipb+hostb+subnetb, 12)
                 logger.critical('WE IN TUN MODE!')
-            
+
 
             def response(ret):
                 if ret[2] != 0:
@@ -229,14 +231,14 @@ class TwistedTTW(TunTapWindows):
             ret = yield self._netsh(ip, subnet)
             response(ret)
 
-                
+
         if 'mtu' in options:
             mtu = options['mtu']
-            self.set_mtu(mtu)                
-        
+            self.set_mtu(mtu)
+
         if 'hwaddr' in options:
-            raise Exception('not implimented!')            
-        
+            raise Exception('not implimented!')
+
 
     def doWrite(self, data):
         '''
@@ -248,11 +250,10 @@ class TwistedTTW(TunTapWindows):
 
 if platform.system() == 'Linux':
     TwistedTunTap = TwistedTTL
-    
+
 elif platform.system() == 'Windows':
     TwistedTunTap = TwistedTTW
-    
+
 else:
     TwistedTunTap = TunTapUnsupported
     raise OSError, "Unsupported platform for tuntap"
-
