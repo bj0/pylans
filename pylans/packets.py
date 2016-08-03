@@ -1,3 +1,3 @@
 from . import util
 
-PacketType = util.enum('PacketType',int)
+PacketType = util.enum('PacketType', int)

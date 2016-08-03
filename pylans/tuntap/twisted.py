@@ -10,21 +10,27 @@ logger = logging.getLogger(__name__)
 
 
 class TunTapUnsupported:
-    def __init__(*x,**y):
+    def __init__(*x, **y):
         raise OSError, "cannot use this device on this platform"
 
+
 import platform
+
 if platform.system() == 'Linux':
     logger.info('Linux detected, using TapTunLinux')
     from .linux import TunTapLinux
 
-    class TunTapWindows(TunTapUnsupported): pass
+
+    class TunTapWindows(TunTapUnsupported):
+        pass
 
 elif platform.system() == 'Windows':
     logger.info('Windows detected, using TapTunWindows')
     from .windows import TunTapWindows
 
-    class TunTapLinux(TunTapUnsupported): pass
+
+    class TunTapLinux(TunTapUnsupported):
+        pass
 
 else:
     raise OSError, "Unsupported platform for tuntap"
@@ -61,48 +67,48 @@ class TwistedTTL(TunTapLinux):
 
     def _shell(self, cmd):
         '''function for calling something through the shell'''
-        return utils.getProcessValue(cmd[0],cmd[1:])
+        return utils.getProcessValue(cmd[0], cmd[1:])
 
     @defer.inlineCallbacks
     def up(self):
         '''bring up interface'''
-        ret = yield self._shell(('/sbin/ip','link','set',self.ifname,'up'))
+        ret = yield self._shell(('/sbin/ip', 'link', 'set', self.ifname, 'up'))
         if ret != 0:
             raise Exception()
 
     @defer.inlineCallbacks
     def down(self):
         '''bring down interface'''
-        ret = yield self._shell(('/sbin/ip','link','set',self.ifname,'down'))
+        ret = yield self._shell(('/sbin/ip', 'link', 'set', self.ifname, 'down'))
         if ret != 0:
             raise Exception()
-
 
     @defer.inlineCallbacks
     def configure_iface(self, **options):
 
         logger.info('configuring interface {1} to: {0}'
-                                    , options, self.ifname)
+                    , options, self.ifname)
+
         def response(retval):
             if retval != 0:
                 logger.error('error configuring interface {1} to: {0}'
-                                    ,options, self.ifname)
+                             , options, self.ifname)
                 raise Exception('retval={0}'.format(retval))
 
         # check for spurious args
         err = [arg for arg in options.keys()
-                            if arg not in ['addr','mtu','hwaddr']]
+               if arg not in ['addr', 'mtu', 'hwaddr']]
         if len(err) > 0:
             logger.error('configure_iface passed unrecognized arguments: {0}'
-                    , err)
+                         , err)
 
         if 'addr' in options:
             addr = options['addr']
             if '/' not in addr:
-                addr = addr+'/32'
+                addr = addr + '/32'
 
             ret = yield self._shell(
-                        ('/sbin/ip','addr','add',addr,'dev',self.ifname))
+                ('/sbin/ip', 'addr', 'add', addr, 'dev', self.ifname))
             response(ret)
 
         if 'mtu' in options:
@@ -113,10 +119,8 @@ class TwistedTTL(TunTapLinux):
             hwaddr = options['hwaddr']
 
             ret = yield self._shell(
-                ('/sbin/ip','link','set','dev',self.ifname,'address',hwaddr))
+                ('/sbin/ip', 'link', 'set', 'dev', self.ifname, 'address', hwaddr))
             response(ret)
-
-
 
     def doRead(self):
         '''
@@ -129,13 +133,14 @@ class TwistedTTL(TunTapLinux):
         '''
             Write some data out to the tun/tap 'wire'.
         '''
-#        try:
+        #        try:
         self.write(data)
-#        except:
-#            import traceback
-#            traceback.print_exc()
-#            logger.warning('Got Exception trying to os.write()\nself.f: {0}\ndata: {1} ({2})',
-#                        self.f, data.encode('hex'), len(data))
+
+    #        except:
+    #            import traceback
+    #            traceback.print_exc()
+    #            logger.warning('Got Exception trying to os.write()\nself.f: {0}\ndata: {1} ({2})',
+    #                        self.f, data.encode('hex'), len(data))
 
     def fileno(self):
         '''Return the file identifier from os.open.  Required for twisted to
@@ -151,9 +156,6 @@ class TwistedTTL(TunTapLinux):
         self.stop()
 
 
-
-
-
 class TwistedTTW(TunTapWindows):
     '''
         Class for using the tun/tap device in twisted.
@@ -162,6 +164,7 @@ class TwistedTTW(TunTapWindows):
         in select().  Instead, we have to create a thread that polls the device
         and returns data when it's available.
     '''
+
     def __init__(self, callback, **kwargs):
         self.callback = callback
         self._running = False
@@ -187,27 +190,25 @@ class TwistedTTW(TunTapWindows):
                 continue
             if data[12] == IPV4_HIGH \
                     and data[13] == IPV4_LOW \
-                    and data[14+9] == IPV4_UDP:
+                    and data[14 + 9] == IPV4_UDP:
                 logger.warning('IPV4 udp: {0}'
-                                    , util.decode_ip(data[26:30]))
+                               , util.decode_ip(data[26:30]))
 
             reactor.callFromThread(self.callback, data)
 
-
     def _shell(self, cmd):
-        return utils.getProcessOutputAndValue(cmd[0],cmd[1:])
+        return utils.getProcessOutputAndValue(cmd[0], cmd[1:])
 
     @defer.inlineCallbacks
     def configure_iface(self, **options):
 
         logger.info('configuring interface {1} to: {0}'
-                                        , options, self.ifname)
+                    , options, self.ifname)
 
         if 'addr' in options:
             addr = options['addr']
             if '/' not in addr:
                 addr += '/32'
-
 
             ip = addr.split('/')[0]
             _, host, subnet = util.ip_to_net_host_subnet(addr)
@@ -218,19 +219,17 @@ class TwistedTTW(TunTapWindows):
             # for the windows driver, the 'internal' IP address has to be set
             if self.mode == self.TUNMODE:
                 w32f.DeviceIoControl(self._handle, TAP_IOCTL_CONFIG_TUN,
-                                            ipb+hostb+subnetb, 12)
+                                     ipb + hostb + subnetb, 12)
                 logger.critical('WE IN TUN MODE!')
-
 
             def response(ret):
                 if ret[2] != 0:
                     logger.error('error configuring address {0} on interface'
-                                +' {1}: {2}', addr, self.ifname, ret[0])
+                                 + ' {1}: {2}', addr, self.ifname, ret[0])
                     raise Exception()
 
             ret = yield self._netsh(ip, subnet)
             response(ret)
-
 
         if 'mtu' in options:
             mtu = options['mtu']
@@ -239,13 +238,11 @@ class TwistedTTW(TunTapWindows):
         if 'hwaddr' in options:
             raise Exception('not implimented!')
 
-
     def doWrite(self, data):
         '''
             Write some data out to the tun/tap 'wire'.
         '''
         deferToThread(self.write, data)
-
 
 
 if platform.system() == 'Linux':
