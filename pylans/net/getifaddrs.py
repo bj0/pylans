@@ -5,6 +5,7 @@ from ctypes import (
     pointer, get_errno, cast,
     c_ushort, c_char, c_byte, c_void_p, c_char_p, c_uint, c_int, c_uint16, c_uint32
 )
+from socket import inet_ntop, AF_INET, AF_INET6, ntohs, ntohl
 import collections
 import ctypes.util
 import ctypes
@@ -15,14 +16,17 @@ IFF_BROADCAST = 0x2
 
 sa_family_t = c_ushort
 
+
 # TODO these C structs should mention the header they're defined in
 
 class struct_sockaddr(Structure):
     _fields_ = [
         ('sa_family', c_ushort),
-        ('sa_data', c_byte * 14),]
+        ('sa_data', c_byte * 14), ]
+
 
 struct_in_addr = c_byte * 4
+
 
 class struct_sockaddr_in(Structure):
     _fields_ = [
@@ -30,7 +34,9 @@ class struct_sockaddr_in(Structure):
         ('sin_port', c_uint16),
         ('sin_addr', struct_in_addr)]
 
+
 struct_in6_addr = c_byte * 16
+
 
 class struct_sockaddr_in6(Structure):
     _fields_ = [
@@ -40,13 +46,17 @@ class struct_sockaddr_in6(Structure):
         ('sin6_addr', struct_in6_addr),
         ('sin6_scope_id', c_uint32)]
 
+
 class union_ifa_ifu(Union):
     _fields_ = [
         ('ifu_broadaddr', POINTER(struct_sockaddr)),
-        ('ifu_dstaddr', POINTER(struct_sockaddr)),]
+        ('ifu_dstaddr', POINTER(struct_sockaddr)), ]
+
 
 class struct_ifaddrs(Structure):
     pass
+
+
 struct_ifaddrs._fields_ = [
     ('ifa_next', POINTER(struct_ifaddrs)),
     ('ifa_name', c_char_p),
@@ -54,27 +64,10 @@ struct_ifaddrs._fields_ = [
     ('ifa_addr', POINTER(struct_sockaddr)),
     ('ifa_netmask', POINTER(struct_sockaddr)),
     ('ifa_ifu', union_ifa_ifu),
-    ('ifa_data', c_void_p),]
+    ('ifa_data', c_void_p), ]
 
-#class py_ifaddrs:
+py_ifaddrs = collections.namedtuple('py_ifaddrs', 'name flags family addr netmask broadcast')
 
-#    __slots__ = 'name', 'flags', 'family', 'addr', 'netmask', 'broadcast'
-
-#    def __init__(self, **kwds):
-#        for key, value in kwds.items():
-#            setattr(self, key, value)
-
-#    def __repr__(self):
-#        s = self.__class__.__name__ + '('
-##        kwargs = {slot: getattr(self, slot) for slot in self.__slots__} # this is 2.7+ only
-#        kwargs = dict((slot,getattr(self, slot)) for slot in self.__slots__)
-#        kwargs['flags'] = hex(kwargs['flags'])
-##        s += ', '.join('{}={}'.format(k, v) for k, v in kwargs.items()) # 2.6 doesn't like empty format specifiers
-#        s += ', '.join('{0}={1}'.format(k, v) for k, v in kwargs.items())
-#        return s + ')'
-#from collections import namedtuple
-py_ifaddrs = collections.namedtuple('py_ifaddrs', 
-                            'name flags family addr netmask broadcast')
 
 class struct_in_pktinfo(Structure):
     _fields_ = [
@@ -91,6 +84,7 @@ _freeifaddrs = libc.freeifaddrs
 _freeifaddrs.restype = None
 _freeifaddrs.argtypes = [POINTER(struct_ifaddrs)]
 
+
 def ifap_iter(ifap):
     '''Iterate over linked list of ifaddrs'''
     ifa = ifap.contents
@@ -100,17 +94,22 @@ def ifap_iter(ifap):
             break
         ifa = ifa.ifa_next.contents
 
-class uniquedict(dict):
 
-    def __setitem__(self, key, value):
-        if key in self:
-            raise KeyError('Key {!r} already set'.format(key))
-        else:
-            super().__setitem__(key, value)
+def getfamaddr(sa):
+    ''' get family address'''
+    family = sa.sa_family
+    addr = None
+    if family == AF_INET:
+        sa = cast(pointer(sa), POINTER(struct_sockaddr_in)).contents
+        addr = inet_ntop(family, sa.sin_addr)
+    elif family == AF_INET6:
+        sa = cast(pointer(sa), POINTER(struct_sockaddr_in6)).contents
+        addr = inet_ntop(family, sa.sin6_addr)
+    return family, addr
+
 
 def pythonize_sockaddr(sa):
     '''Convert ctypes Structure of sockaddr into the Python tuple used in the socket module'''
-    from socket import AF_INET, AF_INET6, ntohs, ntohl, inet_ntop
     family = sa.sa_family
     if family == AF_INET:
         sa = cast(pointer(sa), POINTER(struct_sockaddr_in)).contents
@@ -127,6 +126,7 @@ def pythonize_sockaddr(sa):
     else:
         addr = None
     return family, addr
+
 
 def getifaddrs():
     '''Wraps the C getifaddrs call, returns a list of pythonic ifaddrs'''
@@ -145,9 +145,9 @@ def getifaddrs():
             maddr = None
             baddr = None
             family, addr = None, None
-            if bool(ifa.ifa_addr): # non-null pointer
+            if bool(ifa.ifa_addr):  # non-null pointer
                 family, addr = pythonize_sockaddr(ifa.ifa_addr.contents)
-            if bool(ifa.ifa_netmask): # non-null pointer
+            if bool(ifa.ifa_netmask):  # non-null pointer
                 mfam, maddr = pythonize_sockaddr(ifa.ifa_netmask.contents)
             if ifa.ifa_flags & IFF_BROADCAST != 0 and bool(ifa.ifa_ifu.ifu_broadaddr):
                 bfam, baddr = pythonize_sockaddr(ifa.ifa_ifu.ifu_broadaddr.contents)
@@ -163,6 +163,8 @@ def getifaddrs():
     finally:
         _freeifaddrs(ifap)
 
+
 if __name__ == '__main__':
     from pprint import pprint
+
     pprint(getifaddrs())

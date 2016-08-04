@@ -21,6 +21,8 @@ from __future__ import absolute_import
 from struct import pack, calcsize
 import atexit
 import platform
+import time
+
 from winerror import ERROR_IO_PENDING, ERROR_MORE_DATA
 import _winreg as reg
 import logging
@@ -29,7 +31,8 @@ import win32event as w32e
 import win32file as w32f
 import winerror
 from . import util
-from ..net.getadaptersinfo import GetAdaptersInfo
+#from ..net.getadaptersinfo import GetAdaptersInfo
+from ..net.getadaptersaddresses import GetAdaptersAddresses
 from . import TunTapBase
 
 logger = logging.getLogger(__name__)
@@ -38,23 +41,25 @@ FILE_DEVICE_UNKNOWN = 0x22
 METHOD_BUFFERED = 0x0
 FILE_ANY_ACCESS = 0x0
 
+
 def CTL_CODE(DeviceType, Function, Method, Access):
     return (DeviceType << 16) | (Access << 14) | (Function << 2) | Method
+
 
 def TAP_CONTROL_CODE(function, method):
     return CTL_CODE(FILE_DEVICE_UNKNOWN, function, method, FILE_ANY_ACCESS)
 
-TAP_IOCTL_GET_MAC               = TAP_CONTROL_CODE (1, METHOD_BUFFERED)
-TAP_IOCTL_GET_VERSION           = TAP_CONTROL_CODE (2, METHOD_BUFFERED)
-TAP_IOCTL_GET_MTU               = TAP_CONTROL_CODE (3, METHOD_BUFFERED)
-TAP_IOCTL_GET_INFO              = TAP_CONTROL_CODE (4, METHOD_BUFFERED)
-TAP_IOCTL_CONFIG_POINT_TO_POINT = TAP_CONTROL_CODE (5, METHOD_BUFFERED)
-TAP_IOCTL_SET_MEDIA_STATUS      = TAP_CONTROL_CODE (6, METHOD_BUFFERED)
-TAP_IOCTL_CONFIG_DHCP_MASQ      = TAP_CONTROL_CODE (7, METHOD_BUFFERED)
-TAP_IOCTL_GET_LOG_LINE          = TAP_CONTROL_CODE (8, METHOD_BUFFERED)
-TAP_IOCTL_CONFIG_DHCP_SET_OPT   = TAP_CONTROL_CODE (9, METHOD_BUFFERED)
-TAP_IOCTL_CONFIG_TUN            = TAP_CONTROL_CODE (10, METHOD_BUFFERED)
 
+TAP_IOCTL_GET_MAC = TAP_CONTROL_CODE(1, METHOD_BUFFERED)
+TAP_IOCTL_GET_VERSION = TAP_CONTROL_CODE(2, METHOD_BUFFERED)
+TAP_IOCTL_GET_MTU = TAP_CONTROL_CODE(3, METHOD_BUFFERED)
+TAP_IOCTL_GET_INFO = TAP_CONTROL_CODE(4, METHOD_BUFFERED)
+TAP_IOCTL_CONFIG_POINT_TO_POINT = TAP_CONTROL_CODE(5, METHOD_BUFFERED)
+TAP_IOCTL_SET_MEDIA_STATUS = TAP_CONTROL_CODE(6, METHOD_BUFFERED)
+TAP_IOCTL_CONFIG_DHCP_MASQ = TAP_CONTROL_CODE(7, METHOD_BUFFERED)
+TAP_IOCTL_GET_LOG_LINE = TAP_CONTROL_CODE(8, METHOD_BUFFERED)
+TAP_IOCTL_CONFIG_DHCP_SET_OPT = TAP_CONTROL_CODE(9, METHOD_BUFFERED)
+TAP_IOCTL_CONFIG_TUN = TAP_CONTROL_CODE(10, METHOD_BUFFERED)
 
 USERMODEDEVICEDIR = "\\\\.\\Global\\"
 TAPSUFFX = ".tap"
@@ -69,6 +74,7 @@ except ImportError:
     from .util.which import which
 
 cmd = which('netsh')[0]
+
 
 class TunTapWindows(TunTapBase):
     TUNMODE = 0
@@ -93,12 +99,18 @@ class TunTapWindows(TunTapBase):
 
         self._handle = handle
         self.ifname = devid
-        self.__idx = GetAdaptersInfo(ifname=devid)[0]['Index']
+        for i in GetAdaptersAddresses():
+            if( i.adapter_name == devid ):
+                self.__idx = i.interface_index
+                break
+        else:
+            raise RuntimeError('could not find adapter {}'.format(devid))
+
         self.overlapped_read = pywintypes.OVERLAPPED()
         self.overlapped_write = pywintypes.OVERLAPPED()
 
-        self.overlapped_read.hEvent = w32e.CreateEvent(None,True,False,None)
-        self.overlapped_write.hEvent = w32e.CreateEvent(None,True,False,None)
+        self.overlapped_read.hEvent = w32e.CreateEvent(None, False, False, None)
+        self.overlapped_write.hEvent = w32e.CreateEvent(None, False, False, None)
 
         self.mtu = 1500
         self.mode = mode
@@ -107,10 +119,9 @@ class TunTapWindows(TunTapBase):
         # close device on exit
         atexit.register(self.close)
 
-
-#    def get_mac(self):
-#        # get mac handle
-#        return w32f.DeviceIoControl(handle, TAP_IOCTL_GET_MAC, None, 6)
+    #    def get_mac(self):
+    #        # get mac handle
+    #        return w32f.DeviceIoControl(handle, TAP_IOCTL_GET_MAC, None, 6)
 
     def up(self):
         # enable dev
@@ -130,36 +141,35 @@ class TunTapWindows(TunTapBase):
         return sp.call(cmd)
 
     def _netsh(self, address, netmask):
-        '''Invoke M$' netsh command to set ip address and netmask'''
+        """Invoke M$' netsh command to set ip address and netmask"""
         ver = platform.win32_ver()[0]
         if ver == 'XP':
             return self._shell((cmd,
-                'interface','ip','set','address',
-                self.ifname,'static',address,netmask))
+                                'interface', 'ip', 'set', 'address',
+                                self.ifname, 'static', address, netmask))
         elif ver == '7' or ver == 'post2008Server':
             return self._shell((cmd,
-                'interface','ipv4','set','address',
-                str(self.__idx),'static',address,netmask))
+                                'interface', 'ipv4', 'set', 'address',
+                                str(self.__idx), 'static', address, netmask))
         else:
             raise OSError, 'Unsupported version of Windows: {0}.'.format(ver)
 
     def configure_iface(self, **options):
 
         logger.info('configuring interface {1} to: {0}'
-                                .format(options, self.ifname))
+                    .format(options, self.ifname))
 
         # check for spurious args
         err = [arg for arg in options.keys()
-                            if arg not in ['addr','mtu','hwaddr']]
+               if arg not in ['addr', 'mtu', 'hwaddr']]
         if len(err) > 0:
             logger.error('configure_iface passed unrecognized arguments: {0}'
-                    .format(err))
+                         .format(err))
 
         if 'addr' in options:
             addr = options['addr']
             if '/' not in addr:
                 addr += '/32'
-
 
             ip = addr.split('/')[0]
             _, host, subnet = util.ip_to_net_host_subnet(addr)
@@ -170,19 +180,17 @@ class TunTapWindows(TunTapBase):
             # for the windows driver, the 'internal' IP address has to be set
             if self.mode == self.TUNMODE:
                 w32f.DeviceIoControl(self._handle, TAP_IOCTL_CONFIG_TUN,
-                                            ipb+hostb+subnetb, 12)
+                                     ipb + hostb + subnetb, 12)
                 logger.critical('WE IN TUN MODE!')
-
 
             def response(ret):
                 if ret[2] != 0:
                     logger.error('error configuring address {0} on interface'
-                                +' {1}: {2}'.format(addr, self.ifname, ret[0]))
+                                 + ' {1}: {2}'.format(addr, self.ifname, ret[0]))
                     raise Exception()
 
             ret = self._netsh(ip, subnet)
             response(ret)
-
 
         if 'mtu' in options:
             mtu = options['mtu']
@@ -191,14 +199,13 @@ class TunTapWindows(TunTapBase):
         if 'hwaddr' in options:
             raise Exception('not implimented!')
 
-
     def _enable_iface(self):
         w32f.DeviceIoControl(self._handle, TAP_IOCTL_SET_MEDIA_STATUS,
-                             pack('I',True), calcsize('I'))
+                             pack('I', True), calcsize('I'))
 
     def _disable_iface(self):
         w32f.DeviceIoControl(self._handle, TAP_IOCTL_SET_MEDIA_STATUS,
-                             pack('I',False), calcsize('I'))
+                             pack('I', False), calcsize('I'))
 
     def __del__(self):
         self.close()
@@ -209,20 +216,21 @@ class TunTapWindows(TunTapBase):
             self._handle = None
 
     def _get_tap_handle(self):
-        '''Get a file handle to an available TAP adapter'''
+        """Get a file handle to an available TAP adapter"""
+
         def findTaps():
-            '''get a list of TAP adapters'''
+            """get a list of TAP adapters"""
             h = reg.OpenKey(HKLM, class_key)
             devs = []
-            for i in range(0,30):
+            for i in range(0, 30):
                 try:
                     k = reg.EnumKey(h, i)
-                    h2 = reg.OpenKey(HKLM, '%s\\%s'%(class_key, k))
+                    h2 = reg.OpenKey(HKLM, '%s\\%s' % (class_key, k))
                     cid = reg.QueryValueEx(h2, 'ComponentId')[0]
                     if cid.startswith('tap'):
                         devid = reg.QueryValueEx(h2, 'NetCfgInstanceId')[0]
                         devs.append(devid)
-                except WindowsError, s: # no more keys to enum
+                except WindowsError, s:  # no more keys to enum
                     if s.errno == 259:
                         break
                     continue
@@ -242,24 +250,23 @@ class TunTapWindows(TunTapBase):
             tapname = '%s%s%s' % (USERMODEDEVICEDIR, devid, TAPSUFFX)
             try:
                 f = w32f.CreateFile(tapname,
-                        w32f.GENERIC_READ | w32f.GENERIC_WRITE,
-                        0,
-                        None,
-                        w32f.OPEN_EXISTING,
-                        w32f.FILE_ATTRIBUTE_SYSTEM | w32f.FILE_FLAG_OVERLAPPED,
-                        0)
+                                    w32f.GENERIC_READ | w32f.GENERIC_WRITE,
+                                    0,
+                                    None,
+                                    w32f.OPEN_EXISTING,
+                                    w32f.FILE_ATTRIBUTE_SYSTEM | w32f.FILE_FLAG_OVERLAPPED,
+                                    0)
             except Exception, s:
                 print repr(s)
                 continue
             else:
                 logger.debug('found tap device {0}'.format(tapname))
-                return (f, devid)
+                return f, devid
 
             return None
 
-    def read(self, size=1024*2):
-        '''Read data from TAP adapter (blocking)'''
-        w32e.ResetEvent(self.overlapped_read.hEvent)
+    def read(self, size=1024 * 2):
+        """Read data from TAP adapter (blocking)"""
 
         try:
             (err, data) = w32f.ReadFile(self._handle, size, self.overlapped_read)
@@ -267,12 +274,12 @@ class TunTapWindows(TunTapBase):
             if e[0] == 995:
                 print('adapter not ready')
                 import time
-                time.sleep(200)
+                time.sleep(200)  # prevent a flood of attempts
             else:
-                print('except',type(e),e)
+                print('except', type(e), e)
             return ''
         except Exception as e:
-            print('execpt',type(e),e)
+            print('except', type(e), e)
             return ''
 
         if err == ERROR_IO_PENDING:
@@ -282,11 +289,12 @@ class TunTapWindows(TunTapBase):
         try:
             # need to get size
             size = w32f.GetOverlappedResult(self._handle, self.overlapped_read, False)
+            self.overlapped_read.Offset += size
         except w32f.error, e:
-            if e[0] == 234: # ERROR_MORE_DATA
+            if e[0] == 234:  # ERROR_MORE_DATA
                 logger.warning("ReadFile returned ERROR_MORE_DATA (size={0})"
-                                    .format(size))
-                return str(data) + self.read(size*2)
+                               .format(size))
+                return str(data) + self.read(size * 2)
 
             else:
                 raise
@@ -294,14 +302,10 @@ class TunTapWindows(TunTapBase):
         return str(data[:size])
 
     def write(self, data):
-        '''Write data to TAP adapter (blocking)'''
-        w32e.ResetEvent(self.overlapped_write.hEvent)
+        """Write data to TAP adapter (blocking)"""
 
-        (err, size) = w32f.WriteFile(self._handle, data, self.overlapped_write)
+        w32f.WriteFile(self._handle, data, self.overlapped_write)
+        w32e.WaitForSingleObject(self.overlapped_write.hEvent, w32e.INFINITE)
+        self.overlapped_write.Offset += len(data)
 
-        if err != 0: # must be IO_PENDING
-            w32e.WaitForSingleObject(self.overlapped_write.hEvent, w32e.INFINITE)
-            size = w32f.GetOverlappedResult(self._handle,
-                                            self.overlapped_write, False)
-
-        return size
+        return len(data)
